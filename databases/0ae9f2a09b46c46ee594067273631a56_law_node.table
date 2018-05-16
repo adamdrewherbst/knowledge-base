@@ -1,0 +1,91 @@
+(dp1
+S'concept'
+p2
+(dp3
+S'length'
+p4
+I512
+sS'unique'
+p5
+I00
+sS'sortable'
+p6
+I3
+sS'sql'
+p7
+S'INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE'
+p8
+sS'notnull'
+p9
+I00
+sS'type'
+p10
+S'reference concept'
+p11
+ssS'head'
+p12
+(dp13
+g4
+I512
+sg5
+I00
+sg6
+I4
+sg7
+S'INT  , INDEX head__idx (head), FOREIGN KEY (head) REFERENCES law_node (id) ON DELETE CASCADE'
+p14
+sg9
+I00
+sg10
+S'reference law_node'
+p15
+ssS'law'
+p16
+(dp17
+g4
+I512
+sg5
+I00
+sg6
+I2
+sg7
+S'INT  , INDEX law__idx (law), FOREIGN KEY (law) REFERENCES law (id) ON DELETE CASCADE'
+p18
+sg9
+I00
+sg10
+S'reference law'
+p19
+ssS'id'
+p20
+(dp21
+g4
+I512
+sg5
+I00
+sg6
+I1
+sg7
+S'INT AUTO_INCREMENT NOT NULL'
+p22
+sg9
+I00
+sg10
+g20
+ssS'reference'
+p23
+(dp24
+g4
+I512
+sg5
+I00
+sg6
+I5
+sg7
+S'INT  , INDEX reference__idx (reference), FOREIGN KEY (reference) REFERENCES law_node (id) ON DELETE CASCADE'
+p25
+sg9
+I00
+sg10
+g15
+ss.

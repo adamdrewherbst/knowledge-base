@@ -1,0 +1,238 @@
+timestamp: 2018-04-30T16:48:34.865829
+CREATE TABLE auth_user(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name CHAR(128),
+    last_name CHAR(128),
+    email CHAR(512),
+    password CHAR(512),
+    registration_key CHAR(512),
+    reset_password_key CHAR(512),
+    registration_id CHAR(512)
+);
+success!
+timestamp: 2018-04-30T16:48:34.909319
+CREATE TABLE auth_group(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role CHAR(512),
+    description TEXT
+);
+success!
+timestamp: 2018-04-30T16:48:34.948257
+CREATE TABLE auth_membership(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE  ,
+    group_id INTEGER REFERENCES auth_group (id) ON DELETE CASCADE  
+);
+success!
+timestamp: 2018-04-30T16:48:34.992954
+CREATE TABLE auth_permission(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER REFERENCES auth_group (id) ON DELETE CASCADE  ,
+    name CHAR(512),
+    table_name CHAR(512),
+    record_id INTEGER
+);
+success!
+timestamp: 2018-04-30T16:48:35.033169
+CREATE TABLE auth_event(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    time_stamp TIMESTAMP,
+    client_ip CHAR(512),
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE  ,
+    origin CHAR(512),
+    description TEXT
+);
+success!
+timestamp: 2018-04-30T16:48:35.077799
+CREATE TABLE auth_cas(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE  ,
+    created_on TIMESTAMP,
+    service CHAR(512),
+    ticket CHAR(512),
+    renew CHAR(1)
+);
+success!
+timestamp: 2018-04-30T22:15:59.314928
+CREATE TABLE concept(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name CHAR(512),
+    symbol CHAR(512)
+);
+success!
+timestamp: 2018-04-30T22:20:56.805917
+CREATE TABLE node(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    concept INTEGER REFERENCES concept (id) ON DELETE CASCADE  ,
+    head INTEGER REFERENCES node (id) ON DELETE CASCADE  ,
+    reference INTEGER REFERENCES node (id) ON DELETE CASCADE  
+);
+success!
+timestamp: 2018-04-30T22:21:57.287011
+CREATE TABLE law(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name CHAR(512),
+    description CHAR(512)
+);
+success!
+timestamp: 2018-04-30T22:21:57.321265
+CREATE TABLE law_node(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    law INTEGER REFERENCES law (id) ON DELETE CASCADE  ,
+    concept INTEGER REFERENCES concept (id) ON DELETE CASCADE  ,
+    head INTEGER REFERENCES law_node (id) ON DELETE CASCADE  ,
+    reference INTEGER REFERENCES law_node (id) ON DELETE CASCADE  
+);
+success!
+timestamp: 2018-05-02T21:37:10.940411
+CREATE TABLE auth_user(
+    id INT AUTO_INCREMENT NOT NULL,
+    first_name VARCHAR(128),
+    last_name VARCHAR(128),
+    email VARCHAR(512),
+    password VARCHAR(512),
+    registration_key VARCHAR(512),
+    reset_password_key VARCHAR(512),
+    registration_id VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:10.994727
+CREATE TABLE auth_group(
+    id INT AUTO_INCREMENT NOT NULL,
+    role VARCHAR(512),
+    description LONGTEXT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.033173
+CREATE TABLE auth_membership(
+    id INT AUTO_INCREMENT NOT NULL,
+    user_id INT  , INDEX user_id__idx (user_id), FOREIGN KEY (user_id) REFERENCES auth_user (id) ON DELETE CASCADE,
+    group_id INT  , INDEX group_id__idx (group_id), FOREIGN KEY (group_id) REFERENCES auth_group (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.079295
+CREATE TABLE auth_permission(
+    id INT AUTO_INCREMENT NOT NULL,
+    group_id INT  , INDEX group_id__idx (group_id), FOREIGN KEY (group_id) REFERENCES auth_group (id) ON DELETE CASCADE,
+    name VARCHAR(512),
+    table_name VARCHAR(512),
+    record_id INT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.130953
+CREATE TABLE auth_event(
+    id INT AUTO_INCREMENT NOT NULL,
+    time_stamp DATETIME,
+    client_ip VARCHAR(512),
+    user_id INT  , INDEX user_id__idx (user_id), FOREIGN KEY (user_id) REFERENCES auth_user (id) ON DELETE CASCADE,
+    origin VARCHAR(512),
+    description LONGTEXT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.258543
+CREATE TABLE auth_cas(
+    id INT AUTO_INCREMENT NOT NULL,
+    user_id INT  , INDEX user_id__idx (user_id), FOREIGN KEY (user_id) REFERENCES auth_user (id) ON DELETE CASCADE,
+    created_on DATETIME,
+    service VARCHAR(512),
+    ticket VARCHAR(512),
+    renew CHAR(1),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.364526
+CREATE TABLE concept(
+    id INT AUTO_INCREMENT NOT NULL,
+    name VARCHAR(512),
+    symbol VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.403497
+CREATE TABLE node(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    head INT  , INDEX head__idx (head), FOREIGN KEY (head) REFERENCES node (id) ON DELETE CASCADE,
+    reference INT  , INDEX reference__idx (reference), FOREIGN KEY (reference) REFERENCES node (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.463149
+CREATE TABLE law(
+    id INT AUTO_INCREMENT NOT NULL,
+    name VARCHAR(512),
+    description VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-02T21:37:11.551257
+CREATE TABLE law_node(
+    id INT AUTO_INCREMENT NOT NULL,
+    law INT  , INDEX law__idx (law), FOREIGN KEY (law) REFERENCES law (id) ON DELETE CASCADE,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    head INT  , INDEX head__idx (head), FOREIGN KEY (head) REFERENCES law_node (id) ON DELETE CASCADE,
+    reference INT  , INDEX reference__idx (reference), FOREIGN KEY (reference) REFERENCES law_node (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-03T21:46:13.379084
+CREATE TABLE framework(
+    id INT AUTO_INCREMENT NOT NULL,
+    name VARCHAR(512),
+    description VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-03T21:46:13.469451
+ALTER TABLE concept ADD framework INT  , ADD INDEX framework__idx (framework), ADD FOREIGN KEY (framework) REFERENCES framework (id) ON DELETE CASCADE;
+success!
+timestamp: 2018-05-03T21:46:13.723520
+ALTER TABLE concept ADD description VARCHAR(512);
+success!
+success!
+timestamp: 2018-05-03T21:46:13.857139
+ALTER TABLE law ADD framework INT  , ADD INDEX framework__idx (framework), ADD FOREIGN KEY (framework) REFERENCES framework (id) ON DELETE CASCADE;
+success!
+success!
+timestamp: 2018-05-03T21:46:14.036199
+ALTER TABLE node ADD law INT  , ADD INDEX law__idx (law), ADD FOREIGN KEY (law) REFERENCES law (id) ON DELETE CASCADE;
+success!
+timestamp: 2018-05-07T16:22:50.022445
+CREATE TABLE framework_dependencies(
+    id INT AUTO_INCREMENT NOT NULL,
+    framework INT  , INDEX framework__idx (framework), FOREIGN KEY (framework) REFERENCES framework (id) ON DELETE CASCADE,
+    dependency INT  , INDEX dependency__idx (dependency), FOREIGN KEY (dependency) REFERENCES framework (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-07T16:27:57.045710
+CREATE TABLE framework_dependency(
+    id INT AUTO_INCREMENT NOT NULL,
+    framework INT  , INDEX framework__idx (framework), FOREIGN KEY (framework) REFERENCES framework (id) ON DELETE CASCADE,
+    dependency INT  , INDEX dependency__idx (dependency), FOREIGN KEY (dependency) REFERENCES framework (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-05-07T16:52:46.826116
+ALTER TABLE node ADD predicate CHAR(1);
+success!
+success!
+timestamp: 2018-05-15T19:27:59.083338
+ALTER TABLE node ADD predicate__tmp INT;
+success!
+UPDATE node SET predicate__tmp=predicate;
+success!
+ALTER TABLE node DROP COLUMN predicate;
+success!
+ALTER TABLE node ADD predicate INT;
+success!
+UPDATE node SET predicate=predicate__tmp;
+success!
+ALTER TABLE node DROP COLUMN predicate__tmp;
+success!
+success!
