@@ -249,10 +249,83 @@
             });
         }
 
+        /* EVALUATION */
+        var NEXT_NODE_ID = 0, NEW_NODES = [];
+
         function evaluateRelation() {
+            var relationNodes = getIndex('relation_node'), nodes = getIndex('node'), predicates = getIndex('predicate');
             myDiagram.nodes.each(function(node) {
-               //see if this node can be the wildcard of any predicate
+               //find any deep predicate nodes in included frameworks
+               //that have the same concept as this node
+               var key = node.data['key'];
+               if(!relationNodes.hasOwnProperty(key)) return;
+               var nodeId = relationNodes[key], relationNode = nodes[id], concept = relationNode['concept'];
+               if(!predicates.hasOwnProperty(concept)) return;
+               predicates[concept].each(function(predicateId) {
+                   var idMap = {};
+                   if(checkPredicate(nodeId, predicateId, idMap)) {
+                       appendLaw(nodeId, predicateId, idMap);
+                   }
+               });
             });
+        }
+
+        //see if the relation matches the predicate by recursively tracing the law up to its wildcards
+        function checkPredicate(nodeId, predicateId, idMap) {
+
+            var nodes = getIndex('node'), concepts = getIndex('concept');
+            var node = nodes[nodeId], predicate = nodes[predicateId];
+
+            //make sure this node's concept matches the predicate's concept
+            var match = node['concept'] == predicate['concept'] || concepts[predicate['concept']]['name'] == 'Anything';
+            if(!match) return false;
+            idMap[predicateId] = nodeId;
+
+            //check recursively on this node's head and reference
+            var links = ['head', 'reference'];
+            for(var i = 0; i < 2; i++) {
+                var link = links[i], nodeLink = node[link], predicateLink = predicate[link];
+                if(!predicateLink) continue;
+                else if(!nodeLink || !checkPredicate(nodeLink, predicateLink)) return false;
+            }
+            return true;
+        }
+
+        //given a correspondence between nodes in the relation and predicate, fill in the rest of the law
+        function appendLaw(nodeId, predicateId, idMap) {
+
+            var nodes = getIndex('node'), lawNodes = getIndex('law_node');
+            var node = nodes[nodeId], predicate = nodes[predicateId], law = predicate['law'], lawNode = lawNodes[law];
+
+            return appendLawHelper(lawNode, idMap);
+        }
+
+        function appendLawHelper(nodeId, idMap) {
+
+            var nodes = getIndex('node');
+            var node = nodes[nodeId], head = node['head'], reference = node['reference'], newHead, newReference;
+
+            if(!idMap.hasOwnProperty(head)) newHead = appendLawHelper(head, idMap);
+            else newHead = idMap[head];
+            if(!idMap.hasOwnProperty(reference)) newReference = appendLawHelper(reference, idMap);
+            else newReference = idMap[reference];
+
+            var newNode = $.extend({}, node), newId = getNextNodeID();
+            newNode['id'] = newId;
+            newNode['law'] = getCurrentLaw();
+            newNode['head'] = newHead;
+            newNode['reference'] = newReference;
+            NEW_NODES.push(newNode);
+            idMap[nodeId] = newId;
+            return newId;
+        }
+
+        function getNextNodeID() {
+            return NEXT_NODE_ID++;
+        }
+
+        function getCurrentLaw() {
+            return $('#current_law').val();
         }
     </script>
     {{end page_js}}
