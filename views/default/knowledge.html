@@ -40,6 +40,55 @@
     <script>
         var $$ = go.GraphObject.make;
 
+          // This variation on ForceDirectedLayout does not move any selected Nodes
+          // but does move all other nodes (vertexes).
+          function ContinuousForceDirectedLayout() {
+            go.ForceDirectedLayout.call(this);
+            this._isObserving = false;
+          }
+          go.Diagram.inherit(ContinuousForceDirectedLayout, go.ForceDirectedLayout);
+
+          /** @override */
+          ContinuousForceDirectedLayout.prototype.isFixed = function(v) {
+            return v.node.isSelected;
+          }
+
+          // optimization: reuse the ForceDirectedNetwork rather than re-create it each time
+          /** @override */
+          ContinuousForceDirectedLayout.prototype.doLayout = function(coll) {
+            if (!this._isObserving) {
+              this._isObserving = true;
+              // cacheing the network means we need to recreate it if nodes or links have been added or removed or relinked,
+              // so we need to track structural model changes to discard the saved network.
+              var lay = this;
+              this.diagram.addModelChangedListener(function (e) {
+                // modelChanges include a few cases that we don't actually care about, such as
+                // "nodeCategory" or "linkToPortId", but we'll go ahead and recreate the network anyway.
+                // Also clear the network when replacing the model.
+                if (e.modelChange !== "" ||
+                    (e.change === go.ChangedEvent.Transaction && e.propertyName === "StartingFirstTransaction")) {
+                  lay.network = null;
+                }
+              });
+            }
+            var net = this.network;
+            if (net === null) {  // the first time, just create the network as normal
+              this.network = net = this.makeNetwork(coll);
+            } else {  // but on reuse we need to update the LayoutVertex.bounds for selected nodes
+              this.diagram.nodes.each(function (n) {
+                var v = net.findVertex(n);
+                if (v !== null) v.bounds = n.actualBounds;
+              });
+            }
+            // now perform the normal layout
+            go.ForceDirectedLayout.prototype.doLayout.call(this, coll);
+            // doLayout normally discards the LayoutNetwork by setting Layout.network to null;
+            // here we remember it for next time
+            this.network = net;
+          }
+          // end ContinuousForceDirectedLayout
+
+
         var myDiagram = $$(go.Diagram, "graph-canvas",  // must name or refer to the DIV HTML element
         {
           grid: $$(go.Panel, "Grid",
@@ -49,6 +98,11 @@
                   $$(go.Shape, "LineV", { stroke: "gray", strokeWidth: 0.5, interval: 10 })
                 ),
           allowDrop: true,  // must be true to accept drops from the Palette
+          layout:
+            $$(ContinuousForceDirectedLayout,  // automatically spread nodes apart while dragging
+              { defaultSpringLength: 30, defaultElectricalCharge: 100 }),
+          // do an extra layout at the end of a move
+          "SelectionMoved": function(e) { e.diagram.layout.invalidateLayout(); },
           "draggingTool.dragsLink": true,
           "draggingTool.isGridSnapEnabled": true,
           "linkingTool.isUnconnectedLinkValid": true,
@@ -66,6 +120,12 @@
           //"rotatingTool.snapAngleEpsilon": 15,
           "undoManager.isEnabled": true
         });
+
+        // dragging a node invalidates the Diagram.layout, causing a layout during the drag
+        myDiagram.toolManager.draggingTool.doMouseMove = function() {
+          go.DraggingTool.prototype.doMouseMove.call(this);
+          if (this.isActive) { this.diagram.layout.invalidateLayout(); }
+        }
 
         // when the document is modified, add a "*" to the title and enable the "Save" button
         myDiagram.addDiagramListener("Modified", function(e) {
@@ -249,58 +309,140 @@
             });
         }
 
-        /* EVALUATION */
-        var NEXT_NODE_ID = 0, NEW_NODES = [];
-
-        function evaluateRelation() {
-            var relationNodes = getIndex('relation_node'), nodes = getIndex('node'), predicates = getIndex('predicate');
-            myDiagram.nodes.each(function(node) {
-               //find any deep predicate nodes in included frameworks
-               //that have the same concept as this node
-               var key = node.data['key'];
-               if(!relationNodes.hasOwnProperty(key)) return;
-               var nodeId = relationNodes[key], relationNode = nodes[id], concept = relationNode['concept'];
-               if(!predicates.hasOwnProperty(concept)) return;
-               predicates[concept].each(function(predicateId) {
-                   var idMap = {};
-                   if(checkPredicate(nodeId, predicateId, idMap)) {
-                       appendLaw(nodeId, predicateId, idMap);
-                   }
-               });
+        function loadLaw(id) {
+            $.ajax({
+               url: "{{=URL('default', 'loadLaw', extension='json')}}",
+               type: 'get',
+               dataType: 'json',
+               data: JSON.stringify({id: id}),
+               success: function(data) {
+               },
+               error: function() {
+               }
             });
         }
 
-        //see if the relation matches the predicate by recursively tracing the law up to its wildcards
-        function checkPredicate(nodeId, predicateId, idMap) {
+        /* RELATION EVALUATION
 
-            var nodes = getIndex('node'), concepts = getIndex('concept');
-            var node = nodes[nodeId], predicate = nodes[predicateId];
+        Scheme: Start with the relation R.  For each node N, take its concept C, and find all laws L
+        that have a predicate on C.  Trace the predicate of L up to its roots, all the while matching its
+        nodes with those of the relation R.  If they all match up, retain the map between nodes of L and R.
+
+        If two maps M1 and M2 for the same law, different predicate nodes P1 and P2, are found to intersect - that is,
+        each node of R that is in both M1 and M2 maps to the same node of L - then we check for a logic (AND/OR) relation
+        between P1 and P2 in L.  If there is one, we merge M1 and M2 into a new map M3 (still retaining M1 and M2),
+        add the logic node(s) between P1 and P2 to our relation, and include it(them) in M3.
+
+        When another map M4 is later merged with M3, we again combine the predicate nodes of M4 and M3 using logic nodes
+        from L.  As we keep merging maps, eventually we will create a logic node in our relation that satisfies L.
+        At that point, we can append to our relation R the additional knowledge (relations) that L provides us.
+
+        */
+
+        function Relation() {
+            this.nodes = getIndex('relation_node');
+            this.allNodes = getIndex('node');
+            this.predicates = getIndex('predicate');
+            this.newNodes = [];
+
+            this.wildcardConcept = 2;
+
+            this.tempIdMap = null;
+            this.idMap = {};
+            this.nextMapId = 0;
+        }
+
+        Relation.prototype.evaluate = function() {
+            this.nodes.each(function(node) {
+               //find any deep predicate nodes in included frameworks
+               //that have the same concept as this node
+               var nodeId = node['id'], concept = node['concept'];
+               if(!predicates.hasOwnProperty(concept)) return;
+               predicates[concept].each(function(predicateId) {
+                   this.checkPredicate(nodeId, predicateId);
+               });
+            });
+
+            $.ajax({
+               url: "{{=URL('default', 'saveNodes', extension='json')}}",
+               type: 'post',
+               dataType: 'json',
+               data: JSON.stringify(newNodes),
+               success: function(data) {
+               },
+            });
+        };
+
+        //see if the relation matches the predicate by recursively tracing the law up to its wildcards
+        Relation.prototype.checkPredicate = function(nodeId, predicateId) {
+
+            var node = this.nodes[nodeId], predicate = this.allNodes[predicateId];
+
+            //if this is the first recursion step, initialize aggregators
+            var firstLevel = this.tempIdMap == null;
+            if(firstLevel) {
+                this.tempIdMap = {};
+                this.intersectCandidates = [];
+            }
 
             //make sure this node's concept matches the predicate's concept
-            var match = node['concept'] == predicate['concept'] || concepts[predicate['concept']]['name'] == 'Anything';
+            var match = node['concept'] == predicate['concept'] || predicate['concept'] == this.wildcardConcept;
             if(!match) return false;
-            idMap[predicateId] = nodeId;
+
+            this.tempIdMap[nodeId] = predicateId;
+
+            //note any prior mappings between this node and predicate node - used later to test for intersections
+            if(this.idMap.hasOwnProperty(nodeId) && this.idMap[nodeId].hasOwnProperty(predicateId)) {
+                for(var map in this.idMap[nodeId][predicateId]) {
+                    if(this.idMap[nodeId][predicateId].hasOwnProperty(map))
+                        this.intersectCandidates.push(map);
+                }
+            }
 
             //check recursively on this node's head and reference
             var links = ['head', 'reference'];
             for(var i = 0; i < 2; i++) {
                 var link = links[i], nodeLink = node[link], predicateLink = predicate[link];
                 if(!predicateLink) continue;
-                else if(!nodeLink || !checkPredicate(nodeLink, predicateLink)) return false;
+                else if(!nodeLink || !this.checkPredicate(nodeLink, predicateLink)) return false;
+            }
+
+            if(firstLevel) {
+                //at this point we have a complete match, so retain this ID map
+                var count = 0;
+                for(var node in this.tempIdMap) {
+                    if(!this.tempIdMap.hasOwnProperty(predicate)) continue;
+                    var predicate = this.tempIdMap[node];
+                    if(!this.idMap.hasOwnProperty(node)) this.idMap[node] = {};
+                    if(!this.idMap[node].hasOwnProperty(predicate)) this.idMap[node][predicate] = {};
+                    this.idMap[node][predicate][this.nextMapId] = 1;
+                    count++;
+                }
+                this.tempIdMap = null;
+                if(count > 0) this.nextMapId++;
+
+                //also see if this ID map completely intersects any other ID maps
+                this.intersectCandidates.each(function(map) {
+                    this.checkIntersection(nodeId, this.nextMapId, map);
+                });
             }
             return true;
-        }
+        };
+
+        Relation.prototype.checkIntersection = function(nodeId, mapId, otherMapId) {
+
+        };
 
         //given a correspondence between nodes in the relation and predicate, fill in the rest of the law
-        function appendLaw(nodeId, predicateId, idMap) {
+        Relation.prototype.appendLaw = function(nodeId, predicateId, idMap, newNodes) {
 
             var nodes = getIndex('node'), lawNodes = getIndex('law_node');
             var node = nodes[nodeId], predicate = nodes[predicateId], law = predicate['law'], lawNode = lawNodes[law];
 
             return appendLawHelper(lawNode, idMap);
-        }
+        };
 
-        function appendLawHelper(nodeId, idMap) {
+        Relation.prototype.appendLawHelper = function(nodeId, idMap, newNodes) {
 
             var nodes = getIndex('node');
             var node = nodes[nodeId], head = node['head'], reference = node['reference'], newHead, newReference;
@@ -310,19 +452,11 @@
             if(!idMap.hasOwnProperty(reference)) newReference = appendLawHelper(reference, idMap);
             else newReference = idMap[reference];
 
-            var newNode = $.extend({}, node), newId = getNextNodeID();
-            newNode['id'] = newId;
-            newNode['law'] = getCurrentLaw();
-            newNode['head'] = newHead;
-            newNode['reference'] = newReference;
-            NEW_NODES.push(newNode);
+            var newId = newNodes.length < 1 ? -1 : newNodes[newNodes.length-1]['id'] - 1;
+            newNodes.push({'id': newId, 'law': getCurrentLaw(), 'concept': node['concept'], 'head': newHead, 'reference': newReference});
             idMap[nodeId] = newId;
             return newId;
-        }
-
-        function getNextNodeID() {
-            return NEXT_NODE_ID++;
-        }
+        };
 
         function getCurrentLaw() {
             return $('#current_law').val();
