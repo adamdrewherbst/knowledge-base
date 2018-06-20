@@ -124,6 +124,18 @@ def saveLaw():
     return response.json(ret)
 
 
+def initRelation():
+    frameworks = [framework]
+    while frameworks:
+        fid = frameworks.pop(0)
+        for concept in db(db.concept.framework == fid).iterselect():
+            ret['concepts'].append({'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': fid});
+        for law in db(db.law.framework == fid).iterselect():
+            ret['laws'].append({'id': law.id, 'name': law.name, 'description': law.description});
+        for dep in db(db.framework_dependency.framework == fid).iterselect(db.framework_dependency.dependency):
+            frameworks.append(dep.dependency)
+
+
 def user():
     """
     exposes:

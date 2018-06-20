@@ -337,29 +337,62 @@
         from L.  As we keep merging maps, eventually we will create a logic node in our relation that satisfies L.
         At that point, we can append to our relation R the additional knowledge (relations) that L provides us.
 
+        If we maintain symmetric nodes, we can ensure that every map always has a unique deep node.  QUESTION: How do we
+        store symmetric nodes that relate more than two inputs, ie. a sum, equality, or AND between three operands?
+
         */
 
         function Relation() {
-            this.nodes = getIndex('relation_node');
-            this.allNodes = getIndex('node');
-            this.predicates = getIndex('predicate');
-            this.newNodes = [];
+
+            this.lawId = getCurrentLaw();
+
+            this.nodes = {};
+            this.allNodes = {};
+            this.predicates = {};
+            this.newNodes = {};
 
             this.wildcardConcept = 2;
 
             this.tempIdMap = null;
-            this.idMap = {};
+            this.nodeMap = {};
+            this.map = {};
             this.nextMapId = 0;
+            this.nextNodeId = 0;
         }
 
+        function getCurrentLaw() {
+            return $('#current_law').val();
+        }
+
+        //get and index relevant DB tables for use in the evaluation algorithm
+        Relation.prototype.init = function() {
+
+            var self = this;
+
+            $.ajax({
+               url: "{{=URL('default', 'initRelation', extension='json')}}",
+               type: 'get',
+               dataType: 'json',
+               data: {},
+               success: function(data) {
+                   self.nodes = data.nodes;
+                   self.allNodes = data.allNodes;
+                   self.predicates = data.predicates;
+               }
+            });
+        };
+
         Relation.prototype.evaluate = function() {
-            this.nodes.each(function(node) {
+
+            var self = this, nodes = self.nodes.keys();
+
+            while(nodes.length > 0) {
                //find any deep predicate nodes in included frameworks
                //that have the same concept as this node
-               var nodeId = node['id'], concept = node['concept'];
-               if(!predicates.hasOwnProperty(concept)) return;
-               predicates[concept].each(function(predicateId) {
-                   this.checkPredicate(nodeId, predicateId);
+               var nodeId = nodes.pop(), concept = self.nodes[nodeId]['concept'];
+               if(!self.predicates.hasOwnProperty(concept)) return;
+               self.predicates[concept].forEach(function(predicateId) {
+                   self.checkPredicate(nodeId, predicateId);
                });
             });
 
@@ -367,7 +400,7 @@
                url: "{{=URL('default', 'saveNodes', extension='json')}}",
                type: 'post',
                dataType: 'json',
-               data: JSON.stringify(newNodes),
+               data: JSON.stringify(self.newNodes),
                success: function(data) {
                },
             });
@@ -376,26 +409,27 @@
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
         Relation.prototype.checkPredicate = function(nodeId, predicateId) {
 
-            var node = this.nodes[nodeId], predicate = this.allNodes[predicateId];
+            var self = this, node = this.nodes[nodeId], predicate = this.allNodes[predicateId];
 
             //if this is the first recursion step, initialize aggregators
-            var firstLevel = this.tempIdMap == null;
+            var firstLevel = self.tempIdMap == null;
             if(firstLevel) {
-                this.tempIdMap = {};
-                this.intersectCandidates = [];
+                self.tempIdMap = {};
+                self.intersectCandidates = [];
             }
 
             //make sure this node's concept matches the predicate's concept
             var match = node['concept'] == predicate['concept'] || predicate['concept'] == this.wildcardConcept;
             if(!match) return false;
 
-            this.tempIdMap[nodeId] = predicateId;
+            self.tempIdMap[nodeId] = predicateId;
+            self.tempIdMap[predicateId] = nodeId;
 
             //note any prior mappings between this node and predicate node - used later to test for intersections
-            if(this.idMap.hasOwnProperty(nodeId) && this.idMap[nodeId].hasOwnProperty(predicateId)) {
-                for(var map in this.idMap[nodeId][predicateId]) {
-                    if(this.idMap[nodeId][predicateId].hasOwnProperty(map))
-                        this.intersectCandidates.push(map);
+            if(self.nodeMap.hasOwnProperty(nodeId) && self.nodeMap[nodeId].hasOwnProperty(predicateId)) {
+                for(var map in self.nodeMap[nodeId][predicateId]) {
+                    if(self.nodeMap[nodeId][predicateId].hasOwnProperty(map))
+                        self.intersectCandidates.push(map);
                 }
             }
 
@@ -404,63 +438,123 @@
             for(var i = 0; i < 2; i++) {
                 var link = links[i], nodeLink = node[link], predicateLink = predicate[link];
                 if(!predicateLink) continue;
-                else if(!nodeLink || !this.checkPredicate(nodeLink, predicateLink)) return false;
+                else if(!nodeLink || !self.checkPredicate(nodeLink, predicateLink)) return false;
             }
 
             if(firstLevel) {
                 //at this point we have a complete match, so retain this ID map
                 var count = 0;
-                for(var node in this.tempIdMap) {
-                    if(!this.tempIdMap.hasOwnProperty(predicate)) continue;
-                    var predicate = this.tempIdMap[node];
-                    if(!this.idMap.hasOwnProperty(node)) this.idMap[node] = {};
-                    if(!this.idMap[node].hasOwnProperty(predicate)) this.idMap[node][predicate] = {};
-                    this.idMap[node][predicate][this.nextMapId] = 1;
+                for(let node in self.tempIdMap) {
+                    let predicate = self.tempIdMap[node];
+                    if(!self.nodeMap.hasOwnProperty(node)) self.nodeMap[node] = {};
+                    if(!self.nodeMap[node].hasOwnProperty(predicate)) self.nodeMap[node][predicate] = {};
+                    if(!self.nodeMap.hasOwnProperty(predicate)) self.nodeMap[predicate] = {};
+                    if(!self.nodeMap[predicate].hasOwnProperty(node)) self.nodeMap[predicate][node] = {};
+                    self.nodeMap[node][predicate][self.nextMapId] = 1;
+                    self.nodeMap[predicate][node][self.nextMapId] = 1;
                     count++;
                 }
-                this.tempIdMap = null;
-                if(count > 0) this.nextMapId++;
+                if(count > 0) {
+                    self.map[self.nextMapId++] = {
+                        lawId: predicate['law'],
+                        predicates: predicateId,
+                        idMap: self.tempIdMap
+                    };
+                }
+                self.tempIdMap = null;
 
                 //also see if this ID map completely intersects any other ID maps
-                this.intersectCandidates.each(function(map) {
-                    this.checkIntersection(nodeId, this.nextMapId, map);
+                self.intersectCandidates.forEach(function(mapId) {
+                    self.checkIntersection(self.nextMapId-1, mapId);
                 });
             }
             return true;
         };
 
-        Relation.prototype.checkIntersection = function(nodeId, mapId, otherMapId) {
+        Relation.prototype.checkIntersection = function(mapId1, mapId2) {
 
+            var self = this, map1 = self.map[mapId1], map2 = self.map[mapId2];
+
+            //make sure the two maps are for the same law, but their predicate sets are disjoint
+            if(map1.lawId != map2.lawId) return false;
+            var disjoint = map1.predicates.every(function(predicate) {
+                    return map2.predicates.indexOf(predicate) < 0;
+                });
+            if(!disjoint) return false;
+
+            //and that the joint predicate set is part of a set that satisfies the law
+            var law = self.laws[map1.lawId], predicateSet = map1.predicates.concat(map2.predicates);
+            var match = null;
+            var cannotCombine = law.predicateSets.every(function(set) {
+                var isSubset = predicateSet.every(function(predicate) {
+                    return set.indexOf(predicate) >= 0;
+                }), isMatch = false;
+                if(isSubset) {
+                    //meanwhile, check if the predicates in the two maps in fact satisfy the law
+                    isMatch = set.every(function(predicate) {
+                        return predicateSet.indexOf(predicate) >= 0;
+                    });
+                    if(isMatch) match = set;
+                }
+                return !isSubset && !isMatch;
+            });
+            if(match == null && cannotCombine) return false;
+
+            //whichever relation nodes are shared by the two maps must be mapped to the same predicate node
+            for(let node in map1.idMap) {
+                if(!map2.idMap.hasOwnProperty(node)) continue;
+                if(map2.idMap[node] != map1.idMap[node]) return false;
+            }
+
+            //at this point they do intersect, so create a new map by merging these two
+            var map = {
+                lawId: map1.lawId,
+                predicates: predicateSet,
+                idMap: Object.assign({}, map1.idMap, map2.idMap)
+            };
+            self.map[self.nextMapId++] = map;
+
+            //if the law has been satisfied, use the map to append the knowledge of the law to our relation
+            if(match) {
+                self.appendLaw(map);
+            }
+
+            return true;
         };
 
         //given a correspondence between nodes in the relation and predicate, fill in the rest of the law
-        Relation.prototype.appendLaw = function(nodeId, predicateId, idMap, newNodes) {
+        Relation.prototype.appendLaw = function(map) {
 
-            var nodes = getIndex('node'), lawNodes = getIndex('law_node');
-            var node = nodes[nodeId], predicate = nodes[predicateId], law = predicate['law'], lawNode = lawNodes[law];
+            var self = this;
 
-            return appendLawHelper(lawNode, idMap);
+            //start at each deep node of the law
+            var law = this.laws[map.lawId];
+            law.deepNodes.forEach(function(nodeId) {
+               self.appendLawHelper(map, nodeId);
+            });
         };
 
-        Relation.prototype.appendLawHelper = function(nodeId, idMap, newNodes) {
+        Relation.prototype.appendLawHelper = function(map, nodeId) {
 
-            var nodes = getIndex('node');
-            var node = nodes[nodeId], head = node['head'], reference = node['reference'], newHead, newReference;
+            var self = this, node = self.allNodes[nodeId], head = node['head'], reference = node['reference'], newHead, newReference;
 
-            if(!idMap.hasOwnProperty(head)) newHead = appendLawHelper(head, idMap);
-            else newHead = idMap[head];
-            if(!idMap.hasOwnProperty(reference)) newReference = appendLawHelper(reference, idMap);
-            else newReference = idMap[reference];
+            if(!map.idMap.hasOwnProperty(head)) newHead = self.appendLawHelper(map, head);
+            else newHead = map.idMap[head];
+            if(!map.idMap.hasOwnProperty(reference)) newReference = self.appendLawHelper(map, reference);
+            else newReference = map.idMap[reference];
 
-            var newId = newNodes.length < 1 ? -1 : newNodes[newNodes.length-1]['id'] - 1;
-            newNodes.push({'id': newId, 'law': getCurrentLaw(), 'concept': node['concept'], 'head': newHead, 'reference': newReference});
-            idMap[nodeId] = newId;
+            var newId = self.nextNodeId++;
+            self.newNodes[newId] = {
+                'id': newId,
+                'law': self.lawId,
+                'concept': node['concept'],
+                'head': newHead,
+                'reference': newReference
+            });
+            map.idMap[nodeId] = newId;
             return newId;
         };
 
-        function getCurrentLaw() {
-            return $('#current_law').val();
-        }
     </script>
     {{end page_js}}
 
