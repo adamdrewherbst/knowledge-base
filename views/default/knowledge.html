@@ -18,15 +18,18 @@
         <!-- graph editor -->
         <h2>Build a relation with concepts</h2>
         <div id="graph-buttons" style="margin-bottom: 20px">
-            <button id="graph-save-button" type="button" onclick="saveLaw()">Save Relation</button>
+            <button id="save_relation" type="button">Save Relation</button>
+            <label for="set_predicate">Predicate</label>
+            <select id="set_predicate">
+                <option value="0">--- Select ---</option>
+                <option value="new">New Predicate</option>
+            </select>
+            <label>Click a node to add/remove it from this predicate</label>
         </div>
         <div style="width: 100%; display: flex; justify-content: space-between">
             <div id="concept-palette" style="width: 160px; margin-right: 2px; background-color: whitesmoke; border: solid 1px black"></div>
             <div id="graph-canvas" style="flex-grow: 1; height: 620px; border: solid 1px black"></div>
         </div>
-
-        <input type="hidden" id="current_framework" value="-1">
-        <input type="hidden" id="current_law" value="-1">
     </body>
 
 
@@ -40,207 +43,259 @@
     <script>
         var $$ = go.GraphObject.make;
 
-          // This variation on ForceDirectedLayout does not move any selected Nodes
-          // but does move all other nodes (vertexes).
-          function ContinuousForceDirectedLayout() {
+        // This variation on ForceDirectedLayout does not move any selected Nodes
+        // but does move all other nodes (vertexes).
+        function ContinuousForceDirectedLayout() {
             go.ForceDirectedLayout.call(this);
             this._isObserving = false;
-          }
-          go.Diagram.inherit(ContinuousForceDirectedLayout, go.ForceDirectedLayout);
+        }
+        go.Diagram.inherit(ContinuousForceDirectedLayout, go.ForceDirectedLayout);
 
-          /** @override */
-          ContinuousForceDirectedLayout.prototype.isFixed = function(v) {
+        /** @override */
+        ContinuousForceDirectedLayout.prototype.isFixed = function(v) {
             return v.node.isSelected;
-          }
+        }
 
-          // optimization: reuse the ForceDirectedNetwork rather than re-create it each time
-          /** @override */
-          ContinuousForceDirectedLayout.prototype.doLayout = function(coll) {
+        // optimization: reuse the ForceDirectedNetwork rather than re-create it each time
+        /** @override */
+        ContinuousForceDirectedLayout.prototype.doLayout = function(coll) {
             if (!this._isObserving) {
-              this._isObserving = true;
-              // cacheing the network means we need to recreate it if nodes or links have been added or removed or relinked,
-              // so we need to track structural model changes to discard the saved network.
-              var lay = this;
-              this.diagram.addModelChangedListener(function (e) {
-                // modelChanges include a few cases that we don't actually care about, such as
-                // "nodeCategory" or "linkToPortId", but we'll go ahead and recreate the network anyway.
-                // Also clear the network when replacing the model.
-                if (e.modelChange !== "" ||
-                    (e.change === go.ChangedEvent.Transaction && e.propertyName === "StartingFirstTransaction")) {
-                  lay.network = null;
-                }
-              });
+                this._isObserving = true;
+                // cacheing the network means we need to recreate it if nodes or links have been added or removed or relinked,
+                // so we need to track structural model changes to discard the saved network.
+                var lay = this;
+                this.diagram.addModelChangedListener(function (e) {
+                    // modelChanges include a few cases that we don't actually care about, such as
+                    // "nodeCategory" or "linkToPortId", but we'll go ahead and recreate the network anyway.
+                    // Also clear the network when replacing the model.
+                    if (e.modelChange !== "" ||
+                            (e.change === go.ChangedEvent.Transaction && e.propertyName === "StartingFirstTransaction")) {
+                        lay.network = null;
+                    }
+                });
             }
             var net = this.network;
             if (net === null) {  // the first time, just create the network as normal
-              this.network = net = this.makeNetwork(coll);
+                this.network = net = this.makeNetwork(coll);
             } else {  // but on reuse we need to update the LayoutVertex.bounds for selected nodes
-              this.diagram.nodes.each(function (n) {
-                var v = net.findVertex(n);
-                if (v !== null) v.bounds = n.actualBounds;
-              });
+                this.diagram.nodes.each(function (n) {
+                    var v = net.findVertex(n);
+                    if (v !== null) v.bounds = n.actualBounds;
+                });
             }
             // now perform the normal layout
             go.ForceDirectedLayout.prototype.doLayout.call(this, coll);
             // doLayout normally discards the LayoutNetwork by setting Layout.network to null;
             // here we remember it for next time
             this.network = net;
-          }
-          // end ContinuousForceDirectedLayout
-
-
-        var myDiagram = $$(go.Diagram, "graph-canvas",  // must name or refer to the DIV HTML element
-        {
-          grid: $$(go.Panel, "Grid",
-                  $$(go.Shape, "LineH", { stroke: "lightgray", strokeWidth: 0.5 }),
-                  $$(go.Shape, "LineH", { stroke: "gray", strokeWidth: 0.5, interval: 10 }),
-                  $$(go.Shape, "LineV", { stroke: "lightgray", strokeWidth: 0.5 }),
-                  $$(go.Shape, "LineV", { stroke: "gray", strokeWidth: 0.5, interval: 10 })
-                ),
-          allowDrop: true,  // must be true to accept drops from the Palette
-          layout:
-            $$(ContinuousForceDirectedLayout,  // automatically spread nodes apart while dragging
-              { defaultSpringLength: 30, defaultElectricalCharge: 100 }),
-          // do an extra layout at the end of a move
-          "SelectionMoved": function(e) { e.diagram.layout.invalidateLayout(); },
-          "draggingTool.dragsLink": true,
-          "draggingTool.isGridSnapEnabled": true,
-          "linkingTool.isUnconnectedLinkValid": true,
-          "linkingTool.portGravity": 20,
-          "relinkingTool.isUnconnectedLinkValid": true,
-          "relinkingTool.portGravity": 20,
-          "relinkingTool.fromHandleArchetype":
-            $$(go.Shape, "Diamond", { segmentIndex: 0, cursor: "pointer", desiredSize: new go.Size(8, 8), fill: "tomato", stroke: "darkred" }),
-          "relinkingTool.toHandleArchetype":
-            $$(go.Shape, "Diamond", { segmentIndex: -1, cursor: "pointer", desiredSize: new go.Size(8, 8), fill: "darkred", stroke: "tomato" }),
-          "linkReshapingTool.handleArchetype":
-            $$(go.Shape, "Diamond", { desiredSize: new go.Size(7, 7), fill: "lightblue", stroke: "deepskyblue" }),
-          //rotatingTool: $(TopRotatingTool),  // defined below
-          //"rotatingTool.snapAngleMultiple": 15,
-          //"rotatingTool.snapAngleEpsilon": 15,
-          "undoManager.isEnabled": true
-        });
-
-        // dragging a node invalidates the Diagram.layout, causing a layout during the drag
-        myDiagram.toolManager.draggingTool.doMouseMove = function() {
-          go.DraggingTool.prototype.doMouseMove.call(this);
-          if (this.isActive) { this.diagram.layout.invalidateLayout(); }
         }
+        // end ContinuousForceDirectedLayout
 
-        // when the document is modified, add a "*" to the title and enable the "Save" button
-        myDiagram.addDiagramListener("Modified", function(e) {
-          var button = document.getElementById("graph-save-button");
-          if (button) button.disabled = !myDiagram.isModified;
-          var idx = document.title.indexOf("*");
-          if (myDiagram.isModified) {
-            if (idx < 0) document.title += "*";
-          } else {
-            if (idx >= 0) document.title = document.title.substr(0, idx);
-          }
-        });
 
-        myDiagram.nodeTemplate = $$(go.Node, "Spot",
-            { locationSpot: go.Spot.Center },
-            new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-            new go.Binding("angle").makeTwoWay(),
-            // the main object is a Panel that surrounds a TextBlock with a Shape
-            $$(go.Panel, "Auto",
-              { name: "PANEL" },
-              new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
-              $$(go.Shape, "Rectangle",  // default figure
-                {
-                  cursor: "pointer",
-                  fill: "white",  // default color
-                  strokeWidth: 2
+        /*********   RELATION   *****************
+
+        A wrapper class for all functionality on this page
+
+        *****************************************/
+
+        function Relation() {
+
+            this.currentLaw = -1;
+            this.currentFramework = -1;
+
+            this.myNodes = [];
+            this.concepts = {};
+            this.laws = {};
+            this.nodes = {};
+            this.predicates = {};
+            this.newNodes = {};
+
+            this.tempIdMap = null;
+            this.nodeMap = {};
+            this.map = {};
+            this.nextMapId = 0;
+            this.nextNodeId = 0;
+
+            this.nodeTemplates = {
+                'default': {
+                    shape: "RoundedRectangle",
+                    fill: "#88AD5F"
                 },
-                new go.Binding("figure"),
-                new go.Binding("fill")),
-              $$(go.TextBlock,
-                {
-                  font: "bold 11pt Helvetica, Arial, sans-serif",
-                  margin: 8,
-                  maxSize: new go.Size(160, NaN),
-                  wrap: go.TextBlock.WrapFit,
-                  editable: true
-                },
-                new go.Binding("text").makeTwoWay())
-            ),
-            //port on top for head/reference, port on bottom for properties/referrers
-            makePort("T", go.Spot.Top, true, true, 1, 1),
-            makePort("B", go.Spot.Bottom, true, true),
-            { // handle mouse enter/leave events to show/hide the ports
-              mouseEnter: function(e, node) { showSmallPorts(node, true); },
-              mouseLeave: function(e, node) { showSmallPorts(node, false); }
-            }
-        );
-
-        clearDiagram();
-
-        //concepts required by any framework
-        var CORE_CONCEPTS = $$(go.GraphLinksModel, {
-            nodeDataArray: [
-                    {{
-                        concepts = db(db.concept.framework == None).select()
-                        for concept in concepts:
-                    }}
-                { concept: {{=concept.id}}, text: "{{=concept.name}}", figure: "RoundedRectangle", fill: "#88AD5F" },
-                    {{
-                        pass
-                    }}
-            ],
-            linkDataArray: []
-        });
-
-        // initialize the Palette that is on the left side of the page
-        var myPalette = $$(go.Palette, "concept-palette",  // must name or refer to the DIV HTML element
-        {
-            maxSelectionCount: 1,
-            nodeTemplateMap: myDiagram.nodeTemplateMap,  // share the templates used by myDiagram
-            model: CORE_CONCEPTS,
-        });
-
-
-        function makePort(name, spot, output, input, fromMax, toMax) {
-            // the port is basically just a small transparent square
-            var options =
-            {
-                fill: null,  // not seen, by default; set to a translucent gray by showSmallPorts, defined below
-                stroke: null,
-                desiredSize: new go.Size(7, 7),
-                alignment: spot,  // align the port on the main Shape
-                alignmentFocus: spot,  // just inside the Shape
-                portId: name,  // declare this object to be a "port"
-                fromSpot: spot, toSpot: spot,  // declare where links may connect at this port
-                fromLinkable: output, toLinkable: input,  // declare whether the user may draw links to/from here
-                cursor: "pointer"  // show a different cursor to indicate potential link point
+                'predicate': {
+                    shape: "Rectangle",
+                    fill: "yellow"
+                }
             };
-            if(fromMax !== undefined) options.fromMaxLinks = fromMax;
-            if(toMax !== undefined) options.toMaxLinks = toMax;
-            return $$(go.Shape, "Circle", options);
+
+            this.coreConcepts = {
+                        {{
+                            concepts = db(db.concept.framework == None).select()
+                            for concept in concepts:
+                        }}
+                    {{=concept.id}}: {id: {{=concept.id}}, name: "{{=concept.name}}"},
+                        {{
+                            pass
+                        }}
+                };
+            this.concepts = null;
+            this.wildcardConcept = 2;
+
+            this.predicateSets = {};
         }
 
-        function showSmallPorts(node, show) {
-          node.ports.each(function(port) {
-            if (port.portId !== "") {  // don't change the default port, which is the big shape
-              port.fill = show ? "rgba(0,0,0,.3)" : null;
-            }
-          });
-        }
-
-        function clearDiagram() {
-            myDiagram.model = $$(go.GraphLinksModel,
+        Relation.prototype.initDiagram = function() {
+            var self = this;
+            self.diagram = $$(go.Diagram, "graph-canvas",  // must name or refer to the DIV HTML element
             {
-               linkFromPortIdProperty: 'fromPort',
-               linkToPortIdProperty: 'toPort',
+              grid: $$(go.Panel, "Grid",
+                      $$(go.Shape, "LineH", { stroke: "lightgray", strokeWidth: 0.5 }),
+                      $$(go.Shape, "LineH", { stroke: "gray", strokeWidth: 0.5, interval: 10 }),
+                      $$(go.Shape, "LineV", { stroke: "lightgray", strokeWidth: 0.5 }),
+                      $$(go.Shape, "LineV", { stroke: "gray", strokeWidth: 0.5, interval: 10 })
+                    ),
+              allowDrop: true,  // must be true to accept drops from the Palette
+              layout:
+                $$(ContinuousForceDirectedLayout,  // automatically spread nodes apart while dragging
+                  { defaultSpringLength: 30, defaultElectricalCharge: 100 }),
+//*/          // do an extra layout at the end of a move
+              "SelectionMoved": function(e) { e.diagram.layout.invalidateLayout(); },
+              "draggingTool.dragsLink": true,
+              "draggingTool.isGridSnapEnabled": true,
+              "linkingTool.isUnconnectedLinkValid": true,
+              "linkingTool.portGravity": 20,
+              "relinkingTool.isUnconnectedLinkValid": true,
+              "relinkingTool.portGravity": 20,
+              "relinkingTool.fromHandleArchetype":
+                $$(go.Shape, "Diamond", { segmentIndex: 0, cursor: "pointer", desiredSize: new go.Size(8, 8), fill: "tomato", stroke: "darkred" }),
+              "relinkingTool.toHandleArchetype":
+                $$(go.Shape, "Diamond", { segmentIndex: -1, cursor: "pointer", desiredSize: new go.Size(8, 8), fill: "darkred", stroke: "tomato" }),
+              "linkReshapingTool.handleArchetype":
+                $$(go.Shape, "Diamond", { desiredSize: new go.Size(7, 7), fill: "lightblue", stroke: "deepskyblue" }),
+              //rotatingTool: $(TopRotatingTool),  // defined below
+              //"rotatingTool.snapAngleMultiple": 15,
+              //"rotatingTool.snapAngleEpsilon": 15,
+              "undoManager.isEnabled": true
             });
-        }
 
-        function useFramework(id) { useFrameworkOrLaw('framework', id); }
-        function useLaw(id) { useFrameworkOrLaw('law', id); }
+            // dragging a node invalidates the Diagram.layout, causing a layout during the drag
+            self.diagram.toolManager.draggingTool.doMouseMove = function() {
+              go.DraggingTool.prototype.doMouseMove.call(this);
+              if (this.isActive) { this.diagram.layout.invalidateLayout(); }
+            }
 
-        function useFrameworkOrLaw(type, id) {
-            var currentFramework = parseInt($('#current_framework').val()),
-                currentLaw = parseInt($('#current_law').val());
+            // when the document is modified, add a "*" to the title and enable the "Save" button
+            self.diagram.addDiagramListener("Modified", function(e) {
+              var button = document.getElementById("graph-save-button");
+              if (button) button.disabled = !self.diagram.isModified;
+              var idx = document.title.indexOf("*");
+              if (self.diagram.isModified) {
+                if (idx < 0) document.title += "*";
+              } else {
+                if (idx >= 0) document.title = document.title.substr(0, idx);
+              }
+            });
+
+            function makePort(name, spot, output, input, fromMax, toMax) {
+                // the port is basically just a small transparent square
+                var options =
+                {
+                    fill: null,  // not seen, by default; set to a translucent gray by showSmallPorts, defined below
+                    stroke: null,
+                    desiredSize: new go.Size(7, 7),
+                    alignment: spot,  // align the port on the main Shape
+                    alignmentFocus: spot,  // just inside the Shape
+                    portId: name,  // declare this object to be a "port"
+                    fromSpot: spot, toSpot: spot,  // declare where links may connect at this port
+                    fromLinkable: output, toLinkable: input,  // declare whether the user may draw links to/from here
+                    cursor: "pointer"  // show a different cursor to indicate potential link point
+                };
+                if(fromMax !== undefined) options.fromMaxLinks = fromMax;
+                if(toMax !== undefined) options.toMaxLinks = toMax;
+                return $$(go.Shape, "Circle", options);
+            }
+
+            function showSmallPorts(node, show) {
+              node.ports.each(function(port) {
+                if (port.portId !== "") {  // don't change the default port, which is the big shape
+                  port.fill = show ? "rgba(0,0,0,.3)" : null;
+                }
+              });
+            }
+
+            self.diagram.nodeTemplate = $$(go.Node, "Spot",
+                { locationSpot: go.Spot.Center },
+                new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+                new go.Binding("angle").makeTwoWay(),
+                // the main object is a Panel that surrounds a TextBlock with a Shape
+                $$(go.Panel, "Auto",
+                  { name: "PANEL" },
+                  new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+                  $$(go.Shape, self.nodeTemplates['default'].shape,  // default figure
+                    {
+                      cursor: "pointer",
+                      fill: self.nodeTemplates['default'].fill,  // default color
+                      strokeWidth: 2
+                    },
+                    new go.Binding("figure"),
+                    new go.Binding("fill")),
+                  $$(go.TextBlock,
+                    {
+                      font: "bold 11pt Helvetica, Arial, sans-serif",
+                      margin: 8,
+                      maxSize: new go.Size(160, NaN),
+                      wrap: go.TextBlock.WrapFit,
+                      editable: true
+                    },
+                    new go.Binding("text").makeTwoWay())
+                ),
+                //port on top for head/reference, port on bottom for properties/referrers
+                makePort("T", go.Spot.Top, true, true, 1, 1),
+                makePort("B", go.Spot.Bottom, true, true),
+                { // handle mouse enter/leave events to show/hide the ports
+                  mouseEnter: function(e, node) { showSmallPorts(node, true); },
+                  mouseLeave: function(e, node) { showSmallPorts(node, false); }
+                }
+            );
+
+            // initialize the Palette that is on the left side of the page
+            self.palette = $$(go.Palette, "concept-palette",  // must name or refer to the DIV HTML element
+            {
+                maxSelectionCount: 1,
+                nodeTemplateMap: self.diagram.nodeTemplateMap,  // share the templates used by the diagram
+            });
+
+            self.setPaletteModel();
+            self.clearDiagram();
+        };
+
+        Relation.prototype.setPaletteModel = function() {
+            var self = this, concepts = self.concepts || self.coreConcepts;
+            var dataArray = [];
+            for(let id in concepts) {
+                let concept = concepts[id];
+                dataArray.push({concept: concept.id, text: concept.name});
+            }
+            self.palette.model = $$(go.GraphLinksModel, {
+                nodeDataArray: dataArray,
+                linkDataArray: []
+            });
+        };
+
+        Relation.prototype.clearDiagram = function() {
+            var self = this;
+            self.diagram.model = $$(go.GraphLinksModel,
+            {
+                nodeKeyProperty: 'id',
+                linkFromPortIdProperty: 'fromPort',
+                linkToPortIdProperty: 'toPort',
+            });
+        };
+
+        Relation.prototype.useFramework = function(id) { this.useFrameworkOrLaw('framework', id); };
+        Relation.prototype.useLaw = function(id) { this.useFrameworkOrLaw('law', id); };
+
+        Relation.prototype.useFrameworkOrLaw = function(type, id) {
+            var self = this;
             $.ajax({
                 url: "{{=URL('default', 'useFrameworkOrLaw', extension='json')}}",
                 type: 'get',
@@ -248,46 +303,97 @@
                 data: {
                     type: type,
                     id: id,
-                    currentFramework: currentFramework,
-                    currentLaw: currentLaw,
+                    currentFramework: self.currentFramework,
+                    currentLaw: self.currentLaw,
                 },
                 success: function(data) {
                     //if we received a new framework to use, clear the existing one from the palette
                     //and populate it with the new concepts
                     if(data.frameworks && data.frameworks.length > 0) {
-                        myPalette.model = CORE_CONCEPTS;
+                        self.concepts = Object.assign({}, self.coreConcepts);
                         data.frameworks.forEach(function(framework) {
                             framework.concepts.forEach(function(concept) {
-                                myPalette.model.addNodeData({
-                                    concept: concept.id, text: concept.name, figure: "RoundedRectangle", fill: "#88AD5F"
-                                })
+                                self.concepts[concept.id] = {id: concept.id, name: concept.name};
                             });
                         });
-                        if(data.frameworks[0].id) $('#current_framework').val(data.frameworks[0].id);
+                        self.setPaletteModel();
+                        if(data.frameworks[0].id) self.currentFramework = data.frameworks[0].id;
                     }
                     //if we received a new law to use, clear the existing one from the graph
                     //and populate it with the new nodes
                     if(data.law && data.law.nodes) {
-                        myDiagram.removeParts(myDiagram.nodes);
-                        data.law.nodes.forEach(function(node) {
+                        self.diagram.removeParts(self.diagram.nodes);
+                        //start by arranging the nodes visually as a tree descending from the root,
+                        //then allow the force layout to adjust them
+                        //=> first we need to identify the children of each node
+                        var nodes = data.law.nodes, nodeMeta = {}, roots = [];
+                        nodes[-1] = {};
+                        $.each(nodes, function(id, node) {
+                            nodeMeta[id] = {children: []};
                         });
-                        if(data.law.id) $('#current_law').val(data.law.id);
+                        $.each(nodes, function(id, node) {
+                            if(id >= 0) nodeMeta[node.head || -1].children.push(id);
+                        });
+
+                        let horizontal = 100, vertical = 100;
+                        let getOffsets = function(node) {
+                            let nc = nodeMeta[node].children.length, width = horizontal;
+                            if(nc > 0) {
+                                width = 0;
+                                nodeMeta[node].children.forEach(function(child) {
+                                    nodeMeta[child].offset = width;
+                                    width += getOffsets(child);
+                                });
+                                nodeMeta[node].children.forEach(function(child) {
+                                    nodeMeta[child].offset -= width / 2 - horizontal / 2;
+                                });
+                            }
+                            nodeMeta[node].width = width;
+                            return width;
+                        };
+                        getOffsets(-1);
+
+                        let drawNodes = function(node, x, y) {
+                            if(node >= 0) {
+                                let nodeData = nodes[node];
+                                nodeData['loc'] = '' + x + ' ' + y;
+                                nodeData['text'] = self.concepts[nodes[node].concept].name;
+                                self.diagram.model.addNodeData(nodeData);
+                            }
+                            nodeMeta[node].children.forEach(function(child) {
+                                drawNodes(child, x + nodeMeta[child].offset, y + 100);
+                            });
+                        };
+                        drawNodes(-1, self.diagram.viewportBounds.width/2, 50);
+
+                        let drawLinks = function(node) {
+                            let nodeData = nodes[node];
+                            if(nodeData.head)
+                                self.diagram.model.addLinkData({from: nodeData.head, to: node, fromPort: 'B', toPort: 'T'});
+                            if(nodeData.reference)
+                                self.diagram.model.addLinkData({from: node, to: nodeData.reference, fromPort: 'T', toPort: 'B'});
+                            nodeMeta[node].children.forEach(function(child) {
+                                drawLinks(child);
+                            });
+                        };
+                        drawLinks(-1);
+
+                        if(data.law.id) self.currentLaw = data.law.id;
                     }
                 },
                 error: function() {
                 }
             });
-        }
+        };
 
-        function saveLaw() {
-            var id = $('#current_law').val();
-            if(isNaN(id)) return;
+        Relation.prototype.save = function() {
+            var self = this, id = self.currentLaw;
 
             var nodes = [];
-            myDiagram.nodes.each(function(node) {
+            self.diagram.nodes.each(function(node) {
                 var data = {
-                    'id': node.data['key'], 'law': id, 'concept': node.data['concept'],
-                    'head': null, 'reference': null, 'predicate': null
+                    'id': node.data['id'], 'law': id, 'concept': node.data['concept'],
+                    'head': null, 'reference': null
                 };
                 var head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
@@ -307,20 +413,8 @@
                 error: function() {
                 }
             });
-        }
+        };
 
-        function loadLaw(id) {
-            $.ajax({
-               url: "{{=URL('default', 'loadLaw', extension='json')}}",
-               type: 'get',
-               dataType: 'json',
-               data: JSON.stringify({id: id}),
-               success: function(data) {
-               },
-               error: function() {
-               }
-            });
-        }
 
         /* RELATION EVALUATION
 
@@ -342,59 +436,50 @@
 
         */
 
-        function Relation() {
-
-            this.lawId = getCurrentLaw();
-
-            this.nodes = {};
-            this.allNodes = {};
-            this.predicates = {};
-            this.newNodes = {};
-
-            this.wildcardConcept = 2;
-
-            this.tempIdMap = null;
-            this.nodeMap = {};
-            this.map = {};
-            this.nextMapId = 0;
-            this.nextNodeId = 0;
-        }
-
-        function getCurrentLaw() {
-            return $('#current_law').val();
-        }
-
         //get and index relevant DB tables for use in the evaluation algorithm
-        Relation.prototype.init = function() {
+        Relation.prototype.initEval = function() {
 
-            var self = this;
+            var self = this, law = getCurrentLaw();
 
             $.ajax({
                url: "{{=URL('default', 'initRelation', extension='json')}}",
                type: 'get',
                dataType: 'json',
-               data: {},
+               data: {
+                   law: law
+               },
                success: function(data) {
+                   self.myNodes = data.myNodes;
+                   self.concepts = data.concepts;
+                   self.laws = data.laws;
                    self.nodes = data.nodes;
-                   self.allNodes = data.allNodes;
                    self.predicates = data.predicates;
+                   self.nextNodeId = data.nextNodeId;
+
+                   $.each(self.laws, function(id, law) {
+                       if(id == self.lawId) self.law = law;
+                       law.predicateSets = [];
+                       $.each(law.predicates, function(id, group) {
+                           law.predicateSets.push(group.keys());
+                       });
+                   });
                }
             });
         };
 
         Relation.prototype.evaluate = function() {
 
-            var self = this, nodes = self.nodes.keys();
+            var self = this, myNodes = self.myNodes.slice();
 
-            while(nodes.length > 0) {
+            while(myNodes.length > 0) {
                //find any deep predicate nodes in included frameworks
                //that have the same concept as this node
-               var nodeId = nodes.pop(), concept = self.nodes[nodeId]['concept'];
+               var nodeId = myNodes.pop(), concept = self.nodes[nodeId]['concept'];
                if(!self.predicates.hasOwnProperty(concept)) return;
                self.predicates[concept].forEach(function(predicateId) {
                    self.checkPredicate(nodeId, predicateId);
                });
-            });
+            }
 
             $.ajax({
                url: "{{=URL('default', 'saveNodes', extension='json')}}",
@@ -409,7 +494,7 @@
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
         Relation.prototype.checkPredicate = function(nodeId, predicateId) {
 
-            var self = this, node = this.nodes[nodeId], predicate = this.allNodes[predicateId];
+            var self = this, node = this.nodes[nodeId], predicate = this.nodes[predicateId];
 
             //if this is the first recursion step, initialize aggregators
             var firstLevel = self.tempIdMap == null;
@@ -483,8 +568,7 @@
             if(!disjoint) return false;
 
             //and that the joint predicate set is part of a set that satisfies the law
-            var law = self.laws[map1.lawId], predicateSet = map1.predicates.concat(map2.predicates);
-            var match = null;
+            var law = self.laws[map1.lawId], predicateSet = map1.predicates.concat(map2.predicates), match = null;
             var cannotCombine = law.predicateSets.every(function(set) {
                 var isSubset = predicateSet.every(function(predicate) {
                     return set.indexOf(predicate) >= 0;
@@ -536,7 +620,7 @@
 
         Relation.prototype.appendLawHelper = function(map, nodeId) {
 
-            var self = this, node = self.allNodes[nodeId], head = node['head'], reference = node['reference'], newHead, newReference;
+            var self = this, node = self.nodes[nodeId], head = node['head'], reference = node['reference'], newHead, newReference;
 
             if(!map.idMap.hasOwnProperty(head)) newHead = self.appendLawHelper(map, head);
             else newHead = map.idMap[head];
@@ -546,14 +630,67 @@
             var newId = self.nextNodeId++;
             self.newNodes[newId] = {
                 'id': newId,
-                'law': self.lawId,
+                'law': self.currentLaw,
                 'concept': node['concept'],
                 'head': newHead,
                 'reference': newReference
-            });
+            };
             map.idMap[nodeId] = newId;
             return newId;
         };
+
+
+        Relation.prototype.setNodeTemplate = function(node, template) {
+            var self = this;
+            if(!self.nodeTemplates.hasOwnProperty(template)) return false;
+            if(typeof node != 'object') {
+                if(isNaN(node)) return false;
+                node = self.diagram.model.findNodeDataForKey(node);
+                if(!node) return false;
+            }
+            let nodeTemplate = self.nodeTemplates[template];
+            for(let property in nodeTemplate) {
+                self.diagram.model.setDataProperty(node, property, nodeTemplate[property]);
+            }
+        };
+
+
+        Relation.prototype.setPredicate = function(predicate) {
+            var self = this;
+            //first un-highlight any selected predicate nodes
+            self.diagram.nodes.each(function(node) {
+                self.setNodeTemplate(node.data, 'default');
+            });
+            //now highlight nodes that are part of the chosen predicate
+            if(self.predicateSets.hasOwnProperty(predicate) {
+                for(let node in self.predicateSets[predicate]) {
+                    let data = self.diagram.model.findNodeDataForKey(node);
+                    if(data) self.setNodeTemplate(node, 'predicate');
+                }
+            });
+        };
+
+
+
+        var relation;
+        $(document).ready(function() {
+            relation = new Relation();
+            relation.initDiagram();
+            $('save_relation').click(function(e) {
+                relation.save();
+            });
+            $('set_predicate').change(function(e) {
+                let $this = $(this), val = $this.val();
+                if(val == 'new') {
+                    let $last = $("[value='new']", this);
+                    let next = '' + (parseInt($last.prev().attr('option')) + 1);
+                    $last.before("<option value='" + next + "'>");
+                    $this.val(next);
+                    val = next;
+                }
+                relation.setPredicate(parseInt(val));
+            });
+        });
 
     </script>
     {{end page_js}}

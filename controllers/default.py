@@ -35,20 +35,20 @@ def concept():
     form = SQLFORM.smartgrid(db.framework,
         user_signature=False,
         links={
-            'framework': [lambda row: A('Use', _href='javascript:useFramework('+str(row.id)+')')],
-            'law': [lambda row: A('Use', _href='javascript:useLaw('+str(row.id)+')')]
+            'framework': [lambda row: A('Use', _href='javascript:relation.useFramework('+str(row.id)+')')],
+            'law': [lambda row: A('Use', _href='javascript:relation.useLaw('+str(row.id)+')')]
         },
         linked_tables=[db.framework_dependency.framework, 'concept', 'law'])
     return locals()
 
 
 def useFrameworkOrLaw():
-    currentFramework = int(request.vars.currentFramework)
-    currentLaw = int(request.vars.currentLaw)
+    currentFramework = int(request.vars.currentFramework or -1)
+    currentLaw = int(request.vars.currentLaw or -1)
     recordType = request.vars.type
     recordId = int(request.vars.id)
 
-    ret = {'frameworks': [], 'law': {'nodes': []}}
+    ret = {'frameworks': [], 'law': {'nodes': {}}}
 
     print('{timestamp} -- using framework').format(timestamp=datetime.utcnow().isoformat())
 
@@ -67,8 +67,8 @@ def useFrameworkOrLaw():
         ret['law']['description'] = law.description
         ret['law']['framework'] = law.framework
         for node in db(db.node.law == recordId).iterselect():
-            ret['law']['nodes'].append(
-                {'id': node.id, 'law': recordId, 'concept': node.concept, 'head': node.head, 'reference': node.reference});
+            ret['law']['nodes'][node.id] = \
+                {'id': node.id, 'law': recordId, 'concept': node.concept, 'head': node.head, 'reference': node.reference}
         newFramework = law.framework
 
     #collect the concepts corresponding to the new framework and all its dependencies
@@ -101,21 +101,17 @@ def saveLaw():
 
     request_vars = json.loads(body)
 
-    print('VARS: {vars}').format(vars=request_vars)
-
     lawId = int(request_vars['id'])
     nodes = request_vars['nodes']
     ret = {'success': False}
-
-    print('ID: {id}').format(id=lawId)
-    print('NODES: {nodes}').format(nodes=nodes)
 
     db(db.node.law == lawId).delete()
 
     idMap = {None: None}
     for node in nodes:
         #data = {'law': lawId, 'concept': node['concept'], 'predicate': node['predicate']}
-        nodeId = db.node.insert(law=lawId, concept=node['concept'], predicate=node['predicate'])
+        nodeId = db.node.update_or_insert(db.node.id == node['id'],
+            id=node['id'], law=lawId, concept=node['concept'], predicate=node['predicate'])
         idMap[node['id']] = nodeId
     for node in nodes:
         db(db.node.id == idMap[node['id']]).update(head = idMap[node['head']], reference = idMap[node['reference']])
@@ -125,15 +121,35 @@ def saveLaw():
 
 
 def initRelation():
-    frameworks = [framework]
+
+    lawId = request.vars.law
+    rows = db(db.law.id == lawId).select()
+    relation = rows[0]
+
+    ret = {'myNodes': [], 'concepts': {}, 'laws': {}, 'nodes': {}, 'predicates': {}, 'nextNodeId': -1}
+
+    frameworks = [relation.framework]
     while frameworks:
         fid = frameworks.pop(0)
         for concept in db(db.concept.framework == fid).iterselect():
-            ret['concepts'].append({'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': fid});
+            ret['concepts'][concept.id] = {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': fid};
         for law in db(db.law.framework == fid).iterselect():
-            ret['laws'].append({'id': law.id, 'name': law.name, 'description': law.description});
+            ret['laws'][law.id] = {'id': law.id, 'name': law.name, 'description': law.description, 'predicates': {}};
+            for node in db(db.node.law == law.id).iterselect():
+                ret['nodes'][node.id] = \
+                    {'id': node.id, 'law': node.law, 'concept': node.concept, 'head': node.head, 'reference': node.reference};
+                for predicate in db(db.predicate.node == node.id).iterselect():
+                    ret['predicates'][node.concept] = node.id   #not clear how to avoid repeating this command
+                    ret['laws'][law.id]['predicates'].setdefault(predicate.predicate_group, {})[node.id] = True
+                if law.id == lawId:
+                    ret['myNodes'].append(node.id)
+                if node.id >= ret['nextNodeId']:
+                    ret['nextNodeId'] = node.id + 1
         for dep in db(db.framework_dependency.framework == fid).iterselect(db.framework_dependency.dependency):
             frameworks.append(dep.dependency)
+
+    ret['success'] = True
+    return response.json(ret)
 
 
 def user():

@@ -236,3 +236,30 @@ success!
 ALTER TABLE node DROP COLUMN predicate__tmp;
 success!
 success!
+timestamp: 2018-06-20T19:50:36.149890
+CREATE TABLE predicate(
+    id INT AUTO_INCREMENT NOT NULL,
+    node INT  , INDEX node__idx (node), FOREIGN KEY (node) REFERENCES node (id) ON DELETE CASCADE,
+    group INT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+timestamp: 2018-06-20T19:52:36.686233
+CREATE TABLE predicate(
+    id INT AUTO_INCREMENT NOT NULL,
+    node INT  , INDEX node__idx (node), FOREIGN KEY (node) REFERENCES node (id) ON DELETE CASCADE,
+    predicate_group INT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-06-26T18:56:14.418890
+ALTER TABLE node ADD symmetric CHAR(1);
+success!
+timestamp: 2018-06-26T18:56:14.523245
+ALTER TABLE node ADD predicates INT;
+success!
+timestamp: 2018-06-26T18:56:14.621267
+ALTER TABLE node DROP COLUMN predicate;
+success!
+timestamp: 2018-06-26T19:43:11.562902
+ALTER TABLE node DROP COLUMN predicates;
+success!
