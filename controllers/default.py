@@ -48,7 +48,7 @@ def useFrameworkOrLaw():
     recordType = request.vars.type
     recordId = int(request.vars.id)
 
-    ret = {'frameworks': [], 'law': {'nodes': {}}}
+    ret = {'frameworks': [], 'law': {'nodes': {}, 'predicates': {}}}
 
     print('{timestamp} -- using framework').format(timestamp=datetime.utcnow().isoformat())
 
@@ -69,6 +69,8 @@ def useFrameworkOrLaw():
         for node in db(db.node.law == recordId).iterselect():
             ret['law']['nodes'][node.id] = \
                 {'id': node.id, 'law': recordId, 'concept': node.concept, 'head': node.head, 'reference': node.reference}
+            for predicate in db(db.predicate.node == node.id).iterselect():
+                ret['law']['predicates'].set_default(predicate.predicate_group, {})[node.id] = True   #not clear how to avoid repeating this command
         newFramework = law.framework
 
     #collect the concepts corresponding to the new framework and all its dependencies
@@ -103,18 +105,25 @@ def saveLaw():
 
     lawId = int(request_vars['id'])
     nodes = request_vars['nodes']
+    predicates = request_vars['predicates']
     ret = {'success': False}
-
-    db(db.node.law == lawId).delete()
 
     idMap = {None: None}
     for node in nodes:
         #data = {'law': lawId, 'concept': node['concept'], 'predicate': node['predicate']}
         nodeId = db.node.update_or_insert(db.node.id == node['id'],
-            id=node['id'], law=lawId, concept=node['concept'], predicate=node['predicate'])
+            id=node['id'], law=lawId, concept=node['concept'])
         idMap[node['id']] = nodeId
+
+    for node in db(db.node.law == lawId).iterselect():
+        db(db.predicate.node == node.id).delete()
+        if node.id not in idMap:
+            node.delete()
+
     for node in nodes:
         db(db.node.id == idMap[node['id']]).update(head = idMap[node['head']], reference = idMap[node['reference']])
+    for predicate in predicates:
+        db.predicate.insert(node=predicate['node'], predicate_group=predicate['predicate_group'])
 
     ret['success'] = True
     return response.json(ret)

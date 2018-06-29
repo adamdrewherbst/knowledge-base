@@ -18,13 +18,19 @@
         <!-- graph editor -->
         <h2>Build a relation with concepts</h2>
         <div id="graph-buttons" style="margin-bottom: 20px">
-            <button id="save_relation" type="button">Save Relation</button>
-            <label for="set_predicate">Predicate</label>
-            <select id="set_predicate">
-                <option value="0">--- Select ---</option>
-                <option value="new">New Predicate</option>
-            </select>
-            <label>Click a node to add/remove it from this predicate</label>
+            <div id="graph-controls">
+                <div id="predicate-controls">
+                    <select id="set-predicate">
+                        <option value="-1">Select Predicate</option>
+                        <option value="new">New Predicate</option>
+                    </select>
+                    <button id="remove-predicate" type="button" class="btn btn-primary">Remove Predicate</button>
+                    <label id="predicate-help">Right-click a node to add/remove it from this predicate</label>
+                </div>
+                <div id="relation-controls">
+                    <button id="save-relation" type="button" class="btn btn-primary">Save Relation</button>
+                </div>
+            </div>
         </div>
         <div style="width: 100%; display: flex; justify-content: space-between">
             <div id="concept-palette" style="width: 160px; margin-right: 2px; background-color: whitesmoke; border: solid 1px black"></div>
@@ -140,7 +146,8 @@
             this.concepts = null;
             this.wildcardConcept = 2;
 
-            this.predicateSets = {};
+            this.predicateSets = [];
+            this.currentPredicate = -1;
         }
 
         Relation.prototype.initDiagram = function() {
@@ -222,6 +229,40 @@
               });
             }
 
+            // To simplify this code we define a function for creating a context menu button:
+            function makeButton(text, action, visiblePredicate) {
+              return $$("ContextMenuButton",
+                       $$(go.TextBlock, text),
+                       { click: action },
+                       // don't bother with binding GraphObject.visible if there's no predicate
+                       visiblePredicate ? new go.Binding("visible", "", function(o, e) { return o.diagram ? visiblePredicate(o, e) : false; }).ofObject() : {});
+            }
+
+            // a context menu is an Adornment with a bunch of buttons in them
+            var partContextMenu =
+              $$(go.Adornment, "Vertical",
+                  makeButton("Add to Predicate",
+                             function(e, obj) {
+                                 let part = obj.part.adornedPart;
+                                 if(part instanceof go.Node) self.togglePredicate(part.data.id, true);
+                             },
+                             function(o) {
+                                 let part = o.part.adornedPart;
+                                 if(part instanceof go.Node) return !self.inPredicate(part.data.id);
+                                 return false;
+                             }),
+                  makeButton("Remove from Predicate",
+                             function(e, obj) {
+                                 let part = obj.part.adornedPart;
+                                 if(part instanceof go.Node) self.togglePredicate(part.data.id, false);
+                             },
+                             function(o) {
+                                 let part = o.part.adornedPart;
+                                 if(part instanceof go.Node) return self.inPredicate(part.data.id);
+                                 return false;
+                             }),
+              );
+
             self.diagram.nodeTemplate = $$(go.Node, "Spot",
                 { locationSpot: go.Spot.Center },
                 new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
@@ -253,8 +294,9 @@
                 makePort("B", go.Spot.Bottom, true, true),
                 { // handle mouse enter/leave events to show/hide the ports
                   mouseEnter: function(e, node) { showSmallPorts(node, true); },
-                  mouseLeave: function(e, node) { showSmallPorts(node, false); }
-                }
+                  mouseLeave: function(e, node) { showSmallPorts(node, false); },
+                  contextMenu: partContextMenu
+                },
             );
 
             // initialize the Palette that is on the left side of the page
@@ -378,6 +420,17 @@
                         };
                         drawLinks(-1);
 
+                        self.predicateSets = [];
+                        $('#set-predicate').children().slice(1, -1).remove();
+                        if(data.law.predicates) {
+                            for(let group in data.law.predicates) {
+                                $('#set-predicate > option:first-child').after('<option value="' + (group-1) + '">Predicate ' + group + '</option>');
+                                let obj = {};
+                                for(let node in data.law.predicates[group]) obj[node] = true;
+                                self.predicateSets.push(obj);
+                            }
+                        }
+
                         if(data.law.id) self.currentLaw = data.law.id;
                     }
                 },
@@ -389,7 +442,7 @@
         Relation.prototype.save = function() {
             var self = this, id = self.currentLaw;
 
-            var nodes = [];
+            var nodes = [], predicates = [];
             self.diagram.nodes.each(function(node) {
                 var data = {
                     'id': node.data['id'], 'law': id, 'concept': node.data['concept'],
@@ -397,16 +450,22 @@
                 };
                 var head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
-                if(head.count > 0) data['head'] = head.first().data['key'];
-                if(reference.count > 0) data['reference'] = reference.first().data['key'];
+                if(head.count > 0) data['head'] = head.first().data['id'];
+                if(reference.count > 0) data['reference'] = reference.first().data['id'];
                 nodes.push(data);
+            });
+
+            self.predicateSets.forEach(function(pset, i) {
+                for(let node in pset) {
+                    predicates.push({'node': node, 'predicate_group': i+1});
+                }
             });
 
             $.ajax({
                 url: "{{=URL('default', 'saveLaw', extension='json')}}",
                 type: 'post',
                 dataType: 'json',
-                data: JSON.stringify({id: id, nodes: nodes}),
+                data: JSON.stringify({id: id, nodes: nodes, predicates: predicates}),
                 success: function(data) {
                     $('#law-save-msg').val('Relation saved').show(3000);
                 },
@@ -641,7 +700,7 @@
 
 
         Relation.prototype.setNodeTemplate = function(node, template) {
-            var self = this;
+            let self = this;
             if(!self.nodeTemplates.hasOwnProperty(template)) return false;
             if(typeof node != 'object') {
                 if(isNaN(node)) return false;
@@ -656,18 +715,71 @@
 
 
         Relation.prototype.setPredicate = function(predicate) {
-            var self = this;
+            let self = this;
             //first un-highlight any selected predicate nodes
             self.diagram.nodes.each(function(node) {
                 self.setNodeTemplate(node.data, 'default');
             });
+
+            if(predicate < 0) {
+                $('#remove-predicate, #predicate-help').hide();
+                return;
+            }
+
+            //create a new empty predicate set if requested
+            if(predicate == 'new') {
+                predicate = self.predicateSets.length;
+                self.predicateSets.push({});
+                let $select = $('#set-predicate');
+                $select.find('[value="new"]').before('<option value="' + predicate + '">Predicate ' + (predicate+1) + '</option>');
+                $select.val(predicate);
+            }
+
+            $('#remove-predicate, #predicate-help').show();
+
             //now highlight nodes that are part of the chosen predicate
-            if(self.predicateSets.hasOwnProperty(predicate) {
-                for(let node in self.predicateSets[predicate]) {
-                    let data = self.diagram.model.findNodeDataForKey(node);
-                    if(data) self.setNodeTemplate(node, 'predicate');
-                }
+            for(let node in self.predicateSets[predicate]) {
+                self.setNodeTemplate(node, 'predicate');
+            }
+            self.currentPredicate = predicate;
+        };
+
+
+        Relation.prototype.removePredicate = function(predicate) {
+            let self = this;
+            if(predicate === undefined) predicate = self.currentPredicate;
+            if(isNaN(predicate)) return false;
+            if(self.currentPredicate == predicate) {
+                self.setPredicate(-1);
+                $('#set-predicate').val(0);
+            }
+            self.predicateSets.splice(predicate, 1);
+            let $option = $('#set-predicate > option[value="' + predicate + '"]').val("");
+            $option.nextAll().each(function(i, el) {
+                el.value = parseInt(el.value) - 1;
+                el.text = 'Predicate ' + el.value;
             });
+            $option.remove();
+        };
+
+
+        Relation.prototype.togglePredicate = function(node, include) {
+            let self = this;
+            if(!self.predicateSets.hasOwnProperty(self.currentPredicate)) return false;
+            if(include) {
+                self.predicateSets[self.currentPredicate][node] = true;
+                self.setNodeTemplate(node, 'predicate');
+            } else {
+                delete self.predicateSets[self.currentPredicate][node];
+                self.setNodeTemplate(node, 'default');
+            }
+        };
+
+
+        Relation.prototype.inPredicate = function(node) {
+            let self = this;
+            return self.predicateSets.hasOwnProperty(self.currentPredicate)
+                && self.predicateSets[self.currentPredicate].hasOwnProperty(node);
         };
 
 
@@ -676,19 +788,16 @@
         $(document).ready(function() {
             relation = new Relation();
             relation.initDiagram();
-            $('save_relation').click(function(e) {
-                relation.save();
+
+            $('#set-predicate').change(function(e) {
+                relation.setPredicate($(this).val());
             });
-            $('set_predicate').change(function(e) {
-                let $this = $(this), val = $this.val();
-                if(val == 'new') {
-                    let $last = $("[value='new']", this);
-                    let next = '' + (parseInt($last.prev().attr('option')) + 1);
-                    $last.before("<option value='" + next + "'>");
-                    $this.val(next);
-                    val = next;
-                }
-                relation.setPredicate(parseInt(val));
+            $('#remove-predicate').click(function(e) {
+                relation.removePredicate();
+            });
+
+            $('#save-relation').click(function(e) {
+                relation.save();
             });
         });
 
@@ -739,14 +848,34 @@
             border: 3px solid green;
         }
 
-        #graph-save-button {
+        #graph-controls {
+        }
+        #predicate-controls, #relation-controls {
+            margin-bottom: 20px;
+        }
+        #graph-controls button, #graph-controls select {
+            padding: 5px 10px;
             border: 2px solid black;
-            border-radius: 10px;
-            font-size: 20px;
+            border-radius: 5px;
+            font-size: 16px;
             font-weight: bold;
             background-color: #aaaaff;
             color: black;
         }
+        #predicate-controls {
+            float: left;
+        }
+        #predicate-controls button {
+        }
+        #remove-predicate, #predicate-help {
+            display: none;
+        }
+        #relation-controls {
+            float: right;
+        }
+        #relation-controls button {
+        }
+
     </style>
     {{end page_css}}
 

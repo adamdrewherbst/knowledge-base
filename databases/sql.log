@@ -263,3 +263,10 @@ success!
 timestamp: 2018-06-26T19:43:11.562902
 ALTER TABLE node DROP COLUMN predicates;
 success!
+timestamp: 2018-06-29T00:52:41.057221
+ALTER TABLE concept ADD symmetric CHAR(1);
+success!
+success!
+timestamp: 2018-06-29T00:52:41.224760
+ALTER TABLE node DROP COLUMN symmetric;
+success!
