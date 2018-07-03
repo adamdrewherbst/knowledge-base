@@ -70,7 +70,9 @@ def useFrameworkOrLaw():
             ret['law']['nodes'][node.id] = \
                 {'id': node.id, 'law': recordId, 'concept': node.concept, 'head': node.head, 'reference': node.reference}
             for predicate in db(db.predicate.node == node.id).iterselect():
-                ret['law']['predicates'].set_default(predicate.predicate_group, {})[node.id] = True   #not clear how to avoid repeating this command
+                if predicate.predicate_group not in ret['law']['predicates']:
+                    ret['law']['predicates'][predicate.predicate_group] = {}
+                ret['law']['predicates'][predicate.predicate_group][node.id] = True   #not clear how to avoid repeating this command
         newFramework = law.framework
 
     #collect the concepts corresponding to the new framework and all its dependencies
@@ -109,21 +111,23 @@ def saveLaw():
     ret = {'success': False}
 
     idMap = {None: None}
+    allNodes = {}
     for node in nodes:
         #data = {'law': lawId, 'concept': node['concept'], 'predicate': node['predicate']}
         nodeId = db.node.update_or_insert(db.node.id == node['id'],
-            id=node['id'], law=lawId, concept=node['concept'])
+            law=node['law'], concept=node['concept'])
         idMap[node['id']] = nodeId
+        allNodes[nodeId] = True
 
     for node in db(db.node.law == lawId).iterselect():
         db(db.predicate.node == node.id).delete()
-        if node.id not in idMap:
+        if node.id not in allNodes:
             node.delete()
 
     for node in nodes:
         db(db.node.id == idMap[node['id']]).update(head = idMap[node['head']], reference = idMap[node['reference']])
     for predicate in predicates:
-        db.predicate.insert(node=predicate['node'], predicate_group=predicate['predicate_group'])
+        db.predicate.insert(node=idMap[predicate['node']], predicate_group=predicate['predicate_group'])
 
     ret['success'] = True
     return response.json(ret)
@@ -131,7 +135,7 @@ def saveLaw():
 
 def initRelation():
 
-    lawId = request.vars.law
+    lawId = int(request.vars.law)
     rows = db(db.law.id == lawId).select()
     relation = rows[0]
 
@@ -143,19 +147,28 @@ def initRelation():
         for concept in db(db.concept.framework == fid).iterselect():
             ret['concepts'][concept.id] = {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': fid};
         for law in db(db.law.framework == fid).iterselect():
-            ret['laws'][law.id] = {'id': law.id, 'name': law.name, 'description': law.description, 'predicates': {}};
+            ret['laws'][law.id] = {'id': law.id, 'name': law.name, 'description': law.description, 'nodes': [], 'predicates': {}, 'notDeepNode': {}};
             for node in db(db.node.law == law.id).iterselect():
                 ret['nodes'][node.id] = \
                     {'id': node.id, 'law': node.law, 'concept': node.concept, 'head': node.head, 'reference': node.reference};
+                ret['laws'][law.id]['nodes'].append(node.id)
                 for predicate in db(db.predicate.node == node.id).iterselect():
-                    ret['predicates'][node.concept] = node.id   #not clear how to avoid repeating this command
-                    ret['laws'][law.id]['predicates'].setdefault(predicate.predicate_group, {})[node.id] = True
+                    if node.concept not in ret['predicates']:
+                        ret['predicates'][node.concept] = {}
+                    ret['predicates'][node.concept][node.id] = True
+                    if predicate.predicate_group not in ret['laws'][law.id]['predicates']:
+                        ret['laws'][law.id]['predicates'][predicate.predicate_group] = {}
+                    ret['laws'][law.id]['predicates'][predicate.predicate_group][node.id] = True
                 if law.id == lawId:
                     ret['myNodes'].append(node.id)
-                if node.id >= ret['nextNodeId']:
-                    ret['nextNodeId'] = node.id + 1
+                if node.head:
+                    ret['laws'][law.id]['notDeepNode'][node.head] = True
+                if node.reference:
+                    ret['laws'][law.id]['notDeepNode'][node.reference] = True
         for dep in db(db.framework_dependency.framework == fid).iterselect(db.framework_dependency.dependency):
             frameworks.append(dep.dependency)
+
+    ret['nextNodeId'] = db.executesql("select `auto_increment` from information_schema.tables where table_name = 'node'")
 
     ret['success'] = True
     return response.json(ret)

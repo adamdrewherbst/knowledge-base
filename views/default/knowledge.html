@@ -29,6 +29,7 @@
                 </div>
                 <div id="relation-controls">
                     <button id="save-relation" type="button" class="btn btn-primary">Save Relation</button>
+                    <button id="evaluate-relation" type="button" class="btn btn-primary">Evaluate</button>
                 </div>
             </div>
         </div>
@@ -109,12 +110,14 @@
             this.currentLaw = -1;
             this.currentFramework = -1;
 
-            this.myNodes = [];
             this.concepts = {};
             this.laws = {};
             this.nodes = {};
             this.predicates = {};
-            this.newNodes = {};
+
+            this.myNodes = [];
+            this.nodesToCheck = [];
+            this.newNodes = [];
 
             this.tempIdMap = null;
             this.nodeMap = {};
@@ -244,21 +247,21 @@
                   makeButton("Add to Predicate",
                              function(e, obj) {
                                  let part = obj.part.adornedPart;
-                                 if(part instanceof go.Node) self.togglePredicate(part.data.id, true);
+                                 if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), true);
                              },
                              function(o) {
                                  let part = o.part.adornedPart;
-                                 if(part instanceof go.Node) return !self.inPredicate(part.data.id);
+                                 if(part instanceof go.Node) return !self.inPredicate(parseInt(part.data.id));
                                  return false;
                              }),
                   makeButton("Remove from Predicate",
                              function(e, obj) {
                                  let part = obj.part.adornedPart;
-                                 if(part instanceof go.Node) self.togglePredicate(part.data.id, false);
+                                 if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), false);
                              },
                              function(o) {
                                  let part = o.part.adornedPart;
-                                 if(part instanceof go.Node) return self.inPredicate(part.data.id);
+                                 if(part instanceof go.Node) return self.inPredicate(parseInt(part.data.id));
                                  return false;
                              }),
               );
@@ -310,6 +313,7 @@
             self.clearDiagram();
         };
 
+
         Relation.prototype.setPaletteModel = function() {
             var self = this, concepts = self.concepts || self.coreConcepts;
             var dataArray = [];
@@ -323,6 +327,7 @@
             });
         };
 
+
         Relation.prototype.clearDiagram = function() {
             var self = this;
             self.diagram.model = $$(go.GraphLinksModel,
@@ -332,6 +337,91 @@
                 linkToPortIdProperty: 'toPort',
             });
         };
+
+
+        Relation.prototype.setNodeTemplate = function(node, template) {
+            let self = this;
+            if(!self.nodeTemplates.hasOwnProperty(template)) return false;
+            if(typeof node != 'object') {
+                if(isNaN(node)) return false;
+                node = self.diagram.model.findNodeDataForKey(node);
+                if(!node) return false;
+            }
+            let nodeTemplate = self.nodeTemplates[template];
+            for(let property in nodeTemplate) {
+                self.diagram.model.setDataProperty(node, property, nodeTemplate[property]);
+            }
+        };
+
+
+        Relation.prototype.setPredicate = function(predicate) {
+            let self = this;
+            //first un-highlight any selected predicate nodes
+            self.diagram.nodes.each(function(node) {
+                self.setNodeTemplate(node.data, 'default');
+            });
+
+            if(predicate < 0) {
+                $('#remove-predicate, #predicate-help').hide();
+                return;
+            }
+
+            //create a new empty predicate set if requested
+            if(predicate == 'new') {
+                predicate = self.predicateSets.length;
+                self.predicateSets.push({});
+                let $select = $('#set-predicate');
+                $select.find('[value="new"]').before('<option value="' + predicate + '">Predicate ' + (predicate+1) + '</option>');
+                $select.val(predicate);
+            }
+
+            $('#remove-predicate, #predicate-help').show();
+
+            //now highlight nodes that are part of the chosen predicate
+            for(let node in self.predicateSets[predicate]) {
+                self.setNodeTemplate(node, 'predicate');
+            }
+            self.currentPredicate = predicate;
+        };
+
+
+        Relation.prototype.removePredicate = function(predicate) {
+            let self = this;
+            if(predicate === undefined) predicate = self.currentPredicate;
+            if(isNaN(predicate)) return false;
+            if(self.currentPredicate == predicate) {
+                self.setPredicate(-1);
+                $('#set-predicate').val(0);
+            }
+            self.predicateSets.splice(predicate, 1);
+            let $option = $('#set-predicate > option[value="' + predicate + '"]').val("");
+            $option.nextAll().each(function(i, el) {
+                el.value = parseInt(el.value) - 1;
+                el.text = 'Predicate ' + el.value;
+            });
+            $option.remove();
+        };
+
+
+        Relation.prototype.togglePredicate = function(node, include) {
+            let self = this;
+            if(!self.predicateSets.hasOwnProperty(self.currentPredicate)) return false;
+            if(include) {
+                self.predicateSets[self.currentPredicate][node] = true;
+                self.setNodeTemplate(node, 'predicate');
+            } else {
+                delete self.predicateSets[self.currentPredicate][node];
+                self.setNodeTemplate(node, 'default');
+            }
+        };
+
+
+        Relation.prototype.inPredicate = function(node) {
+            let self = this;
+            return self.predicateSets.hasOwnProperty(self.currentPredicate)
+                && self.predicateSets[self.currentPredicate].hasOwnProperty(node);
+        };
+
 
         Relation.prototype.useFramework = function(id) { this.useFrameworkOrLaw('framework', id); };
         Relation.prototype.useLaw = function(id) { this.useFrameworkOrLaw('law', id); };
@@ -424,7 +514,7 @@
                         $('#set-predicate').children().slice(1, -1).remove();
                         if(data.law.predicates) {
                             for(let group in data.law.predicates) {
-                                $('#set-predicate > option:first-child').after('<option value="' + (group-1) + '">Predicate ' + group + '</option>');
+                                $('#set-predicate > option:last-child').before('<option value="' + (group-1) + '">Predicate ' + group + '</option>');
                                 let obj = {};
                                 for(let node in data.law.predicates[group]) obj[node] = true;
                                 self.predicateSets.push(obj);
@@ -457,7 +547,7 @@
 
             self.predicateSets.forEach(function(pset, i) {
                 for(let node in pset) {
-                    predicates.push({'node': node, 'predicate_group': i+1});
+                    predicates.push({'node': parseInt(node), 'predicate_group': i+1});
                 }
             });
 
@@ -496,16 +586,17 @@
         */
 
         //get and index relevant DB tables for use in the evaluation algorithm
-        Relation.prototype.initEval = function() {
+        Relation.prototype.initEval = function(evaluate) {
 
-            var self = this, law = getCurrentLaw();
+            var self = this;
+            if(self.currentLaw < 0) return false;
 
             $.ajax({
                url: "{{=URL('default', 'initRelation', extension='json')}}",
                type: 'get',
                dataType: 'json',
                data: {
-                   law: law
+                   law: self.currentLaw
                },
                success: function(data) {
                    self.myNodes = data.myNodes;
@@ -519,35 +610,52 @@
                        if(id == self.lawId) self.law = law;
                        law.predicateSets = [];
                        $.each(law.predicates, function(id, group) {
-                           law.predicateSets.push(group.keys());
+                           let pset = [];
+                           for(let node in group) pset.push(node);
+                           law.predicateSets.push(pset);
+                       });
+                       law.deepNodes = [];
+                       law.nodes.forEach(function(node) {
+                           if(!law.notDeepNode.hasOwnProperty(node)) {
+                               law.deepNodes.push(node);
+                           }
                        });
                    });
+
+                   if(evaluate) self.evaluate();
                }
             });
         };
 
-        Relation.prototype.evaluate = function() {
+        Relation.prototype.evaluate = function(doInit = false) {
 
-            var self = this, myNodes = self.myNodes.slice();
+            var self = this;
 
-            while(myNodes.length > 0) {
-               //find any deep predicate nodes in included frameworks
-               //that have the same concept as this node
-               var nodeId = myNodes.pop(), concept = self.nodes[nodeId]['concept'];
-               if(!self.predicates.hasOwnProperty(concept)) return;
-               self.predicates[concept].forEach(function(predicateId) {
-                   self.checkPredicate(nodeId, predicateId);
-               });
+            if(doInit) {
+                self.initEval(true);
+                return;
             }
 
-            $.ajax({
+            self.nodesToCheck = self.myNodes.slice();
+
+            while(self.nodesToCheck.length > 0) {
+               //find any deep predicate nodes in included frameworks
+               //that have the same concept as this node
+               var nodeId = self.nodesToCheck.pop(), concept = self.nodes[nodeId]['concept'];
+               if(!self.predicates.hasOwnProperty(concept)) continue;
+               for(let predicateId in self.predicates[concept]) {
+                   self.checkPredicate(nodeId, predicateId);
+               }
+            }
+
+            /*$.ajax({
                url: "{{=URL('default', 'saveNodes', extension='json')}}",
                type: 'post',
                dataType: 'json',
                data: JSON.stringify(self.newNodes),
                success: function(data) {
                },
-            });
+            });//*/
         };
 
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
@@ -601,7 +709,7 @@
                 if(count > 0) {
                     self.map[self.nextMapId++] = {
                         lawId: predicate['law'],
-                        predicates: predicateId,
+                        predicates: [predicateId],
                         idMap: self.tempIdMap
                     };
                 }
@@ -671,7 +779,7 @@
             var self = this;
 
             //start at each deep node of the law
-            var law = this.laws[map.lawId];
+            var law = self.laws[map.lawId];
             law.deepNodes.forEach(function(nodeId) {
                self.appendLawHelper(map, nodeId);
             });
@@ -687,99 +795,23 @@
             else newReference = map.idMap[reference];
 
             var newId = self.nextNodeId++;
-            self.newNodes[newId] = {
+            self.nodes[newId] = {
                 'id': newId,
                 'law': self.currentLaw,
                 'concept': node['concept'],
                 'head': newHead,
                 'reference': newReference
             };
+            self.newNodes.push(newId);
+            self.nodesToCheck.push(newId);
             map.idMap[nodeId] = newId;
+            map.idMap[newId] = nodeId;
+
+            self.diagram.model.addNodeData(self.nodes[newId]);
+            self.diagram.model.addLinkData({from: newHead, to: newId, fromPort: 'B', toPort: 'T'});
+            self.diagram.model.addLinkData({from: newId, to: newReference, fromPort: 'T', toPort: 'B'});
+
             return newId;
-        };
-
-
-        Relation.prototype.setNodeTemplate = function(node, template) {
-            let self = this;
-            if(!self.nodeTemplates.hasOwnProperty(template)) return false;
-            if(typeof node != 'object') {
-                if(isNaN(node)) return false;
-                node = self.diagram.model.findNodeDataForKey(node);
-                if(!node) return false;
-            }
-            let nodeTemplate = self.nodeTemplates[template];
-            for(let property in nodeTemplate) {
-                self.diagram.model.setDataProperty(node, property, nodeTemplate[property]);
-            }
-        };
-
-
-        Relation.prototype.setPredicate = function(predicate) {
-            let self = this;
-            //first un-highlight any selected predicate nodes
-            self.diagram.nodes.each(function(node) {
-                self.setNodeTemplate(node.data, 'default');
-            });
-
-            if(predicate < 0) {
-                $('#remove-predicate, #predicate-help').hide();
-                return;
-            }
-
-            //create a new empty predicate set if requested
-            if(predicate == 'new') {
-                predicate = self.predicateSets.length;
-                self.predicateSets.push({});
-                let $select = $('#set-predicate');
-                $select.find('[value="new"]').before('<option value="' + predicate + '">Predicate ' + (predicate+1) + '</option>');
-                $select.val(predicate);
-            }
-
-            $('#remove-predicate, #predicate-help').show();
-
-            //now highlight nodes that are part of the chosen predicate
-            for(let node in self.predicateSets[predicate]) {
-                self.setNodeTemplate(node, 'predicate');
-            }
-            self.currentPredicate = predicate;
-        };
-
-
-        Relation.prototype.removePredicate = function(predicate) {
-            let self = this;
-            if(predicate === undefined) predicate = self.currentPredicate;
-            if(isNaN(predicate)) return false;
-            if(self.currentPredicate == predicate) {
-                self.setPredicate(-1);
-                $('#set-predicate').val(0);
-            }
-            self.predicateSets.splice(predicate, 1);
-            let $option = $('#set-predicate > option[value="' + predicate + '"]').val("");
-            $option.nextAll().each(function(i, el) {
-                el.value = parseInt(el.value) - 1;
-                el.text = 'Predicate ' + el.value;
-            });
-            $option.remove();
-        };
-
-
-        Relation.prototype.togglePredicate = function(node, include) {
-            let self = this;
-            if(!self.predicateSets.hasOwnProperty(self.currentPredicate)) return false;
-            if(include) {
-                self.predicateSets[self.currentPredicate][node] = true;
-                self.setNodeTemplate(node, 'predicate');
-            } else {
-                delete self.predicateSets[self.currentPredicate][node];
-                self.setNodeTemplate(node, 'default');
-            }
-        };
-
-
-        Relation.prototype.inPredicate = function(node) {
-            let self = this;
-            return self.predicateSets.hasOwnProperty(self.currentPredicate)
-                && self.predicateSets[self.currentPredicate].hasOwnProperty(node);
         };
 
 
@@ -798,6 +830,9 @@
 
             $('#save-relation').click(function(e) {
                 relation.save();
+            });
+            $('#evaluate-relation').click(function(e) {
+                relation.evaluate(true);
             });
         });
 
