@@ -135,13 +135,22 @@ def saveLaw():
 
 def initRelation():
 
+    frameworkId = int(request.vars.framework)
     lawId = int(request.vars.law)
-    rows = db(db.law.id == lawId).select()
-    relation = rows[0]
+
+    relation = None
+    if lawId > 0:
+        rows = db(db.law.id == lawId).select()
+        relation = rows[0]
 
     ret = {'myNodes': [], 'concepts': {}, 'laws': {}, 'nodes': {}, 'predicates': {}, 'nextNodeId': -1}
 
-    frameworks = [relation.framework]
+    frameworks = []
+    if frameworkId > 0:
+        frameworks.append(frameworkId)
+    elif relation is not None:
+        frameworks.append(relation.framework)
+
     while frameworks:
         fid = frameworks.pop(0)
         for concept in db(db.concept.framework == fid).iterselect():
@@ -168,7 +177,8 @@ def initRelation():
         for dep in db(db.framework_dependency.framework == fid).iterselect(db.framework_dependency.dependency):
             frameworks.append(dep.dependency)
 
-    ret['nextNodeId'] = db.executesql("select `auto_increment` from information_schema.tables where table_name = 'node'")
+    rows = db.executesql("select `auto_increment` from information_schema.tables where table_name = 'node'")
+    ret['nextNodeId'] = rows[0][0]
 
     ret['success'] = True
     return response.json(ret)

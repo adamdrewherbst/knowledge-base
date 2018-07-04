@@ -30,6 +30,7 @@
                 <div id="relation-controls">
                     <button id="save-relation" type="button" class="btn btn-primary">Save Relation</button>
                     <button id="evaluate-relation" type="button" class="btn btn-primary">Evaluate</button>
+                    <label id="evaluate-msg"></label>
                 </div>
             </div>
         </div>
@@ -112,6 +113,7 @@
 
             this.concepts = {};
             this.laws = {};
+            this.law = null;
             this.nodes = {};
             this.predicates = {};
 
@@ -133,6 +135,10 @@
                 'predicate': {
                     shape: "Rectangle",
                     fill: "yellow"
+                },
+                'appended': {
+                    shape: 'RoundedRectangle',
+                    fill: '#FF66AA'
                 }
             };
 
@@ -152,6 +158,53 @@
             this.predicateSets = [];
             this.currentPredicate = -1;
         }
+
+        Relation.prototype.init = function(callback) {
+
+            let self = this;
+            if(self.currentLaw < 0 && self.currentFramework < 0) return false;
+
+            $.ajax({
+               url: "{{=URL('default', 'initRelation', extension='json')}}",
+               type: 'get',
+               dataType: 'json',
+               data: {
+                   framework: self.currentFramework,
+                   law: self.currentLaw
+               },
+               success: function(data) {
+                   self.myNodes = data.myNodes;
+                   self.concepts = Object.assign({}, self.coreConcepts, data.concepts);
+                   self.laws = data.laws;
+                   if(self.laws.hasOwnProperty(self.currentLaw)) {
+                       self.law = self.laws[self.currentLaw];
+                   } else {
+                       self.law = null;
+                   }
+                   self.nodes = data.nodes;
+                   self.predicates = data.predicates;
+                   self.nextNodeId = data.nextNodeId;
+
+                   $.each(self.laws, function(id, law) {
+                       if(id == self.lawId) self.law = law;
+                       law.predicateSets = [];
+                       $.each(law.predicates, function(id, group) {
+                           let pset = [];
+                           for(let node in group) pset.push(node);
+                           law.predicateSets.push(pset);
+                       });
+                       law.deepNodes = [];
+                       law.nodes.forEach(function(node) {
+                           if(!law.notDeepNode.hasOwnProperty(node)) {
+                               law.deepNodes.push(node);
+                           }
+                       });
+                   });
+
+                   if(callback) callback.call(self);
+               }
+            });
+        };
 
         Relation.prototype.initDiagram = function() {
             var self = this;
@@ -339,6 +392,92 @@
         };
 
 
+        Relation.prototype.draw = function() {
+            let self = this;
+            self.diagram.removeParts(self.diagram.nodes);
+            //start by arranging the nodes visually as a tree descending from the root,
+            //then allow the force layout to adjust them
+            //=> first we need to identify the children of each node
+            let nodeMeta = {'-1': {'children': []}};
+            self.myNodes.forEach(function(node) {
+                nodeMeta[node] = {'children': []};
+            });
+            self.myNodes.forEach(function(node) {
+                if(node >= 0) nodeMeta[self.nodes[node].head || -1].children.push(node);
+            });
+
+            let horizontal = 100, vertical = 100;
+            let getOffsets = function(node) {
+                let nc = nodeMeta[node].children.length, width = horizontal;
+                if(nc > 0) {
+                    width = 0;
+                    nodeMeta[node].children.forEach(function(child) {
+                        nodeMeta[child].offset = width;
+                        width += getOffsets(child);
+                    });
+                    nodeMeta[node].children.forEach(function(child) {
+                        nodeMeta[child].offset -= width / 2 - horizontal / 2;
+                    });
+                }
+                nodeMeta[node].width = width;
+                return width;
+            };
+            getOffsets(-1);
+
+            let drawNodes = function(node, x, y) {
+                if(node >= 0) {
+                    self.drawNode(node, {
+                        loc: '' + x + ' ' + y,
+                        text: self.concepts[self.nodes[node].concept].name + '[' + node + ']'
+                    });
+                }
+                nodeMeta[node].children.forEach(function(child) {
+                    drawNodes(child, x + nodeMeta[child].offset, y + 100);
+                });
+            };
+            drawNodes(-1, self.diagram.viewportBounds.width/2, 50);
+
+            let drawLinks = function(node) {
+                if(node >= 0) self.drawLinks(node);
+                nodeMeta[node].children.forEach(function(child) {
+                    drawLinks(child);
+                });
+            };
+            drawLinks(-1);
+        };
+
+
+        Relation.prototype.drawNode = function(nodeId, options) {
+
+            let self = this, node = self.nodes[nodeId];
+
+            if(!options) options = {};
+            let template = {};
+            if(options.template) {
+                if(self.nodeTemplates.hasOwnProperty(options.template))
+                    template = self.nodeTemplates[options.template];
+            }
+            let drawLinks = options.drawLinks ? true : false;
+            delete options.template, options.drawLinks;
+
+            let nodeData = Object.assign({}, node, options, template);
+            self.diagram.model.addNodeData(nodeData);
+
+            if(drawLinks) self.drawLinks(nodeId);
+        };
+
+
+        Relation.prototype.drawLinks = function(nodeId) {
+            let self = this, node = self.nodes[nodeId];
+            if(node.head) {
+                self.diagram.model.addLinkData({from: node.head, to: node.id, fromPort: 'B', toPort: 'T'});
+            }
+            if(node.reference) {
+                self.diagram.model.addLinkData({from: node.id, to: node.reference, fromPort: 'T', toPort: 'B'});
+            }
+        };
+
+
         Relation.prototype.setNodeTemplate = function(node, template) {
             let self = this;
             if(!self.nodeTemplates.hasOwnProperty(template)) return false;
@@ -423,122 +562,51 @@
         };
 
 
-        Relation.prototype.useFramework = function(id) { this.useFrameworkOrLaw('framework', id); };
-        Relation.prototype.useLaw = function(id) { this.useFrameworkOrLaw('law', id); };
+        Relation.prototype.useFramework = function(id) {
+            let self = this;
+            self.currentFramework = id;
+            self.reloadDiagram();
+        };
 
-        Relation.prototype.useFrameworkOrLaw = function(type, id) {
-            var self = this;
-            $.ajax({
-                url: "{{=URL('default', 'useFrameworkOrLaw', extension='json')}}",
-                type: 'get',
-                dataType: 'json',
-                data: {
-                    type: type,
-                    id: id,
-                    currentFramework: self.currentFramework,
-                    currentLaw: self.currentLaw,
-                },
-                success: function(data) {
-                    //if we received a new framework to use, clear the existing one from the palette
-                    //and populate it with the new concepts
-                    if(data.frameworks && data.frameworks.length > 0) {
-                        self.concepts = Object.assign({}, self.coreConcepts);
-                        data.frameworks.forEach(function(framework) {
-                            framework.concepts.forEach(function(concept) {
-                                self.concepts[concept.id] = {id: concept.id, name: concept.name};
-                            });
-                        });
-                        self.setPaletteModel();
-                        if(data.frameworks[0].id) self.currentFramework = data.frameworks[0].id;
+        Relation.prototype.useLaw = function(id) {
+            let self = this;
+            self.currentLaw = id;
+            self.reloadDiagram();
+        };
+
+        Relation.prototype.reloadDiagram = function() {
+            let self = this;
+            self.init(self.drawAll);
+        };
+
+        Relation.prototype.drawAll = function() {
+            let self = this;
+            self.setPaletteModel();
+            if(self.law) {
+                self.draw();
+                self.predicateSets = [];
+                $('#set-predicate').children().slice(1, -1).remove();
+                if(self.law.predicates) {
+                    for(let group in self.law.predicates) {
+                        $('#set-predicate > option:last-child').before('<option value="' + (group-1) + '">Predicate ' + group + '</option>');
+                        let obj = {};
+                        for(let node in self.law.predicates[group]) obj[node] = true;
+                        self.predicateSets.push(obj);
                     }
-                    //if we received a new law to use, clear the existing one from the graph
-                    //and populate it with the new nodes
-                    if(data.law && data.law.nodes) {
-                        self.diagram.removeParts(self.diagram.nodes);
-                        //start by arranging the nodes visually as a tree descending from the root,
-                        //then allow the force layout to adjust them
-                        //=> first we need to identify the children of each node
-                        var nodes = data.law.nodes, nodeMeta = {}, roots = [];
-                        nodes[-1] = {};
-                        $.each(nodes, function(id, node) {
-                            nodeMeta[id] = {children: []};
-                        });
-                        $.each(nodes, function(id, node) {
-                            if(id >= 0) nodeMeta[node.head || -1].children.push(id);
-                        });
-
-                        let horizontal = 100, vertical = 100;
-                        let getOffsets = function(node) {
-                            let nc = nodeMeta[node].children.length, width = horizontal;
-                            if(nc > 0) {
-                                width = 0;
-                                nodeMeta[node].children.forEach(function(child) {
-                                    nodeMeta[child].offset = width;
-                                    width += getOffsets(child);
-                                });
-                                nodeMeta[node].children.forEach(function(child) {
-                                    nodeMeta[child].offset -= width / 2 - horizontal / 2;
-                                });
-                            }
-                            nodeMeta[node].width = width;
-                            return width;
-                        };
-                        getOffsets(-1);
-
-                        let drawNodes = function(node, x, y) {
-                            if(node >= 0) {
-                                let nodeData = nodes[node];
-                                nodeData['loc'] = '' + x + ' ' + y;
-                                nodeData['text'] = self.concepts[nodes[node].concept].name;
-                                self.diagram.model.addNodeData(nodeData);
-                            }
-                            nodeMeta[node].children.forEach(function(child) {
-                                drawNodes(child, x + nodeMeta[child].offset, y + 100);
-                            });
-                        };
-                        drawNodes(-1, self.diagram.viewportBounds.width/2, 50);
-
-                        let drawLinks = function(node) {
-                            let nodeData = nodes[node];
-                            if(nodeData.head)
-                                self.diagram.model.addLinkData({from: nodeData.head, to: node, fromPort: 'B', toPort: 'T'});
-                            if(nodeData.reference)
-                                self.diagram.model.addLinkData({from: node, to: nodeData.reference, fromPort: 'T', toPort: 'B'});
-                            nodeMeta[node].children.forEach(function(child) {
-                                drawLinks(child);
-                            });
-                        };
-                        drawLinks(-1);
-
-                        self.predicateSets = [];
-                        $('#set-predicate').children().slice(1, -1).remove();
-                        if(data.law.predicates) {
-                            for(let group in data.law.predicates) {
-                                $('#set-predicate > option:last-child').before('<option value="' + (group-1) + '">Predicate ' + group + '</option>');
-                                let obj = {};
-                                for(let node in data.law.predicates[group]) obj[node] = true;
-                                self.predicateSets.push(obj);
-                            }
-                        }
-
-                        if(data.law.id) self.currentLaw = data.law.id;
-                    }
-                },
-                error: function() {
                 }
-            });
+            }
         };
 
         Relation.prototype.save = function() {
-            var self = this, id = self.currentLaw;
+            let self = this, id = self.currentLaw;
 
-            var nodes = [], predicates = [];
+            let nodes = [], predicates = [];
             self.diagram.nodes.each(function(node) {
-                var data = {
+                let data = {
                     'id': node.data['id'], 'law': id, 'concept': node.data['concept'],
                     'head': null, 'reference': null
                 };
-                var head = node.findNodesInto('T'),
+                let head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
                 if(head.count > 0) data['head'] = head.first().data['id'];
                 if(reference.count > 0) data['reference'] = reference.first().data['id'];
@@ -585,54 +653,14 @@
 
         */
 
-        //get and index relevant DB tables for use in the evaluation algorithm
-        Relation.prototype.initEval = function(evaluate) {
-
-            var self = this;
-            if(self.currentLaw < 0) return false;
-
-            $.ajax({
-               url: "{{=URL('default', 'initRelation', extension='json')}}",
-               type: 'get',
-               dataType: 'json',
-               data: {
-                   law: self.currentLaw
-               },
-               success: function(data) {
-                   self.myNodes = data.myNodes;
-                   self.concepts = data.concepts;
-                   self.laws = data.laws;
-                   self.nodes = data.nodes;
-                   self.predicates = data.predicates;
-                   self.nextNodeId = data.nextNodeId;
-
-                   $.each(self.laws, function(id, law) {
-                       if(id == self.lawId) self.law = law;
-                       law.predicateSets = [];
-                       $.each(law.predicates, function(id, group) {
-                           let pset = [];
-                           for(let node in group) pset.push(node);
-                           law.predicateSets.push(pset);
-                       });
-                       law.deepNodes = [];
-                       law.nodes.forEach(function(node) {
-                           if(!law.notDeepNode.hasOwnProperty(node)) {
-                               law.deepNodes.push(node);
-                           }
-                       });
-                   });
-
-                   if(evaluate) self.evaluate();
-               }
-            });
-        };
-
         Relation.prototype.evaluate = function(doInit = false) {
 
-            var self = this;
+            $('#evaluate-msg').text('Evaluating...');
+
+            let self = this;
 
             if(doInit) {
-                self.initEval(true);
+                self.init(self.evaluate);
                 return;
             }
 
@@ -644,6 +672,7 @@
                var nodeId = self.nodesToCheck.pop(), concept = self.nodes[nodeId]['concept'];
                if(!self.predicates.hasOwnProperty(concept)) continue;
                for(let predicateId in self.predicates[concept]) {
+                   if(self.nodes[nodeId].law == self.nodes[predicateId].law) continue;
                    self.checkPredicate(nodeId, predicateId);
                }
             }
@@ -656,6 +685,8 @@
                success: function(data) {
                },
             });//*/
+
+            $('#evaluate-msg').text('Done evaluating');
         };
 
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
@@ -807,6 +838,8 @@
             map.idMap[nodeId] = newId;
             map.idMap[newId] = nodeId;
 
+            let nodeData = self.nodes[newId];
+            nodeData['text'] = self.concepts[nodeData.concept].name + '[' + nodeId + ']';
             self.diagram.model.addNodeData(self.nodes[newId]);
             self.diagram.model.addLinkData({from: newHead, to: newId, fromPort: 'B', toPort: 'T'});
             self.diagram.model.addLinkData({from: newId, to: newReference, fromPort: 'T', toPort: 'B'});
