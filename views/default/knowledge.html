@@ -147,7 +147,13 @@
                             concepts = db(db.concept.framework == None).select()
                             for concept in concepts:
                         }}
-                    {{=concept.id}}: {id: {{=concept.id}}, name: "{{=concept.name}}"},
+                    {{=concept.id}}: {
+                        id: {{=concept.id}},
+                        name: "{{=concept.name}}",
+                        description: "{{=concept.description}}",
+                        framework: {{=concept.framework}},
+                        symmetric: {{=concept.symmetric}}
+                    },
                         {{
                             pass
                         }}
@@ -184,6 +190,14 @@
                    self.nodes = data.nodes;
                    self.predicates = data.predicates;
                    self.nextNodeId = data.nextNodeId;
+
+                   self.nodes[-1] = {id: -1};
+                   $.each(self.nodes, function(id, node) {
+                       node.children = {};
+                   });
+                   $.each(self.nodes, function(id, node) {
+                       self.nodes[node.head || -1].children[id] = true;
+                   });
 
                    $.each(self.laws, function(id, law) {
                        if(id == self.lawId) self.law = law;
@@ -461,6 +475,18 @@
             delete options.template, options.drawLinks;
 
             let nodeData = Object.assign({}, node, options, template);
+            if(!nodeData.hasOwnProperty('text')) {
+                nodeData.text = self.concepts[node.concept].name + ' [' + nodeId + ']';
+            }
+            if(!nodeData.hasOwnProperty('loc') && nodeData.head && nodeData.reference
+              && self.nodes.hasOwnProperty(nodeData.head) && self.nodes.hasOwnProperty(nodeData.reference)) {
+                let head = self.diagram.model.findNodeDataForKey(nodeData.head),
+                    reference = self.diagram.model.findNodeDataForKey(nodeData.reference);
+                let headLoc = head.loc.split(' '), refLoc = reference.loc.split(' ');
+                let x = (parseFloat(headLoc[0]) + parseFloat(refLoc[0])) / 2,
+                    y = Math.max(parseFloat(headLoc[1]), parseFloat(refLoc[1])) + 75;
+                nodeData.loc = '' + x + ' ' + y;
+            }
             self.diagram.model.addNodeData(nodeData);
 
             if(drawLinks) self.drawLinks(nodeId);
@@ -702,7 +728,7 @@
             }
 
             //make sure this node's concept matches the predicate's concept
-            var match = node['concept'] == predicate['concept'] || predicate['concept'] == this.wildcardConcept;
+            var match = node['concept'] == predicate['concept'] || predicate['concept'] == self.wildcardConcept;
             if(!match) return false;
 
             self.tempIdMap[nodeId] = predicateId;
@@ -716,17 +742,38 @@
                 }
             }
 
+            let symmetric = self.concepts[node.concept].symmetric;
+
             //check recursively on this node's head and reference
-            var links = ['head', 'reference'];
+            let links = ['head', 'reference'], checkReverse = false;
             for(var i = 0; i < 2; i++) {
                 var link = links[i], nodeLink = node[link], predicateLink = predicate[link];
                 if(!predicateLink) continue;
-                else if(!nodeLink || !self.checkPredicate(nodeLink, predicateLink)) return false;
+                else if(!nodeLink || !self.checkPredicate(nodeLink, predicateLink)) {
+                    if(!symmetric) {
+                        delete self.tempIdMap[nodeId], self.tempIdMap[predicateId];
+                        return false;
+                    } else {
+                        checkReverse = true;
+                        break;
+                    }
+                }
+            }
+            if(symmetric && checkReverse) {
+                if(predicate['reference'] && (!node['head'] || !self.checkPredicate(node['head'], predicate['reference']))) {
+                    delete self.tempIdMap[nodeId], self.tempIdMap[predicateId];
+                    return false;
+                }
+                if(predicate['head'] && (!node['reference'] || !self.checkPredicate(node['reference'], predicate['head']))) {
+                    delete self.tempIdMap[nodeId], self.tempIdMap[predicateId];
+                    return false;
+                }
             }
 
+
             if(firstLevel) {
-                //at this point we have a complete match, so retain this ID map
-                var count = 0;
+                //at this point we have a complete match to the predicate, so see if the law is fully satisfied
+                let count = 0;
                 for(let node in self.tempIdMap) {
                     let predicate = self.tempIdMap[node];
                     if(!self.nodeMap.hasOwnProperty(node)) self.nodeMap[node] = {};
@@ -746,10 +793,18 @@
                 }
                 self.tempIdMap = null;
 
-                //also see if this ID map completely intersects any other ID maps
-                self.intersectCandidates.forEach(function(mapId) {
-                    self.checkIntersection(self.nextMapId-1, mapId);
+                let law = self.laws[predicate['law']];
+                let satisfied = !law.predicateSets.every(function(pset) {
+                    return !(pset.length == 1 && pset[0] == predicateId);
                 });
+                if(satisfied) {
+                    self.appendLaw(self.map[self.nextMapId-1]);
+                } else {
+                    //see if this ID map completely intersects any other ID maps
+                    self.intersectCandidates.forEach(function(mapId) {
+                        self.checkIntersection(self.nextMapId-1, mapId);
+                    });
+                }
             }
             return true;
         };
@@ -818,32 +873,52 @@
 
         Relation.prototype.appendLawHelper = function(map, nodeId) {
 
-            var self = this, node = self.nodes[nodeId], head = node['head'], reference = node['reference'], newHead, newReference;
+            if(map.idMap.hasOwnProperty(nodeId)) return map.idMap[nodeId];
 
-            if(!map.idMap.hasOwnProperty(head)) newHead = self.appendLawHelper(map, head);
-            else newHead = map.idMap[head];
-            if(!map.idMap.hasOwnProperty(reference)) newReference = self.appendLawHelper(map, reference);
-            else newReference = map.idMap[reference];
+            let self = this, node = self.nodes[nodeId], head = node['head'], reference = node['reference'],
+                newHead = self.appendLawHelper(map, head), newReference = self.appendLawHelper(map, reference);
 
-            var newId = self.nextNodeId++;
-            self.nodes[newId] = {
-                'id': newId,
+            if(newHead == null || newReference == null || newHead == newReference) return null;
+
+            for(let child in self.nodes[newHead].children) {
+                if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newReference) {
+                    return child;
+                }
+            }
+            if(self.concepts[node.concept].symmetric) {
+                for(let child in self.nodes[newReference].children) {
+                    if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newHead) {
+                        return child;
+                    }
+                }
+            }
+
+            let newId = self.addNode({
                 'law': self.currentLaw,
                 'concept': node['concept'],
-                'head': newHead,
-                'reference': newReference
-            };
+                'head': parseInt(newHead),
+                'reference': parseInt(newReference),
+            });
             self.newNodes.push(newId);
             self.nodesToCheck.push(newId);
             map.idMap[nodeId] = newId;
             map.idMap[newId] = nodeId;
 
-            let nodeData = self.nodes[newId];
-            nodeData['text'] = self.concepts[nodeData.concept].name + '[' + nodeId + ']';
-            self.diagram.model.addNodeData(self.nodes[newId]);
-            self.diagram.model.addLinkData({from: newHead, to: newId, fromPort: 'B', toPort: 'T'});
-            self.diagram.model.addLinkData({from: newId, to: newReference, fromPort: 'T', toPort: 'B'});
+            self.drawNode(newId, {
+                template: 'appended',
+                drawLinks: true
+            });
+            return newId;
+        };
 
+
+        Relation.prototype.addNode = function(data) {
+            let self = this, newId = self.nextNodeId;
+            self.nextNodeId++;
+            let node = self.nodes[newId] = Object.assign({id: newId, children: {}}, data);
+            if(node.head && self.nodes.hasOwnProperty(node.head)) {
+                self.nodes[node.head].children[node.id] = true;
+            }
             return newId;
         };
 

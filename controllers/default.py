@@ -154,7 +154,8 @@ def initRelation():
     while frameworks:
         fid = frameworks.pop(0)
         for concept in db(db.concept.framework == fid).iterselect():
-            ret['concepts'][concept.id] = {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': fid};
+            ret['concepts'][concept.id] = \
+                {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': fid, 'symmetric': concept.symmetric or False};
         for law in db(db.law.framework == fid).iterselect():
             ret['laws'][law.id] = {'id': law.id, 'name': law.name, 'description': law.description, 'nodes': [], 'predicates': {}, 'notDeepNode': {}};
             for node in db(db.node.law == law.id).iterselect():
