@@ -270,3 +270,21 @@ success!
 timestamp: 2018-06-29T00:52:41.224760
 ALTER TABLE node DROP COLUMN symmetric;
 success!
+timestamp: 2018-07-09T18:41:24.021175
+CREATE TABLE concept_dependency(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    dependency INT  , INDEX dependency__idx (dependency), FOREIGN KEY (dependency) REFERENCES concept (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-07-11T19:00:48.237281
+ALTER TABLE concept ADD head INT  , ADD INDEX head__idx (head), ADD FOREIGN KEY (head) REFERENCES concept (id) ON DELETE CASCADE;
+success!
+timestamp: 2018-07-11T19:00:48.346311
+ALTER TABLE concept ADD reference INT  , ADD INDEX reference__idx (reference), ADD FOREIGN KEY (reference) REFERENCES concept (id) ON DELETE CASCADE;
+success!
+success!
+timestamp: 2018-07-11T19:09:04.789118
+ALTER TABLE node ADD node_values VARCHAR(512);
+success!

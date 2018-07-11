@@ -142,23 +142,7 @@
                 }
             };
 
-            this.coreConcepts = {
-                        {{
-                            concepts = db(db.concept.framework == None).select()
-                            for concept in concepts:
-                        }}
-                    {{=concept.id}}: {
-                        id: {{=concept.id}},
-                        name: "{{=concept.name}}",
-                        description: "{{=concept.description}}",
-                        framework: {{=concept.framework}},
-                        symmetric: {{=concept.symmetric}}
-                    },
-                        {{
-                            pass
-                        }}
-                };
-            this.concepts = null;
+            this.concepts = {};
             this.wildcardConcept = 2;
 
             this.predicateSets = [];
@@ -180,7 +164,7 @@
                },
                success: function(data) {
                    self.myNodes = data.myNodes;
-                   self.concepts = Object.assign({}, self.coreConcepts, data.concepts);
+                   self.concepts = data.concepts;
                    self.laws = data.laws;
                    if(self.laws.hasOwnProperty(self.currentLaw)) {
                        self.law = self.laws[self.currentLaw];
@@ -193,6 +177,7 @@
 
                    self.nodes[-1] = {id: -1};
                    $.each(self.nodes, function(id, node) {
+                       node.values = node.values ? JSON.parse(node.values) : null;
                        node.children = {};
                    });
                    $.each(self.nodes, function(id, node) {
@@ -231,12 +216,12 @@
                       $$(go.Shape, "LineV", { stroke: "gray", strokeWidth: 0.5, interval: 10 })
                     ),
               allowDrop: true,  // must be true to accept drops from the Palette
-              layout:
+/*              layout:
                 $$(ContinuousForceDirectedLayout,  // automatically spread nodes apart while dragging
-                  { defaultSpringLength: 30, defaultElectricalCharge: 100 }),
-//*/          // do an extra layout at the end of a move
+                  { defaultSpringLength: 30, defaultSpringStiffness: 0, defaultElectricalCharge: 100 }),
+              // do an extra layout at the end of a move
               "SelectionMoved": function(e) { e.diagram.layout.invalidateLayout(); },
-              "draggingTool.dragsLink": true,
+//*/          "draggingTool.dragsLink": true,
               "draggingTool.isGridSnapEnabled": true,
               "linkingTool.isUnconnectedLinkValid": true,
               "linkingTool.portGravity": 20,
@@ -311,26 +296,58 @@
             // a context menu is an Adornment with a bunch of buttons in them
             var partContextMenu =
               $$(go.Adornment, "Vertical",
+                  makeButton("Set Values",
+                            function(e, obj) {
+                                let part = obj.part.adornedPart;
+                                if(!(part instanceof go.Node)) return;
+                                let input = prompt("Enter a set of real numbers in interval notation, e.g. [0.5,2];5.7;[3,9);(9,17)");
+                                if(input == null) return;
+                                input = input.replace(new RegExp(' ','g'), '');
+                                let values = [];
+                                arr = input.split(';');
+                                for(let i = 0; i < arr.length; i++) {
+                                    let str = arr[i];
+                                    if(!isNaN(str)) {
+                                        values.push(parseFloat(str));
+                                        continue;
+                                    }
+                                    let inc1 = str[0], inc2 = str[str.length-1];
+                                    inc1 = inc1 == '[' ? true : inc1 == '(' ? false : inc1;
+                                    inc2 = inc2 == '[' ? true : inc2 == '(' ? false : inc2;
+                                    if(typeof inc1 != 'boolean' || typeof inc2 != 'boolean') return;
+                                    let limits = str.substring(1, str.length-1).split(',');
+                                    if(limits.length != 2 || isNaN(limits[0]) || isNaN(limits[1])) return;
+                                    let interval = [parseFloat(limit[0]), parseFloat(limits[1])];
+                                    if(!inc1 || inc1 != inc2) interval[2] = inc1;
+                                    if(inc1 != inc2) interval[3] = inc2;
+                                    values.push(interval);
+                                }
+                                part.data.values = input;
+                                if(self.nodes.hasOwnProperty(part.data.id)) self.nodes[part.data.id].values = values;
+                            },
+                            function(o) {
+                                return true;
+                            }),
                   makeButton("Add to Predicate",
-                             function(e, obj) {
-                                 let part = obj.part.adornedPart;
-                                 if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), true);
-                             },
-                             function(o) {
-                                 let part = o.part.adornedPart;
-                                 if(part instanceof go.Node) return !self.inPredicate(parseInt(part.data.id));
-                                 return false;
-                             }),
+                            function(e, obj) {
+                                let part = obj.part.adornedPart;
+                                if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), true);
+                            },
+                            function(o) {
+                                let part = o.part.adornedPart;
+                                if(part instanceof go.Node) return self.currentPredicate >= 0 && !self.inPredicate(parseInt(part.data.id));
+                                return false;
+                            }),
                   makeButton("Remove from Predicate",
-                             function(e, obj) {
-                                 let part = obj.part.adornedPart;
-                                 if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), false);
-                             },
-                             function(o) {
-                                 let part = o.part.adornedPart;
-                                 if(part instanceof go.Node) return self.inPredicate(parseInt(part.data.id));
-                                 return false;
-                             }),
+                            function(e, obj) {
+                                let part = obj.part.adornedPart;
+                                if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), false);
+                            },
+                            function(o) {
+                                let part = o.part.adornedPart;
+                                if(part instanceof go.Node) return self.inPredicate(parseInt(part.data.id));
+                                return false;
+                            }),
               );
 
             self.diagram.nodeTemplate = $$(go.Node, "Spot",
@@ -382,7 +399,7 @@
 
 
         Relation.prototype.setPaletteModel = function() {
-            var self = this, concepts = self.concepts || self.coreConcepts;
+            var self = this, concepts = self.concepts;
             var dataArray = [];
             for(let id in concepts) {
                 let concept = concepts[id];
@@ -630,7 +647,7 @@
             self.diagram.nodes.each(function(node) {
                 let data = {
                     'id': node.data['id'], 'law': id, 'concept': node.data['concept'],
-                    'head': null, 'reference': null
+                    'head': null, 'reference': null, 'values': JSON.stringify(node.values)
                 };
                 let head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
@@ -646,7 +663,7 @@
             });
 
             $.ajax({
-                url: "{{=URL('default', 'saveLaw', extension='json')}}",
+                url: "{{=URL('default', 'saveRelation', extension='json')}}",
                 type: 'post',
                 dataType: 'json',
                 data: JSON.stringify({id: id, nodes: nodes, predicates: predicates}),
@@ -695,12 +712,15 @@
             while(self.nodesToCheck.length > 0) {
                //find any deep predicate nodes in included frameworks
                //that have the same concept as this node
-               var nodeId = self.nodesToCheck.pop(), concept = self.nodes[nodeId]['concept'];
-               if(!self.predicates.hasOwnProperty(concept)) continue;
-               for(let predicateId in self.predicates[concept]) {
-                   if(self.nodes[nodeId].law == self.nodes[predicateId].law) continue;
-                   self.checkPredicate(nodeId, predicateId);
-               }
+               var nodeId = self.nodesToCheck.pop(), concept = self.nodes[nodeId]['concept'], concepts = [concept];
+               for(let dep in self.concepts[concept].dependencies) concepts.push(dep);
+               concepts.forEach(function(concept) {
+                   if(!self.predicates.hasOwnProperty(concept)) return;;
+                   for(let predicateId in self.predicates[concept]) {
+                       if(self.nodes[nodeId].law == self.nodes[predicateId].law) continue;
+                       self.checkPredicate(nodeId, predicateId);
+                   }
+               });
             }
 
             /*$.ajax({
@@ -718,21 +738,28 @@
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
         Relation.prototype.checkPredicate = function(nodeId, predicateId) {
 
-            var self = this, node = this.nodes[nodeId], predicate = this.nodes[predicateId];
+            let self = this, node = this.nodes[nodeId], predicate = this.nodes[predicateId];
 
             //if this is the first recursion step, initialize aggregators
-            var firstLevel = self.tempIdMap == null;
+            let firstLevel = self.tempIdMap == null;
             if(firstLevel) {
                 self.tempIdMap = {};
+                self.tempValueMap = {};
                 self.intersectCandidates = [];
             }
 
             //make sure this node's concept matches the predicate's concept
-            var match = node['concept'] == predicate['concept'] || predicate['concept'] == self.wildcardConcept;
-            if(!match) return false;
+            let match = node['concept'] == predicate['concept']
+                || predicate['concept'] == self.wildcardConcept
+                || self.concepts[node['concept']].dependencies[predicate['concept']];
+            //and find the intersection of any values on the two nodes
+            let values = null;
+            if(match) values = self.intersectValues(node.values, predicate.values);
+            if(!match || (values && values.length == 0)) return false;
 
             self.tempIdMap[nodeId] = predicateId;
             self.tempIdMap[predicateId] = nodeId;
+            self.tempValueMap[nodeId] = values;
 
             //note any prior mappings between this node and predicate node - used later to test for intersections
             if(self.nodeMap.hasOwnProperty(nodeId) && self.nodeMap[nodeId].hasOwnProperty(predicateId)) {
@@ -746,8 +773,8 @@
 
             //check recursively on this node's head and reference
             let links = ['head', 'reference'], checkReverse = false;
-            for(var i = 0; i < 2; i++) {
-                var link = links[i], nodeLink = node[link], predicateLink = predicate[link];
+            for(let i = 0; i < 2; i++) {
+                let link = links[i], nodeLink = node[link], predicateLink = predicate[link];
                 if(!predicateLink) continue;
                 else if(!nodeLink || !self.checkPredicate(nodeLink, predicateLink)) {
                     if(!symmetric) {
@@ -788,10 +815,12 @@
                     self.map[self.nextMapId++] = {
                         lawId: predicate['law'],
                         predicates: [predicateId],
-                        idMap: self.tempIdMap
+                        idMap: self.tempIdMap,
+                        values: self.tempValueMap
                     };
                 }
                 self.tempIdMap = null;
+                self.tempValueMap = null;
 
                 let law = self.laws[predicate['law']];
                 let satisfied = !law.predicateSets.every(function(pset) {
@@ -808,6 +837,65 @@
             }
             return true;
         };
+
+
+        Relation.prototype.intersectValues = function(v1, v2) {
+            let self = this;
+
+            let v1all = v1 == null || v1.length == 0,
+                v2all = v2 == null || v2.length == 0;
+            if(v1all && v2all) return null;
+            if(v1all) return v2;
+            if(v2all) return v1;
+
+            let sorted = [];
+            for(let i = 0; i < 2; i++) {
+                let arr = i == 0 ? v1 : v2;
+                if(typeof arr == 'object') arr.forEach(function(el) {
+                    if(typeof el == 'number') {
+                        sorted.push([el, i, true, false]);
+                    } else if(typeof el == 'object') {
+                        sorted.push([el[0], i, el.length > 2 ? el[2] : true, true]);
+                        sorted.push([el[1], i, el.length > 3 ? el[3] : el.length > 2 ? el[2] : true, false]);
+                    }
+                });
+            }
+            sorted.sort(function(a, b) {
+                if(a[0] == b[0]) {
+                    let apos = (a[2] ? 6 : 9) & (a[3] ? 12 : 3),
+                        bpos = (b[2] ? 6 : 9) & (b[3] ? 12 : 3);
+                    return apos < bpos ? -1 : 1;
+                }
+                return a[0] < b[0] ? -1 : 1;
+            });
+
+            let values = [];
+            let inside = [false, false], begin = null;
+            sorted.forEach(function(arr, ind) {
+                let other = (arr[1]+1)%2;
+                if(!arr[3]) {
+                    if(inside[other]) {
+                        if(!inside[arr[1]] && arr[2]) values.push(arr[0]);
+                        if(inside[arr[1]]) {
+                            let interval = [begin[0], arr[0]];
+                            if(!begin[2] || begin[2] != arr[2]) interval[2] = begin[2];
+                            if(begin[2] != arr[2]) interval[3] = arr[2];
+                            values.push(interval);
+                        }
+                    } else {
+                        if(arr[2] && ind < sorted.length-1 && sorted[ind+1][1] == other
+                        && sorted[ind+1][0] == arr[0] && sorted[ind+1][2])
+                            values.push(arr[0]);
+                    }
+                } else {
+                    begin = arr;
+                }
+                inside[arr[1]] = arr[3];
+            });
+
+            return values;
+        };
+
 
         Relation.prototype.checkIntersection = function(mapId1, mapId2) {
 
@@ -864,6 +952,11 @@
 
             var self = this;
 
+            //update our relation with all value intersections calculated during the mapping
+            for(let node in map.values) {
+                self.nodes[node].values = map.values[node];
+            }
+
             //start at each deep node of the law
             var law = self.laws[map.lawId];
             law.deepNodes.forEach(function(nodeId) {
@@ -898,6 +991,7 @@
                 'concept': node['concept'],
                 'head': parseInt(newHead),
                 'reference': parseInt(newReference),
+                'values': self.nodes[nodeId].values
             });
             self.newNodes.push(newId);
             self.nodesToCheck.push(newId);
