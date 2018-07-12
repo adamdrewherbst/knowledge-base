@@ -177,7 +177,7 @@
 
                    self.nodes[-1] = {id: -1};
                    $.each(self.nodes, function(id, node) {
-                       node.values = node.values ? JSON.parse(node.values) : null;
+                       node.values = self.convertValues(node.values, 'array');
                        node.children = {};
                    });
                    $.each(self.nodes, function(id, node) {
@@ -301,27 +301,8 @@
                                 let part = obj.part.adornedPart;
                                 if(!(part instanceof go.Node)) return;
                                 let input = prompt("Enter a set of real numbers in interval notation, e.g. [0.5,2];5.7;[3,9);(9,17)");
-                                if(input == null) return;
-                                input = input.replace(new RegExp(' ','g'), '');
-                                let values = [];
-                                arr = input.split(';');
-                                for(let i = 0; i < arr.length; i++) {
-                                    let str = arr[i];
-                                    if(!isNaN(str)) {
-                                        values.push(parseFloat(str));
-                                        continue;
-                                    }
-                                    let inc1 = str[0], inc2 = str[str.length-1];
-                                    inc1 = inc1 == '[' ? true : inc1 == '(' ? false : inc1;
-                                    inc2 = inc2 == '[' ? true : inc2 == '(' ? false : inc2;
-                                    if(typeof inc1 != 'boolean' || typeof inc2 != 'boolean') return;
-                                    let limits = str.substring(1, str.length-1).split(',');
-                                    if(limits.length != 2 || isNaN(limits[0]) || isNaN(limits[1])) return;
-                                    let interval = [parseFloat(limit[0]), parseFloat(limits[1])];
-                                    if(!inc1 || inc1 != inc2) interval[2] = inc1;
-                                    if(inc1 != inc2) interval[3] = inc2;
-                                    values.push(interval);
-                                }
+                                let values = self.convertValues(input, 'array');
+                                if(values == null) return;
                                 part.data.values = input;
                                 if(self.nodes.hasOwnProperty(part.data.id)) self.nodes[part.data.id].values = values;
                             },
@@ -395,6 +376,51 @@
 
             self.setPaletteModel();
             self.clearDiagram();
+        };
+
+
+        Relation.prototype.convertValues = function(v, newType) {
+            let self = this, values = null;
+            if(v == null) return null;
+            if(newType == 'array' && typeof v == 'string') {
+                values = [];
+                v = v.replace(new RegExp(' ','g'), '');
+                arr = v.split(';');
+                for(let i = 0; i < arr.length; i++) {
+                    let str = arr[i];
+                    if(!isNaN(str)) {
+                        values.push(parseFloat(str));
+                        continue;
+                    }
+                    let inc1 = str[0], inc2 = str[str.length-1];
+                    inc1 = inc1 == '[' ? true : inc1 == '(' ? false : inc1;
+                    inc2 = inc2 == '[' ? true : inc2 == '(' ? false : inc2;
+                    if(typeof inc1 != 'boolean' || typeof inc2 != 'boolean') return;
+                    let limits = str.substring(1, str.length-1).split(',');
+                    if(limits.length != 2 || isNaN(limits[0]) || isNaN(limits[1])) return;
+                    let interval = [parseFloat(limit[0]), parseFloat(limits[1])];
+                    if(!inc1 || inc1 != inc2) interval[2] = inc1;
+                    if(inc1 != inc2) interval[3] = inc2;
+                    values.push(interval);
+                }
+            } else if(newType == 'string' && typeof v == 'object') {
+                values = '';
+                v.forEach(function(el, i) {
+                    let str = '';
+                    if(typeof el == 'number') {
+                        str = '' + el;
+                    } else if(typeof el == 'object') {
+                        if(!el.hasOwnProperty(2) || el[2]) str += '[';
+                        else str += '(';
+                        str += '' + el[0] + ',' + el[1];
+                        if(el[2] && !el.hasOwnProperty(3) || el[3]) str += ']';
+                        else str += ')';
+                    }
+                    values += str;
+                    if(i < values.length-1) values += ';'
+                });
+            }
+            return values;
         };
 
 
@@ -492,6 +518,7 @@
             delete options.template, options.drawLinks;
 
             let nodeData = Object.assign({}, node, options, template);
+            nodeData.values = self.convertValues(nodeData.values, 'string');
             if(!nodeData.hasOwnProperty('text')) {
                 nodeData.text = self.concepts[node.concept].name + ' [' + nodeId + ']';
             }
@@ -647,7 +674,7 @@
             self.diagram.nodes.each(function(node) {
                 let data = {
                     'id': node.data['id'], 'law': id, 'concept': node.data['concept'],
-                    'head': null, 'reference': null, 'values': JSON.stringify(node.values)
+                    'head': null, 'reference': null, 'values': node.data['values'] || null,
                 };
                 let head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
@@ -971,7 +998,7 @@
             let self = this, node = self.nodes[nodeId], head = node['head'], reference = node['reference'],
                 newHead = self.appendLawHelper(map, head), newReference = self.appendLawHelper(map, reference);
 
-            if(newHead == null || newReference == null || newHead == newReference) return null;
+            if(newHead == null || newReference == null) return null;
 
             for(let child in self.nodes[newHead].children) {
                 if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newReference) {
