@@ -37,7 +37,11 @@
         <div style="width: 100%; display: flex; justify-content: space-between">
             <div id="concept-palette" style="width: 160px; margin-right: 2px; background-color: whitesmoke; border: solid 1px black"></div>
             <div id="graph-canvas" style="flex-grow: 1; height: 620px; border: solid 1px black"></div>
-        </div>
+            <div id="node-info" style="display: inline-block; vertical-align: top;">
+                <h3 id="node-title"></h3>
+                <p id="node-description"></p>
+            </div>
+      </div>
     </body>
 
 
@@ -236,8 +240,20 @@
               //rotatingTool: $(TopRotatingTool),  // defined below
               //"rotatingTool.snapAngleMultiple": 15,
               //"rotatingTool.snapAngleEpsilon": 15,
-              "undoManager.isEnabled": true
+              "undoManager.isEnabled": true,
+              "ChangedSelection": onSelectionChanged
             });
+
+            function onSelectionChanged(e) {
+                var node = e.diagram.selection.first();
+                if (!(node instanceof go.Node)) return;
+                var data = node.data;
+                var title = document.getElementById('node-title');
+                var description = document.getElementById('node-description');
+
+                title.textContent = "Node Info";
+                description.innerHTML = self.getNodeString(data.id).replace(new RegExp("\n", 'g'), "<br>");
+            }
 
             // dragging a node invalidates the Diagram.layout, causing a layout during the drag
             self.diagram.toolManager.draggingTool.doMouseMove = function() {
@@ -331,8 +347,28 @@
                             }),
               );
 
+            let infoString = function(obj) {
+                let part = obj.part;
+                if (part instanceof go.Adornment) part = part.adornedPart;
+                let msg = "";
+                if (part instanceof go.Link) {
+                    msg = "";
+                } else if (part instanceof go.Node) {
+                    msg = self.getNodeString(part.data.id);
+                }
+                return msg;
+            };
+
             self.diagram.nodeTemplate = $$(go.Node, "Spot",
-                { locationSpot: go.Spot.Center },
+                {
+                    locationSpot: go.Spot.Center,
+                    toolTip:
+                      $$(go.Adornment, "Auto",
+                        $$(go.Shape, { fill: "#EFEFCC" }),
+                        $$(go.TextBlock, { margin: 4, width: 140 },
+                          new go.Binding("text", "", infoString).ofObject())
+                      )
+                },
                 new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
                 new go.Binding("angle").makeTwoWay(),
                 // the main object is a Panel that surrounds a TextBlock with a Shape
@@ -376,6 +412,47 @@
 
             self.setPaletteModel();
             self.clearDiagram();
+        };
+
+
+        Relation.prototype.getNodeString = function(id) {
+
+            let self = this, node = self.nodes[id], law = self.laws[self.currentLaw];
+
+            let predicates = '';
+            for(let group in self.predicateSets) {
+                if(self.predicateSets[group].hasOwnProperty(id)) {
+                    let groupStr = '';
+                    for(let n in self.predicateSets[group]) groupStr += '' + n + ',';
+                    predicates += groupStr.substring(0, groupStr.length-1) + '; ';
+                }
+            }
+            if(predicates == '') predicates = 'none';
+            else predicates = predicates.substring(0, predicates.length-2);
+
+            let mappings = '';
+            if(self.nodeMap.hasOwnProperty(id)) {
+                for(let p in self.nodeMap[id]) {
+                    for(let m in self.nodeMap[id][p]) {
+                        let map = self.map[m], law = self.laws[map.lawId];
+                        let mapStr = '';
+                        for(let n in map.idMap) if(self.nodes[n].law == self.currentLaw) mapStr += '' + n + ',';
+                        mapStr = mapStr.substring(0, mapStr.length-1);
+                        mappings += '' + p + ' [' + self.concepts[self.nodes[p].concept].name + ']' + "\n"
+                            + '.  in ' + law.name + ' [' + law.id + ']' + "\n"
+                            + '.  ' + mapStr + ' (map ' + m + ')' + "\n";
+                    }
+                }
+            }
+            if(mappings == '') mappings = 'none';
+            else mappings = "\n" + mappings;
+
+            msg = 'ID: ' + node.id + "\n"
+                + 'Law: ' + law.name + ' [' + law.id + "]\n"
+                + 'Predicates: ' + predicates + "\n"
+                + 'Values: ' + self.convertValues(node.values, 'string') + "\n"
+                + 'Mappings: ' + mappings;
+            return msg;
         };
 
 
@@ -772,7 +849,7 @@
             if(firstLevel) {
                 self.tempIdMap = {};
                 self.tempValueMap = {};
-                self.intersectCandidates = [];
+                self.intersectCandidates = {};
             }
 
             //make sure this node's concept matches the predicate's concept
@@ -792,7 +869,7 @@
             if(self.nodeMap.hasOwnProperty(nodeId) && self.nodeMap[nodeId].hasOwnProperty(predicateId)) {
                 for(var map in self.nodeMap[nodeId][predicateId]) {
                     if(self.nodeMap[nodeId][predicateId].hasOwnProperty(map))
-                        self.intersectCandidates.push(map);
+                        self.intersectCandidates[map] = true;
                 }
             }
 
@@ -849,6 +926,9 @@
                 self.tempIdMap = null;
                 self.tempValueMap = null;
 
+                console.log('Predicate match for law ' + predicate['law'] + ' on ' + nodeId + ' => map ' + (self.nextMapId-1));
+                console.info(self.map[self.nextMapId-1]);
+
                 let law = self.laws[predicate['law']];
                 let satisfied = !law.predicateSets.every(function(pset) {
                     return !(pset.length == 1 && pset[0] == predicateId);
@@ -857,9 +937,11 @@
                     self.appendLaw(self.map[self.nextMapId-1]);
                 } else {
                     //see if this ID map completely intersects any other ID maps
-                    self.intersectCandidates.forEach(function(mapId) {
+                    for(let mapId in self.intersectCandidates) {
+                        console.log('checking intersection with map ' + mapId + ':');
+                        console.info(self.map[mapId]);
                         self.checkIntersection(self.nextMapId-1, mapId);
-                    });
+                    };
                 }
             }
             return true;
@@ -937,20 +1019,27 @@
 
             //and that the joint predicate set is part of a set that satisfies the law
             var law = self.laws[map1.lawId], predicateSet = map1.predicates.concat(map2.predicates), match = null;
-            var cannotCombine = law.predicateSets.every(function(set) {
+            var cannotCombine = law.predicateSets.every(function(pset) {
                 var isSubset = predicateSet.every(function(predicate) {
-                    return set.indexOf(predicate) >= 0;
+                    return pset.indexOf(predicate) >= 0;
                 }), isMatch = false;
                 if(isSubset) {
+                    console.info('' + mapId1 + ' x ' + mapId2 + ' subset of ' + pset.toString());
                     //meanwhile, check if the predicates in the two maps in fact satisfy the law
-                    isMatch = set.every(function(predicate) {
+                    isMatch = pset.every(function(predicate) {
                         return predicateSet.indexOf(predicate) >= 0;
                     });
-                    if(isMatch) match = set;
+                    if(isMatch) {
+                        match = pset;
+                        console.info('' + mapId1 + ' x ' + mapId2 + ' matches ' + pset.toString());
+                    }
                 }
                 return !isSubset && !isMatch;
             });
-            if(match == null && cannotCombine) return false;
+            if(match == null && cannotCombine) {
+                console.log('failed intersection: ' + mapId1 + ', ' + mapId2);
+                return false;
+            }
 
             //whichever relation nodes are shared by the two maps must be mapped to the same predicate node
             for(let node in map1.idMap) {
@@ -1138,6 +1227,13 @@
             float: right;
         }
         #relation-controls button {
+        }
+
+        #node-info {
+            background-color: #8ff;
+            color: #604;
+            font-weight: bold;
+            padding: 0 20px;
         }
 
     </style>
