@@ -780,23 +780,32 @@
         };
 
 
-        /* RELATION EVALUATION
+        /*
+
+        RELATION EVALUATION:
 
         Scheme: Start with the relation R.  For each node N, take its concept C, and find all laws L
         that have a predicate on C.  Trace the predicate of L up to its roots, all the while matching its
         nodes with those of the relation R.  If they all match up, retain the map between nodes of L and R.
 
         If two maps M1 and M2 for the same law, different predicate nodes P1 and P2, are found to intersect - that is,
-        each node of R that is in both M1 and M2 maps to the same node of L - then we check for a logic (AND/OR) relation
-        between P1 and P2 in L.  If there is one, we merge M1 and M2 into a new map M3 (still retaining M1 and M2),
-        add the logic node(s) between P1 and P2 to our relation, and include it(them) in M3.
+        each node of R that is in both M1 and M2 maps to the same node of L, and each node of L that is in both M1 and M2
+        maps to the same node of R - then we check for a logic (AND/OR) relation between P1 and P2 in L.  If there is one,
+        we merge M1 and M2 into a new map M3 (still retaining M1 and M2).
 
-        When another map M4 is later merged with M3, we again combine the predicate nodes of M4 and M3 using logic nodes
-        from L.  As we keep merging maps, eventually we will create a logic node in our relation that satisfies L.
+        When another map M4 is later merged with M3, we again combine the predicate nodes of M4 and M3 using logic
+        from L.  As we keep merging maps, eventually we may have a map whose predicate nodes completely satisfy L.
         At that point, we can append to our relation R the additional knowledge (relations) that L provides us.
 
-        If we maintain symmetric nodes, we can ensure that every map always has a unique deep node.  QUESTION: How do we
-        store symmetric nodes that relate more than two inputs, ie. a sum, equality, or AND between three operands?
+        *Symmetry*:
+
+        Certain concepts, eg. sum, product, equality, are symmetric.  Within the tree rooted at a predicate node, if there
+        is a symmetric node, we can flip its subtree relative to our relation, and if both orientations match, they give
+        us two alternative submaps within the full map for that predicate node.
+
+        So a given predicate map has 2^n alternative configurations where n is the number of symmetric nodes that matched
+        in both orientations.  We make a separate map for each configuration.  Then we check all intersections with any of
+        those 2^n maps.
 
         */
 
@@ -840,16 +849,15 @@
         };
 
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
-        Relation.prototype.checkPredicate = function(nodeId, predicateId) {
+        Relation.prototype.checkPredicate = function(nodeId, predicateId, map) {
 
-            let self = this, node = this.nodes[nodeId], predicate = this.nodes[predicateId];
+            let self = this, nodeId = parseInt(nodeId), predicateId = parseInt(predicateId),
+                node = this.nodes[nodeId], predicate = this.nodes[predicateId];
 
             //if this is the first recursion step, initialize aggregators
-            let firstLevel = self.tempIdMap == null;
+            let firstLevel = !map;
             if(firstLevel) {
-                self.tempIdMap = {};
-                self.tempValueMap = {};
-                self.intersectCandidates = {};
+                map = {lawId: predicate['law'], idMap: {}, values: {}, intersects: {}, children: []};
             }
 
             //make sure this node's concept matches the predicate's concept
@@ -861,90 +869,106 @@
             if(match) values = self.intersectValues(node.values, predicate.values);
             if(!match || (values && values.length == 0)) return false;
 
-            self.tempIdMap[nodeId] = predicateId;
-            self.tempIdMap[predicateId] = nodeId;
-            self.tempValueMap[nodeId] = values;
+            map.idMap[nodeId] = predicateId;
+            map.idMap[predicateId] = nodeId;
+            map.values[nodeId] = values;
 
             //note any prior mappings between this node and predicate node - used later to test for intersections
             if(self.nodeMap.hasOwnProperty(nodeId) && self.nodeMap[nodeId].hasOwnProperty(predicateId)) {
-                for(var map in self.nodeMap[nodeId][predicateId]) {
-                    if(self.nodeMap[nodeId][predicateId].hasOwnProperty(map))
-                        self.intersectCandidates[map] = true;
+                for(let mapId in self.nodeMap[nodeId][predicateId]) {
+                    map.intersects[mapId] = true;
                 }
             }
 
-            let symmetric = self.concepts[node.concept].symmetric;
+            //for symmetric nodes, make 2 submaps, one for each orientation
+            let symmetric = self.concepts[node.concept].symmetric, fwdMap = map, revMap = map;
+            if(symmetric) {
+                fwdMap = {lawId: predicate.law, idMap: {}, values: {}, intersects: {}, parent: map};
+                revMap = {lawId: predicate.law, idMap: {}, values: {}, intersects: {}, parent: map};
+            }
 
             //check recursively on this node's head and reference
-            let links = ['head', 'reference'], checkReverse = false;
-            for(let i = 0; i < 2; i++) {
-                let link = links[i], nodeLink = node[link], predicateLink = predicate[link];
-                if(!predicateLink) continue;
-                else if(!nodeLink || !self.checkPredicate(nodeLink, predicateLink)) {
-                    if(!symmetric) {
-                        delete self.tempIdMap[nodeId], self.tempIdMap[predicateId];
-                        return false;
-                    } else {
-                        checkReverse = true;
-                        break;
-                    }
+            let fwd = true, rev = true, nh = node.head, nr = node.reference, ph = predicate.head, pr = predicate.reference;
+            if(ph) fwd = fwd && nh && self.checkPredicate(nh, ph, fwdMap);
+            if(pr) fwd = fwd && nr && self.checkPredicate(nr, pr, fwdMap);
+            //for symmetric nodes, check the other orientation
+            if(symmetric) {
+                if(ph) rev = rev && nr && self.checkPredicate(nr, ph, revMap);
+                if(pr) rev = rev && nh && self.checkPredicate(nh, pr, revMap);
+                //if both succeed, keep the two alternatives as a pair of submaps
+                if(fwd && rev) map.children.push([fwdMap, revMap]);
+                //if only one, absorb the corresponding submap into this map
+                else if(fwd || rev) {
+                    let keepMap = fwd ? fwdMap : revMap;
+                    if(!self.absorbMap(map, keepMap)) return false;
                 }
-            }
-            if(symmetric && checkReverse) {
-                if(predicate['reference'] && (!node['head'] || !self.checkPredicate(node['head'], predicate['reference']))) {
-                    delete self.tempIdMap[nodeId], self.tempIdMap[predicateId];
-                    return false;
-                }
-                if(predicate['head'] && (!node['reference'] || !self.checkPredicate(node['reference'], predicate['head']))) {
-                    delete self.tempIdMap[nodeId], self.tempIdMap[predicateId];
-                    return false;
-                }
-            }
-
+            } else rev = false;
+            //and if neither direction worked, the predicate fails
+            if(!fwd && !rev) return false;
 
             if(firstLevel) {
-                //at this point we have a complete match to the predicate, so see if the law is fully satisfied
-                let count = 0;
-                for(let node in self.tempIdMap) {
-                    let predicate = self.tempIdMap[node];
-                    if(!self.nodeMap.hasOwnProperty(node)) self.nodeMap[node] = {};
-                    if(!self.nodeMap[node].hasOwnProperty(predicate)) self.nodeMap[node][predicate] = {};
-                    if(!self.nodeMap.hasOwnProperty(predicate)) self.nodeMap[predicate] = {};
-                    if(!self.nodeMap[predicate].hasOwnProperty(node)) self.nodeMap[predicate][node] = {};
-                    self.nodeMap[node][predicate][self.nextMapId] = 1;
-                    self.nodeMap[predicate][node][self.nextMapId] = 1;
-                    count++;
-                }
-                if(count > 0) {
-                    self.map[self.nextMapId++] = {
-                        lawId: predicate['law'],
-                        predicates: [predicateId],
-                        idMap: self.tempIdMap,
-                        values: self.tempValueMap
-                    };
-                }
-                self.tempIdMap = null;
-                self.tempValueMap = null;
-
-                console.log('Predicate match for law ' + predicate['law'] + ' on ' + nodeId + ' => map ' + (self.nextMapId-1));
-                console.info(self.map[self.nextMapId-1]);
-
-                let law = self.laws[predicate['law']];
+                //at this point we have a complete match to the predicate
+                //separate all the forks on symmetric nodes into full maps
+                let maps = self.splitMaps(map), newMaps = 0, law = self.laws[predicate.law];
                 let satisfied = !law.predicateSets.every(function(pset) {
                     return !(pset.length == 1 && pset[0] == predicateId);
                 });
-                if(satisfied) {
-                    self.appendLaw(self.map[self.nextMapId-1]);
-                } else {
-                    //see if this ID map completely intersects any other ID maps
-                    for(let mapId in self.intersectCandidates) {
-                        console.log('checking intersection with map ' + mapId + ':');
-                        console.info(self.map[mapId]);
-                        self.checkIntersection(self.nextMapId-1, mapId);
-                    };
-                }
+                maps.forEach(function(map) {
+                    let count = 0, id = self.nextMapId;
+                    for(let n in map.idMap) {
+                        let p = map.idMap[n];
+                        if(!self.nodeMap.hasOwnProperty(n)) self.nodeMap[n] = {};
+                        if(!self.nodeMap[n].hasOwnProperty(p)) self.nodeMap[n][p] = {};
+                        if(!self.nodeMap.hasOwnProperty(p)) self.nodeMap[p] = {};
+                        if(!self.nodeMap[p].hasOwnProperty(n)) self.nodeMap[p][n] = {};
+                        self.nodeMap[n][p][id] = 1;
+                        self.nodeMap[p][n][id] = 1;
+                        count++;
+                    }
+                    if(count > 0) {
+                        map.id = id;
+                        self.map[self.nextMapId++] = map;
+                        newMaps++;
+                    }
+                    if(satisfied) {
+                        self.appendLaw(map);
+                    } else {
+                        for(let other in map.intersects) {
+                            self.checkIntersection(map.id, other);
+                        }
+                    }
+                });
             }
             return true;
+        };
+
+
+        Relation.prototype.splitMaps = function(map) {
+            let self = this, maps = [];
+
+            map.children.forEach(function(pair) {
+                let submaps = pair[0].splitMaps().concat(pair[1].splitMaps());
+                submaps.forEach(function(submap) {
+                    let merge = self.absorbMap(Object.assign({}, map), submap);
+                    if(merge) maps.push(merge);
+                });
+            });
+
+            if(maps.length == 0) maps.push(map);
+
+            return maps;
+        }
+
+
+        Relation.prototype.absorbMap = function(map, submap) {
+            let self = this;
+            for(let n in submap.idMap) {
+                if(map.idMap.hasOwnProperty(n) && map.idMap[n] != submap.idMap[n]) return false;
+            }
+            map.idMap[n] = submap.idMap[n];
+            for(let n in submap.values) map.values[n] = submap.values[n];
+            for(let m in submap.intersects) map.intersects[m] = submap.intersects[m];
+            map.children = map.children.concat(submap.children);
         };
 
 
