@@ -41,8 +41,145 @@
                 <h3 id="node-title"></h3>
                 <p id="node-description"></p>
             </div>
-      </div>
+        </div>
+
+        <div id="concept-select" class="modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+        <div class="modal-content">
+        <div class="modal-body">
+            <ul class="nav nav-tabs" id="concept-select-tabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="concept-search-tab" data-toggle="tab" href="#concept-search" role="tab" aria-controls="concept-search" aria-selected="true">
+                        Search Concepts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="new-concept-tab" data-toggle="tab" href="#new-concept" role="tab" aria-controls="new-concept" aria-selected="false">
+                        New Concept
+                    </a>
+                </li>
+            </ul>
+            <div class="tab-content" id="concept-select-content">
+                <div class="tab-pane fade show active" id="concept-search" role="tabpanel" aria-labelledby="search-concepts-tab">
+                    <input type="text" id="concept-search" class="search-field" placeholder="Enter name or key words">
+                    <div id="concept-results" class="search-results">
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="new-concept" role="tabpanel" aria-labelledby="new-concept-tab">
+                    <input type="text" id="concept-new-name" placeholder="Name">
+                    <input type="text" id="concept-new-description" placeholder="Description">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-primary">Save changes</button>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+        </div>
+        </div>
+        </div>
+
+        <div id="search-template" style="display: none">
+            <input type="text" class="search-field" placeholder="Enter name or key words"/>
+            <div class="search-results"/>
+        </div>
     </body>
+
+
+
+    {{block page_css}}
+    <style>
+        html {
+            height: 100%;
+        }
+        body {
+            min-height: 100%;
+            margin: 20px;
+        }
+
+        .concept {
+            border: 3px solid red;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 14px;
+            color: black;
+        }
+
+        #editor-wrapper {
+            display: table;
+            width: 100%;
+            height: 100%;
+        }
+        #editor-container {
+            display: table-row;
+            width: 100%;
+            height: 100%;
+        }
+        #concept-container, #graph-container {
+            display: table-cell;
+        }
+        #concept-container {
+            width: 10%;
+            height: 100%;
+            border: 3px solid blue;
+        }
+        #graph-container {
+            width: auto;
+            height: 100%;
+            border: 3px solid green;
+        }
+
+        #graph-controls {
+        }
+        #predicate-controls, #relation-controls {
+            margin-bottom: 20px;
+        }
+        #graph-controls button, #graph-controls select {
+            padding: 5px 10px;
+            border: 2px solid black;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: #aaaaff;
+            color: black;
+        }
+        #predicate-controls {
+            float: left;
+        }
+        #predicate-controls button {
+        }
+        #remove-predicate, #predicate-help {
+            display: none;
+        }
+        #relation-controls {
+            float: right;
+        }
+        #relation-controls button {
+        }
+
+        #node-info {
+            background-color: #8ff;
+            color: #604;
+            font-weight: bold;
+            padding: 0 20px;
+        }
+
+        /*search results*/
+
+        .result-display {
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .result-name {
+            float: left;
+        }
+        .result-description {
+            float: right;
+        }
+
+    </style>
+    {{end page_css}}
+
 
 
 
@@ -177,7 +314,7 @@
                    }
                    self.nodes = data.nodes;
                    self.predicates = data.predicates;
-                   self.nextNodeId = data.nextNodeId;
+                   self.nextNodeId = parseInt(data.nextNodeId);
 
                    self.nodes[-1] = {id: -1};
                    $.each(self.nodes, function(id, node) {
@@ -193,13 +330,14 @@
                        law.predicateSets = [];
                        $.each(law.predicates, function(id, group) {
                            let pset = [];
-                           for(let node in group) pset.push(node);
+                           for(let node in group) pset.push(parseInt(node));
                            law.predicateSets.push(pset);
                        });
                        law.deepNodes = [];
                        law.nodes.forEach(function(node) {
-                           if(!law.notDeepNode.hasOwnProperty(node)) {
-                               law.deepNodes.push(node);
+                           let n = parseInt(node);
+                           if(!law.notDeepNode.hasOwnProperty(n)) {
+                               law.deepNodes.push(n);
                            }
                        });
                    });
@@ -312,7 +450,19 @@
             // a context menu is an Adornment with a bunch of buttons in them
             var partContextMenu =
               $$(go.Adornment, "Vertical",
-                  makeButton("Set Values",
+                    makeButton("Change Concept",
+                            function(e, obj) {
+                                let part = obj.part.adornedPart;
+                                if(!(part instanceof go.Node)) return;
+                                self.getEntry('concept', function(concept) {
+                                    if(concept && self.concepts.hasOwnProperty(concept))
+                                        self.setNodeData(part.data.id, 'concept', concept);
+                                });
+                            },
+                            function(o) {
+                                return true;
+                            }),
+                    makeButton("Set Values",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
                                 if(!(part instanceof go.Node)) return;
@@ -325,7 +475,7 @@
                             function(o) {
                                 return true;
                             }),
-                  makeButton("Add to Predicate",
+                    makeButton("Add to Predicate",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
                                 if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), true);
@@ -335,7 +485,7 @@
                                 if(part instanceof go.Node) return self.currentPredicate >= 0 && !self.inPredicate(parseInt(part.data.id));
                                 return false;
                             }),
-                  makeButton("Remove from Predicate",
+                    makeButton("Remove from Predicate",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
                                 if(part instanceof go.Node) self.togglePredicate(parseInt(part.data.id), false);
@@ -415,9 +565,41 @@
         };
 
 
+        Relation.prototype.getEntry = function(table, callback) {
+            let self = this, $modal = $('#' + table + '-select');
+            $modal.modal('show');
+            $modal.on('hide.bs.modal', function(e) {
+                let id = $('#' + table + '-selected-id').val();
+                callback.call(self, id);
+            });
+        };
+
+
+        Relation.prototype.getTable = function(name) {
+            let self = this;
+            switch(name) {
+                case 'concept': return self.concepts; break;
+                case 'framework': return self.frameworks; break;
+                case 'node': return self.nodes; break;
+                case 'law': return self.laws; break;
+                default: break;
+            }
+            return null;
+        };
+
+
+        Relation.prototype.setNodeData = function(nodeId, attr, value) {
+            let self = this, node = self.nodes[nodeId];
+            if(node && node.hasOwnProperty(attr)) node[attr] = value;
+            let data = self.diagram.model.findNodeDataForKey(nodeId);
+            if(data && data.hasOwnProperty(attr)) data[attr] = value;
+        };
+
+
         Relation.prototype.getNodeString = function(id) {
 
             let self = this, node = self.nodes[id], law = self.laws[self.currentLaw];
+            if(!node) return '';
 
             let predicates = '';
             for(let group in self.predicateSets) {
@@ -532,12 +714,16 @@
             //start by arranging the nodes visually as a tree descending from the root,
             //then allow the force layout to adjust them
             //=> first we need to identify the children of each node
-            let nodeMeta = {'-1': {'children': []}};
+            let rootNodes = [];
+            let nodeMeta = {'-1': {children: []}};
             self.myNodes.forEach(function(node) {
-                nodeMeta[node] = {'children': []};
+                nodeMeta[node] = {children: []};
             });
             self.myNodes.forEach(function(node) {
-                if(node >= 0) nodeMeta[self.nodes[node].head || -1].children.push(node);
+                if(node < 0) return;
+                let head = self.nodes[node].head, root = !head;;
+                nodeMeta[root ? -1 : head].children.push(node);
+                if(root) nodeMeta[node].level = 0;
             });
 
             let horizontal = 100, vertical = 100;
@@ -849,15 +1035,15 @@
         };
 
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
-        Relation.prototype.checkPredicate = function(nodeId, predicateId, map) {
+        Relation.prototype.checkPredicate = function(nodeID, predicateID, map) {
 
-            let self = this, nodeId = parseInt(nodeId), predicateId = parseInt(predicateId),
+            let self = this, nodeId = parseInt(nodeID), predicateId = parseInt(predicateID),
                 node = this.nodes[nodeId], predicate = this.nodes[predicateId];
 
             //if this is the first recursion step, initialize aggregators
             let firstLevel = !map;
             if(firstLevel) {
-                map = {lawId: predicate['law'], idMap: {}, values: {}, intersects: {}, children: []};
+                map = {lawId: predicate['law'], predicates: [predicateId], idMap: {}, values: {}, intersects: {}, children: []};
             }
 
             //make sure this node's concept matches the predicate's concept
@@ -881,14 +1067,15 @@
             }
 
             //for symmetric nodes, make 2 submaps, one for each orientation
-            let symmetric = self.concepts[node.concept].symmetric, fwdMap = map, revMap = map;
-            if(symmetric) {
-                fwdMap = {lawId: predicate.law, idMap: {}, values: {}, intersects: {}, parent: map};
-                revMap = {lawId: predicate.law, idMap: {}, values: {}, intersects: {}, parent: map};
+            let symmetric = self.concepts[node.concept].symmetric, fwdMap = map, revMap = map, fwd = true, rev = true;
+            let nh = node.head, nr = node.reference, ph = predicate.head, pr = predicate.reference, twoMaps = false;
+            if(symmetric && ((ph && nh) || (pr && nr))) {
+                twoMaps = true;
+                fwdMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, values: {}, intersects: {}, children: [], parent: map};
+                revMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, values: {}, intersects: {}, children: [], parent: map};
             }
 
             //check recursively on this node's head and reference
-            let fwd = true, rev = true, nh = node.head, nr = node.reference, ph = predicate.head, pr = predicate.reference;
             if(ph) fwd = fwd && nh && self.checkPredicate(nh, ph, fwdMap);
             if(pr) fwd = fwd && nr && self.checkPredicate(nr, pr, fwdMap);
             //for symmetric nodes, check the other orientation
@@ -896,7 +1083,9 @@
                 if(ph) rev = rev && nr && self.checkPredicate(nr, ph, revMap);
                 if(pr) rev = rev && nh && self.checkPredicate(nh, pr, revMap);
                 //if both succeed, keep the two alternatives as a pair of submaps
-                if(fwd && rev) map.children.push([fwdMap, revMap]);
+                if(fwd && rev) {
+                    if(twoMaps) map.children.push([fwdMap, revMap]);
+                }
                 //if only one, absorb the corresponding submap into this map
                 else if(fwd || rev) {
                     let keepMap = fwd ? fwdMap : revMap;
@@ -910,9 +1099,12 @@
                 //at this point we have a complete match to the predicate
                 //separate all the forks on symmetric nodes into full maps
                 let maps = self.splitMaps(map), newMaps = 0, law = self.laws[predicate.law];
+                console.log('node ' + nodeId + ' matches ' + law.name + ' on ' + predicateId);
+                console.log('   ' + maps.length + ' map versions');
                 let satisfied = !law.predicateSets.every(function(pset) {
                     return !(pset.length == 1 && pset[0] == predicateId);
                 });
+                if(satisfied) console.log('   satisfied');
                 maps.forEach(function(map) {
                     let count = 0, id = self.nextMapId;
                     for(let n in map.idMap) {
@@ -943,13 +1135,25 @@
         };
 
 
+        Relation.prototype.absorbMap = function(map, submap) {
+            let self = this;
+            for(let n in submap.idMap) {
+                if(map.idMap.hasOwnProperty(n) && map.idMap[n] != submap.idMap[n]) return false;
+                map.idMap[n] = submap.idMap[n];
+            }
+            for(let n in submap.values) map.values[n] = submap.values[n];
+            for(let m in submap.intersects) map.intersects[m] = submap.intersects[m];
+            map.children = map.children.concat(submap.children);
+        };
+
+
         Relation.prototype.splitMaps = function(map) {
             let self = this, maps = [];
 
             map.children.forEach(function(pair) {
-                let submaps = pair[0].splitMaps().concat(pair[1].splitMaps());
+                let submaps = self.splitMaps(pair[0]).concat(self.splitMaps(pair[1]));
                 submaps.forEach(function(submap) {
-                    let merge = self.absorbMap(Object.assign({}, map), submap);
+                    let merge = self.mergeMaps(map, submap);
                     if(merge) maps.push(merge);
                 });
             });
@@ -960,15 +1164,20 @@
         }
 
 
-        Relation.prototype.absorbMap = function(map, submap) {
-            let self = this;
-            for(let n in submap.idMap) {
-                if(map.idMap.hasOwnProperty(n) && map.idMap[n] != submap.idMap[n]) return false;
+        Relation.prototype.mergeMaps = function(map1, map2) {
+            let self = this, map = {};
+
+            map.lawId = map1.lawId;
+            for(let n in map1.idMap) {
+                if(map2.idMap.hasOwnProperty(n) && map2.idMap[n] != map1.idMap[n]) return false;
             }
-            map.idMap[n] = submap.idMap[n];
-            for(let n in submap.values) map.values[n] = submap.values[n];
-            for(let m in submap.intersects) map.intersects[m] = submap.intersects[m];
-            map.children = map.children.concat(submap.children);
+            map.idMap = Object.assign({}, map1.idMap, map2.idMap);
+            map.values = Object.assign({}, map1.values, map2.values);
+            map.intersects = Object.assign({}, map1.intersects, map2.intersects);
+            map.predicates = map1.predicates.concat(map2.predicates);
+            map.children = [];
+
+            return map;
         };
 
 
@@ -1032,36 +1241,40 @@
 
         Relation.prototype.checkIntersection = function(mapId1, mapId2) {
 
-            var self = this, map1 = self.map[mapId1], map2 = self.map[mapId2];
+            let self = this, map1 = self.map[mapId1], map2 = self.map[mapId2];
+            console.log('intersecting map ' + mapId1 + ' with ' + mapId2);
 
             //make sure the two maps are for the same law, but their predicate sets are disjoint
             if(map1.lawId != map2.lawId) return false;
-            var disjoint = map1.predicates.every(function(predicate) {
+            let disjoint = map1.predicates.every(function(predicate) {
                     return map2.predicates.indexOf(predicate) < 0;
                 });
             if(!disjoint) return false;
 
             //and that the joint predicate set is part of a set that satisfies the law
-            var law = self.laws[map1.lawId], predicateSet = map1.predicates.concat(map2.predicates), match = null;
-            var cannotCombine = law.predicateSets.every(function(pset) {
-                var isSubset = predicateSet.every(function(predicate) {
+            let law = self.laws[map1.lawId], predicateSet = map1.predicates.concat(map2.predicates), match = null;
+            let predicates1 = map1.predicates.join(','), predicates2 = map2.predicates.join(',');
+            console.log('intersecting ' + predicates1 + ' with ' + predicates2 + ' for ' + law.name);
+            console.log('   requires: ' + JSON.stringify(law.predicateSets));
+            let cannotCombine = law.predicateSets.every(function(pset) {
+                let isSubset = predicateSet.every(function(predicate) {
                     return pset.indexOf(predicate) >= 0;
                 }), isMatch = false;
                 if(isSubset) {
-                    console.info('' + mapId1 + ' x ' + mapId2 + ' subset of ' + pset.toString());
+                    console.log('   subset');
                     //meanwhile, check if the predicates in the two maps in fact satisfy the law
                     isMatch = pset.every(function(predicate) {
                         return predicateSet.indexOf(predicate) >= 0;
                     });
                     if(isMatch) {
                         match = pset;
-                        console.info('' + mapId1 + ' x ' + mapId2 + ' matches ' + pset.toString());
+                        console.log('   match');
                     }
                 }
                 return !isSubset && !isMatch;
             });
             if(match == null && cannotCombine) {
-                console.log('failed intersection: ' + mapId1 + ', ' + mapId2);
+                console.log('   predicate failure');
                 return false;
             }
 
@@ -1070,13 +1283,10 @@
                 if(!map2.idMap.hasOwnProperty(node)) continue;
                 if(map2.idMap[node] != map1.idMap[node]) return false;
             }
+            console.log('   success');
 
             //at this point they do intersect, so create a new map by merging these two
-            var map = {
-                lawId: map1.lawId,
-                predicates: predicateSet,
-                idMap: Object.assign({}, map1.idMap, map2.idMap)
-            };
+            let map = self.mergeMaps(map1, map2);
             self.map[self.nextMapId++] = map;
 
             //if the law has been satisfied, use the map to append the knowledge of the law to our relation
@@ -1086,6 +1296,7 @@
 
             return true;
         };
+
 
         //given a correspondence between nodes in the relation and predicate, fill in the rest of the law
         Relation.prototype.appendLaw = function(map) {
@@ -1163,6 +1374,34 @@
             relation = new Relation();
             relation.initDiagram();
 
+            $('.search-field').change(function(e) {
+                let self = relation, $this = $(this), text = $this.val().toLowerCase(), table = $this.attr('id').split('-')[0],
+                    entries = null, results = [];
+                switch(table) {
+                    case 'concept': entries = self.concepts; break;
+                    case 'framework': entries = self.frameworks; break;
+                    default: break;
+                }
+                if(!entries) return;
+                for(let id in entries) {
+                    let entry = entries[id];
+                    if(entry.hasOwnProperty('name')) {
+                        let name = entry.name.toLowerCase();
+                        if(name.includes(text)) {
+                            let result =
+                                '<div id="result-' + table + '-' + id + '" class="result-display">' +
+                                '<span class="result-name">' + entry.name + '</span>';
+                            if(entry.hasOwnProperty('description'))
+                                result += '<span class="result-description">' + entry.description + '</span>';
+                            result += '</div>';
+                            results.push(result);
+                        }
+                    }
+                }
+                let $results = $this.parent().children('.search-results');
+                $results.html(results.join(''));
+            });
+
             $('#set-predicate').change(function(e) {
                 relation.setPredicate($(this).val());
             });
@@ -1180,87 +1419,5 @@
 
     </script>
     {{end page_js}}
-
-
-
-    {{block page_css}}
-    <style>
-        html {
-            height: 100%;
-        }
-        body {
-            min-height: 100%;
-            margin: 20px;
-        }
-
-        .concept {
-            border: 3px solid red;
-            border-radius: 4px;
-            padding: 6px;
-            font-size: 14px;
-            color: black;
-        }
-
-        #editor-wrapper {
-            display: table;
-            width: 100%;
-            height: 100%;
-        }
-        #editor-container {
-            display: table-row;
-            width: 100%;
-            height: 100%;
-        }
-        #concept-container, #graph-container {
-            display: table-cell;
-        }
-        #concept-container {
-            width: 10%;
-            height: 100%;
-            border: 3px solid blue;
-        }
-        #graph-container {
-            width: auto;
-            height: 100%;
-            border: 3px solid green;
-        }
-
-        #graph-controls {
-        }
-        #predicate-controls, #relation-controls {
-            margin-bottom: 20px;
-        }
-        #graph-controls button, #graph-controls select {
-            padding: 5px 10px;
-            border: 2px solid black;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            background-color: #aaaaff;
-            color: black;
-        }
-        #predicate-controls {
-            float: left;
-        }
-        #predicate-controls button {
-        }
-        #remove-predicate, #predicate-help {
-            display: none;
-        }
-        #relation-controls {
-            float: right;
-        }
-        #relation-controls button {
-        }
-
-        #node-info {
-            background-color: #8ff;
-            color: #604;
-            font-weight: bold;
-            padding: 0 20px;
-        }
-
-    </style>
-    {{end page_css}}
 
 </html>
