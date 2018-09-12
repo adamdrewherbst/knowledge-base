@@ -42,6 +42,11 @@ def concept():
     return locals()
 
 
+def entry():
+    table = request.vars.table
+    return locals()
+
+
 def initRelation():
 
     frameworkId = int(request.vars.framework)
@@ -52,7 +57,16 @@ def initRelation():
         rows = db(db.law.id == lawId).select()
         relation = rows[0]
 
-    ret = {'myNodes': [], 'concepts': {}, 'laws': {}, 'nodes': {}, 'predicates': {}, 'nextNodeId': -1}
+    ret = {'frameworks': {}, 'myNodes': [], 'concepts': {}, 'laws': {}, 'nodes': {}, 'predicates': {}, 'nextNodeId': -1}
+
+    #include the metadata for all frameworks
+    for framework in db(db.framework.id > 0).iterselect():
+        ret['frameworks'][framework.id] = \
+            {'id': framework.id, 'name': framework.name, 'description': framework.description, 'dependencies': {}}
+        for dep in db(db.framework_dependency.framework == framework.id).iterselect():
+            ret['frameworks'][framework.id]['dependencies'][dep.id] = True
+    for law in db(db.law.id > 0).iterselect():
+        ret['laws'][law.id] = {'id': law.id, 'name': law.name, 'description': law.description, 'nodes': [], 'predicates': {}, 'notDeepNode': {}};
 
     #include all concepts not specific to any framework (ROOT and Anything)
     for concept in db(db.concept.framework == None).iterselect():
@@ -74,7 +88,6 @@ def initRelation():
             for dep in db(db.concept_dependency.concept == concept.id).iterselect():
                 ret['concepts'][concept.id]['dependencies'][dep.id] = True
         for law in db(db.law.framework == fid).iterselect():
-            ret['laws'][law.id] = {'id': law.id, 'name': law.name, 'description': law.description, 'nodes': [], 'predicates': {}, 'notDeepNode': {}};
             for node in db(db.node.law == law.id).iterselect():
                 ret['nodes'][node.id] = \
                     {'id': node.id, 'law': node.law, 'concept': node.concept, 'head': node.head, 'reference': node.reference, 'values': node.node_values};

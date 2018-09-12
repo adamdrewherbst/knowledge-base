@@ -1,0 +1,36 @@
+<div id="{{=table}}-select" class="modal entry-modal" tabindex="-1" role="dialog">
+<div class="modal-dialog" role="document">
+<div class="modal-content">
+<div class="modal-body">
+    <ul class="nav nav-tabs" id="{{=table}}-select-tabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="{{=table}}-search-tab" data-toggle="tab" href="#{{=table}}-search" role="tab" aria-controls="{{=table}}-search" aria-selected="true">
+                Search {{=table}}s
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="new-{{=table}}-tab" data-toggle="tab" href="#new-{{=table}}" role="tab" aria-controls="new-{{=table}}" aria-selected="false">
+                New {{=table}}
+            </a>
+        </li>
+    </ul>
+    <div class="tab-content" id="{{=table}}-select-content">
+        <div class="tab-pane fade active" id="{{=table}}-search" role="tabpanel" aria-labelledby="{{=table}}-search-tab">
+            <input type="text" id="{{=table}}-search" class="search-field" placeholder="Enter name or key words">
+            <div id="{{=table}}-results" class="search-results">
+            </div>
+        </div>
+        <div class="tab-pane fade" id="new-{{=table}}" role="tabpanel" aria-labelledby="new-{{=table}}-tab">
+            <input type="text" id="{{=table}}-new-name" placeholder="Name">
+            <input type="text" id="{{=table}}-new-description" placeholder="Description">
+        </div>
+    </div>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-primary">Save changes</button>
+    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+</div>
+</div>
+</div>
+<input type="hidden" id="{{=table}}-selected-id">
+</div>

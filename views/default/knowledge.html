@@ -12,8 +12,26 @@
     <body>
 
         <!-- form: create/modify concepts -->
-        <h2>Create a new concept</h2>
-        {{=LOAD('default', 'concept.load', ajax=True)}}
+        <!--<h2>Create a new concept</h2>
+        {{=LOAD('default', 'concept.load', ajax=True)}}-->
+
+        <!-- controls -->
+        <div id="controls">
+            <div id="framework-wrapper">
+                <button id="framework-set-button" type="button" class="btn btn-primary">Select Framework</button>
+                <div id="framework-info" style="display:none">
+                    <div id="framework-msg">Using Framework <span id="framework-name"></span></div>
+                    <button id="framework-edit-button" type="button" class="btn btn-primary">Edit</button>
+                </div>
+            </div>
+            <div id="law-wrapper">
+                <button id="law-set-button" type="button" class="btn btn-primary">Select Law</button>
+                <div id="law-info" style="display:none">
+                    <div id="law-msg">Using Law <span id="law-name"></span></div>
+                    <button id="law-edit-button" type="button" class="btn btn-primary">Edit</button>
+                </div>
+            </div>
+        </div>
 
         <!-- graph editor -->
         <h2>Build a relation with concepts</h2>
@@ -43,41 +61,11 @@
             </div>
         </div>
 
-        <div id="concept-select" class="modal" tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
-        <div class="modal-content">
-        <div class="modal-body">
-            <ul class="nav nav-tabs" id="concept-select-tabs" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="concept-search-tab" data-toggle="tab" href="#concept-search" role="tab" aria-controls="concept-search" aria-selected="true">
-                        Search Concepts
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" id="new-concept-tab" data-toggle="tab" href="#new-concept" role="tab" aria-controls="new-concept" aria-selected="false">
-                        New Concept
-                    </a>
-                </li>
-            </ul>
-            <div class="tab-content" id="concept-select-content">
-                <div class="tab-pane fade show active" id="concept-search" role="tabpanel" aria-labelledby="search-concepts-tab">
-                    <input type="text" id="concept-search" class="search-field" placeholder="Enter name or key words">
-                    <div id="concept-results" class="search-results">
-                    </div>
-                </div>
-                <div class="tab-pane fade" id="new-concept" role="tabpanel" aria-labelledby="new-concept-tab">
-                    <input type="text" id="concept-new-name" placeholder="Name">
-                    <input type="text" id="concept-new-description" placeholder="Description">
-                </div>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-primary">Save changes</button>
-            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        </div>
-        </div>
-        </div>
-        </div>
+        {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'framework'}) }}
+
+        {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'law'}) }}
+
+        {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'concept'}) }}
 
         <div id="search-template" style="display: none">
             <input type="text" class="search-field" placeholder="Enter name or key words"/>
@@ -97,13 +85,68 @@
             margin: 20px;
         }
 
-        .concept {
+        #framework-wrapper {
+            padding: 10px 0;
+        }
+        #law-wrapper {
+            padding: 10px 0;
+        }
+
+        .entry-modal .modal-dialog {
+            width: 70%;
+        }
+        .entry-modal .nav-tabs {
+            border-width: 2px;
+        }
+        .entry-modal .nav-tabs > li {
+            font-size: 16px;
+        }
+        .entry-modal .nav-tabs > li > a {
+            border-width: 2px;
+        }
+        .entry-modal .tab-content {
+            padding: 10px;
+        }
+        .entry-modal .tab-pane > * {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .entry-modal .tab-pane > input {
+            border-radius: 5px;
+            font-size: 18px;
+            background-color: #eff;
+            color: #000;
+        }
+        .entry-modal .result-display {
+            padding: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow-x: hidden;
+        }
+        .entry-modal .result-display.selected {
+            background-color: #ddf;
+            border-radius: 10px;
+        }
+        .entry-modal .result-display > span {
+            display: inline-block;
+            white-space: nowrap;
+            overflow-x: hidden;
+        }
+        .entry-modal .result-display > .result-name {
+            width: 40%;
+        }
+        .entry-modal .result-display > .result-description {
+        }
+
+        /*.concept {
             border: 3px solid red;
             border-radius: 4px;
             padding: 6px;
             font-size: 14px;
             color: black;
-        }
+        }*/
 
         #editor-wrapper {
             display: table;
@@ -162,19 +205,6 @@
             color: #604;
             font-weight: bold;
             padding: 0 20px;
-        }
-
-        /*search results*/
-
-        .result-display {
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .result-name {
-            float: left;
-        }
-        .result-description {
-            float: right;
         }
 
     </style>
@@ -252,6 +282,7 @@
             this.currentLaw = -1;
             this.currentFramework = -1;
 
+            this.frameworks = {};
             this.concepts = {};
             this.laws = {};
             this.law = null;
@@ -293,7 +324,6 @@
         Relation.prototype.init = function(callback) {
 
             let self = this;
-            if(self.currentLaw < 0 && self.currentFramework < 0) return false;
 
             $.ajax({
                url: "{{=URL('default', 'initRelation', extension='json')}}",
@@ -304,6 +334,7 @@
                    law: self.currentLaw
                },
                success: function(data) {
+                   self.frameworks = data.frameworks;
                    self.myNodes = data.myNodes;
                    self.concepts = data.concepts;
                    self.laws = data.laws;
@@ -547,9 +578,9 @@
                 makePort("T", go.Spot.Top, true, true, 1, 1),
                 makePort("B", go.Spot.Bottom, true, true),
                 { // handle mouse enter/leave events to show/hide the ports
-                  mouseEnter: function(e, node) { showSmallPorts(node, true); },
-                  mouseLeave: function(e, node) { showSmallPorts(node, false); },
-                  contextMenu: partContextMenu
+                    mouseEnter: function(e, node) { showSmallPorts(node, true); },
+                    mouseLeave: function(e, node) { showSmallPorts(node, false); },
+                    contextMenu: partContextMenu
                 },
             );
 
@@ -570,6 +601,7 @@
             $modal.modal('show');
             $modal.on('hide.bs.modal', function(e) {
                 let id = $('#' + table + '-selected-id').val();
+                if(!id) return;
                 callback.call(self, id);
             });
         };
@@ -1372,7 +1404,21 @@
         var relation;
         $(document).ready(function() {
             relation = new Relation();
-            relation.initDiagram();
+            let self = relation;
+
+            self.initDiagram();
+            self.init(self.drawAll);
+
+            $('#framework-set-button').click(function(e) {
+                self.getEntry('framework', function(framework) {
+                    self.useFramework(framework);
+                });
+            });
+            $('#law-set-button').click(function(e) {
+                self.getEntry('law', function(law) {
+                    self.useLaw(law);
+                });
+            });
 
             $('.search-field').change(function(e) {
                 let self = relation, $this = $(this), text = $this.val().toLowerCase(), table = $this.attr('id').split('-')[0],
@@ -1380,26 +1426,34 @@
                 switch(table) {
                     case 'concept': entries = self.concepts; break;
                     case 'framework': entries = self.frameworks; break;
+                    case 'law': entries = self.laws; break;
                     default: break;
                 }
                 if(!entries) return;
+                let $results = $this.parent().children('.search-results');
                 for(let id in entries) {
                     let entry = entries[id];
                     if(entry.hasOwnProperty('name')) {
                         let name = entry.name.toLowerCase();
                         if(name.includes(text)) {
                             let result =
-                                '<div id="result-' + table + '-' + id + '" class="result-display">' +
+                                '<div id="' + table + '-result-' + id + '" class="result-display">' +
                                 '<span class="result-name">' + entry.name + '</span>';
                             if(entry.hasOwnProperty('description'))
                                 result += '<span class="result-description">' + entry.description + '</span>';
                             result += '</div>';
-                            results.push(result);
+                            let $result = $(result);
+                            $result.click(function(e) {
+                                $('#' + table + '-selected-id').val(id);
+                                $results.children().removeClass('selected');
+                                $(this).addClass('selected');
+                            });
+                            results.push($result);
                         }
                     }
                 }
-                let $results = $this.parent().children('.search-results');
-                $results.html(results.join(''));
+                $results.empty();
+                results.forEach(function($res) { $results.append($res); });
             });
 
             $('#set-predicate').change(function(e) {
