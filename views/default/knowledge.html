@@ -62,9 +62,7 @@
         </div>
 
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'framework'}) }}
-
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'law'}) }}
-
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'concept'}) }}
 
         <div id="search-template" style="display: none">
@@ -139,6 +137,16 @@
         }
         .entry-modal .result-display > .result-description {
         }
+        .entry-modal .tab-footer {
+            text-align: right;
+        }
+
+
+        .multiple-template {
+            display: none;
+        }
+
+
 
         /*.concept {
             border: 3px solid red;
@@ -373,6 +381,8 @@
                        });
                    });
 
+                   self.updateFields();
+
                    if(callback) callback.call(self);
                }
             });
@@ -491,6 +501,16 @@
                                 });
                             },
                             function(o) {
+                                let part = o.part.adornedPart;
+                                return part.diagram === self.diagram;
+                            }),
+                    makeButton("Edit Concept",
+                            function(e, obj) {
+                                let part = obj.part.adornedPart;
+                                if(!(part instanceof go.Node)) return;
+                                self.editEntry('concept', part.data.concept);
+                            },
+                            function(o) {
                                 return true;
                             }),
                     makeButton("Set Values",
@@ -504,7 +524,8 @@
                                 if(self.nodes.hasOwnProperty(part.data.id)) self.nodes[part.data.id].values = values;
                             },
                             function(o) {
-                                return true;
+                                let part = o.part.adornedPart;
+                                return part.diagram === self.diagram;
                             }),
                     makeButton("Add to Predicate",
                             function(e, obj) {
@@ -513,6 +534,7 @@
                             },
                             function(o) {
                                 let part = o.part.adornedPart;
+                                if(part.diagram !== self.diagram) return false;
                                 if(part instanceof go.Node) return self.currentPredicate >= 0 && !self.inPredicate(parseInt(part.data.id));
                                 return false;
                             }),
@@ -523,6 +545,7 @@
                             },
                             function(o) {
                                 let part = o.part.adornedPart;
+                                if(part.diagram !== self.diagram) return false;
                                 if(part instanceof go.Node) return self.inPredicate(parseInt(part.data.id));
                                 return false;
                             }),
@@ -572,7 +595,7 @@
                       wrap: go.TextBlock.WrapFit,
                       editable: true
                     },
-                    new go.Binding("text").makeTwoWay())
+                    new go.Binding("text", "name").makeTwoWay())
                 ),
                 //port on top for head/reference, port on bottom for properties/referrers
                 makePort("T", go.Spot.Top, true, true, 1, 1),
@@ -596,17 +619,6 @@
         };
 
 
-        Relation.prototype.getEntry = function(table, callback) {
-            let self = this, $modal = $('#' + table + '-select');
-            $modal.modal('show');
-            $modal.on('hide.bs.modal', function(e) {
-                let id = $('#' + table + '-selected-id').val();
-                if(!id) return;
-                callback.call(self, id);
-            });
-        };
-
-
         Relation.prototype.getTable = function(name) {
             let self = this;
             switch(name) {
@@ -617,6 +629,21 @@
                 default: break;
             }
             return null;
+        };
+
+
+        Relation.prototype.updateFields = function(element) {
+            let self = this;
+            let $element = element ? $(element) : $(document);
+            $element.find('select[select-table]').each(function() {
+                let $this = $(this), table = $this.attr('select-table');
+                $this.children().first().nextAll().remove();
+                let entries = self.getTable(table);
+                for(let id in entries) {
+                    let entry = entries[id];
+                    $this.append('<option value="' + entry.id + '">' + entry.name + '</select>');
+                }
+            });
         };
 
 
@@ -632,6 +659,10 @@
 
             let self = this, node = self.nodes[id], law = self.laws[self.currentLaw];
             if(!node) return '';
+
+            let lawStr = '';
+            if(law) lawStr = law.name + ' [' + law.id + ']';
+            else lawStr = 'none';
 
             let predicates = '';
             for(let group in self.predicateSets) {
@@ -662,7 +693,7 @@
             else mappings = "\n" + mappings;
 
             msg = 'ID: ' + node.id + "\n"
-                + 'Law: ' + law.name + ' [' + law.id + "]\n"
+                + 'Law: ' + lawStr + "\n"
                 + 'Predicates: ' + predicates + "\n"
                 + 'Values: ' + self.convertValues(node.values, 'string') + "\n"
                 + 'Mappings: ' + mappings;
@@ -720,7 +751,7 @@
             var dataArray = [];
             for(let id in concepts) {
                 let concept = concepts[id];
-                dataArray.push({concept: concept.id, text: concept.name});
+                dataArray.push({concept: concept.id, name: concept.name});
             }
             self.palette.model = $$(go.GraphLinksModel, {
                 nodeDataArray: dataArray,
@@ -814,8 +845,8 @@
 
             let nodeData = Object.assign({}, node, options, template);
             nodeData.values = self.convertValues(nodeData.values, 'string');
-            if(!nodeData.hasOwnProperty('text')) {
-                nodeData.text = self.concepts[node.concept].name + ' [' + nodeId + ']';
+            if(!nodeData.hasOwnProperty('name')) {
+                nodeData.name = self.concepts[node.concept].name + ' [' + nodeId + ']';
             }
             if(!nodeData.hasOwnProperty('loc') && nodeData.head && nodeData.reference
               && self.nodes.hasOwnProperty(nodeData.head) && self.nodes.hasOwnProperty(nodeData.reference)) {
@@ -922,6 +953,7 @@
 
         Relation.prototype.inPredicate = function(node) {
             let self = this;
+            if(isNaN(node)) return false;
             return self.predicateSets.hasOwnProperty(self.currentPredicate)
                 && self.predicateSets[self.currentPredicate].hasOwnProperty(node);
         };
@@ -929,12 +961,14 @@
 
         Relation.prototype.useFramework = function(id) {
             let self = this;
+            if(self.currentFramework == id) return;
             self.currentFramework = id;
             self.reloadDiagram();
         };
 
         Relation.prototype.useLaw = function(id) {
             let self = this;
+            if(self.currentLaw == id) return;
             self.currentLaw = id;
             self.reloadDiagram();
         };
@@ -1400,6 +1434,63 @@
         };
 
 
+        Relation.prototype.getEntry = function(table, callback) {
+            let self = this;
+            let $modal = $('#' + table + '-select');
+            $modal.data('callback', callback);
+            $modal.modal('show');
+        };
+
+
+        Relation.prototype.editEntry = function(table, id, callback) {
+            let self = this, entries = self.getTable(table);
+            if(!entries.hasOwnProperty(id)) return;
+            let entry = entries[id];
+            let $modal = $('#' + table + '-edit'), $form = $modal.find('#' + table + '-edit-form');
+            $form.find('[name="name"]').val(entry.name);
+            $form.find('[name="description"]').val(entry.description);
+            switch(table) {
+                case 'framework':
+                case 'concept':
+                    let $wrapper = $form.find('.multiple-wrapper');
+                    $wrapper.children().first().nextAll('.multiple-item').remove();
+                    let depCount = 0;
+                    for(let dep in entry.dependencies) {
+                        self.addMultipleField($wrapper, {dependency: dep});
+                        depCount++;
+                    }
+                    if(depCount == 0) self.addMultipleField($wrapper);
+                    break;
+                default: break;
+            }
+            $modal.data('callback', callback);
+            $modal.modal('show');
+        }
+
+
+        Relation.prototype.addMultipleField = function($element, values) {
+            let self = this, $template = $element.find('.multiple-template');
+            //add a new copy of the template
+            let $entry = $template.clone().removeClass('multiple-template');
+            //update any input field choices according to the current data set
+            self.updateFields($entry);
+            //update the index, and values if given, on all sub-elements that have names for form submission
+            let index = $entry.index();
+            $entry.find('[name]').each(function() {
+                let $this = $(this), name = $this.attr('name');
+                $this.attr('name', name + '_' + index);
+                if(typeof values == 'object' && values.hasOwnProperty(name)) $this.val(values[name]);
+            });
+            //add listener to the REMOVE button
+            let $required = $entry.find('.multiple-required'), $removeButton = $entry.find('.multiple-remove');
+            $removeButton.click(function(e) {
+                if($(this).hasClass('disabled')) return;
+                $entry.remove();
+            });
+            $element.find('.multiple-item').last().after($entry);
+        };
+
+
 
         var relation;
         $(document).ready(function() {
@@ -1408,6 +1499,31 @@
 
             self.initDiagram();
             self.init(self.drawAll);
+
+            $('.entry-modal').on('hide.bs.modal', function(e) {
+                let $this = $(this), $button = $(document.activeElement), callback = $this.data('callback');
+                let table = $this.attr('id').split('-')[0];
+                console.log('modal ' + $this.attr('id') + ' hidden');
+                if($button.hasClass('modal-cancel')) {
+                    return;
+                } else if($button.hasClass('modal-select')) {
+                    let id = $('#' + table + '-selected-id').val();
+                    if(!id) return;
+                    callback.call(self, id);
+                } else if($button.hasClass('modal-save')) {
+                    let $form = $('#' + table + '-create-form'), arr = $form.serializeArray(), obj = {};
+                    for(let i = 0; i < arr.length; i++) obj[arr[i]['name']] = arr[i]['value'];
+                    $.ajax({
+                        url: "{{=URL('default', 'saveEntry', extension='json')}}",
+                        type: 'post',
+                        dataType: 'json',
+                        data: JSON.stringify(obj),
+                        success: function(data) {
+                            if(data.hasOwnProperty('id') && !isNaN(data.id)) callback.call(self, data.id);
+                        }
+                    });
+                }
+            });
 
             $('#framework-set-button').click(function(e) {
                 self.getEntry('framework', function(framework) {
@@ -1422,13 +1538,7 @@
 
             $('.search-field').change(function(e) {
                 let self = relation, $this = $(this), text = $this.val().toLowerCase(), table = $this.attr('id').split('-')[0],
-                    entries = null, results = [];
-                switch(table) {
-                    case 'concept': entries = self.concepts; break;
-                    case 'framework': entries = self.frameworks; break;
-                    case 'law': entries = self.laws; break;
-                    default: break;
-                }
+                    entries = self.getTable(table), results = [];
                 if(!entries) return;
                 let $results = $this.parent().children('.search-results');
                 for(let id in entries) {
@@ -1455,6 +1565,15 @@
                 $results.empty();
                 results.forEach(function($res) { $results.append($res); });
             });
+
+            $('.multiple-wrapper').each(function() {
+                let $this = $(this);
+                self.addMultipleField($this);
+                $this.find('.multiple-add').click(function(e) {
+                    self.addMultipleField($this);
+                });
+            });
+
 
             $('#set-predicate').change(function(e) {
                 relation.setPredicate($(this).val());

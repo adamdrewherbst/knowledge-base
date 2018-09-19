@@ -1,0 +1,49 @@
+<form id="{{=table}}-{{=type}}-form" action="javascript:void(0)">
+
+    <input type="hidden" name="table" value="{{=table}}">
+
+    {{ if type == 'edit': }}
+    <input type="hidden" name="id" id="{{=table}}-edit-id" value="">
+    {{ pass }}
+
+    <input type="text" name="name" id="{{=table}}-{{=type}}-name" placeholder="Name">
+    <input type="text" name="description" id="{{=table}}-{{=type}}-description" placeholder="Description">
+
+    {{ if table == 'framework': }}
+    <div class="multiple-wrapper">
+    <div class="framework-{{=type}}-dep multiple-template">
+        <select name="dependency" class="multiple-required" select-table="framework">
+            <option value="">-- Select Required Frameworks --</option>
+        </select>
+        <button type="button" class="multiple-remove btn btn-primary">Remove</button>
+    </div>
+    <button type="button" class="multiple-add btn btn-secondary">Add</button>
+    </div>
+
+    {{ elif table == 'concept': }}
+    <div class="concept-symmetric">
+        <label for="symmetric">Symmetric</label>
+        <input type="checkbox" name="symmetric">
+    </div>
+    <div class="concept-head">
+        <select name="head" select-table="concept">
+            <option value="">-- Select Head Concept --</option>
+        </select>
+    </div>
+    <div class="concept-reference">
+        <select name="head" select-table="concept">
+            <option value="">-- Select Reference Concept --</option>
+        </select>
+    </div>
+    <div class="concept-parents multiple-wrapper">
+    <div class="concept-{{=type}}-parent multiple-item multiple-template">
+        <select name="dependency" class="multiple-required" select-table="concept">
+            <option value="">-- Select Parent Concepts --</option>
+        </select>
+        <button type="button" class="multiple-remove btn btn-primary">Remove</button>
+    </div>
+    <button type="button" class="multiple-add btn btn-secondary">Add</button>
+    </div>
+    {{ pass }}
+
+</form>

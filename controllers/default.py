@@ -47,6 +47,72 @@ def entry():
     return locals()
 
 
+def create_edit():
+    table = request.vars.table
+    type = request.vars.type
+    return locals()
+
+
+def saveEntry():
+    import json, urllib
+    body = request.body.read()
+    body = urllib.unquote(body).decode('utf8')
+
+    print('{timestamp} -- saving entry').format(timestamp=datetime.utcnow().isoformat())
+    print('BODY: {body}').format(body=body)
+
+    request_vars = json.loads(body)
+
+    ret = {'success': False}
+
+    tableName = None
+    if 'table' in request_vars:
+        tableName = request_vars['table']
+        del request_vars['table']
+    else:
+        return response.json(ret)
+
+    table = None
+    depTable = None
+    if tableName == 'framework':
+        table = db.framework
+        depTable = db.framework_dependency
+    elif tableName == 'law':
+        table = db.law
+    elif tableName == 'concept':
+        table = db.concept
+        depTable = db.concept_dependency
+    else:
+        return response.json(ret)
+
+    deps = []
+    ind = 1
+    name = 'dependency_' + str(ind)
+    while name in request_vars:
+        dep = request_vars[name]
+        try:
+            depId = int(dep)
+            if depId > 0:
+                deps.append(depId)
+        except ValueError:
+            pass
+        del request_vars[name]
+        ind += 1
+        name = 'dependency_' + str(ind)
+
+    if 'dependency' in request_vars:
+        del request_vars['dependency']
+
+    entryId = table.insert(**request_vars)
+    if entryId:
+        for dep in deps:
+            depTable.insert(**{tableName: entryId, 'dependency': dep})
+
+    ret['id'] = entryId
+    ret['success'] = True
+    return response.json(ret)
+
+
 def initRelation():
 
     frameworkId = int(request.vars.framework)
@@ -71,7 +137,8 @@ def initRelation():
     #include all concepts not specific to any framework (ROOT and Anything)
     for concept in db(db.concept.framework == None).iterselect():
         ret['concepts'][concept.id] = \
-            {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': concept.framework, 'symmetric': concept.symmetric or False};
+            {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': concept.framework, \
+             'symmetric': concept.symmetric or False, 'dependencies': {}};
 
     frameworks = []
     if frameworkId > 0:

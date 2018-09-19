@@ -9,28 +9,46 @@
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" id="new-{{=table}}-tab" data-toggle="tab" href="#new-{{=table}}" role="tab" aria-controls="new-{{=table}}" aria-selected="false">
+            <a class="nav-link" id="{{=table}}-create-tab" data-toggle="tab" href="#{{=table}}-create" role="tab" aria-controls="{{=table}}-create" aria-selected="false">
                 New {{=table}}
             </a>
         </li>
     </ul>
     <div class="tab-content" id="{{=table}}-select-content">
         <div class="tab-pane fade active" id="{{=table}}-search" role="tabpanel" aria-labelledby="{{=table}}-search-tab">
-            <input type="text" id="{{=table}}-search" class="search-field" placeholder="Enter name or key words">
+            <input type="text" id="{{=table}}-search-field" class="search-field" placeholder="Enter name or key words">
             <div id="{{=table}}-results" class="search-results">
+            <input type="hidden" id="{{=table}}-selected-id">
+            </div>
+            <div class="tab-footer">
+                <button type="button" class="modal-select btn btn-primary" data-dismiss="modal">Select</button>
+                <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
             </div>
         </div>
-        <div class="tab-pane fade" id="new-{{=table}}" role="tabpanel" aria-labelledby="new-{{=table}}-tab">
-            <input type="text" id="{{=table}}-new-name" placeholder="Name">
-            <input type="text" id="{{=table}}-new-description" placeholder="Description">
+        <div class="tab-pane fade" id="{{=table}}-create" role="tabpanel" aria-labelledby="{{=table}}-create-tab">
+            {{ =LOAD('default', 'create_edit.load', ajax=False, vars={'table': table, 'type': 'create'}) }}
+            <div class="tab-footer">
+                <button type="button" class="modal-save btn btn-primary" data-dismiss="modal">Save</button>
+                <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
+            </div>
         </div>
     </div>
 </div>
-<div class="modal-footer">
-    <button type="button" class="btn btn-primary">Save changes</button>
-    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
 </div>
 </div>
 </div>
-<input type="hidden" id="{{=table}}-selected-id">
+
+
+<div id="{{=table}}-edit" class="modal entry-modal" tabindex="-1" role="dialog">
+<div class="modal-dialog" role="document">
+<div class="modal-content">
+    <div class="modal-body">
+        {{ =LOAD('default', 'create_edit.load', ajax=False, vars={'table': table, 'type': 'edit'}) }}
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="modal-save btn btn-primary" data-dismiss="modal">Save Changes</button>
+        <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
+    </div>
+</div>
+</div>
 </div>
