@@ -109,11 +109,20 @@
             display: block;
             margin-bottom: 5px;
         }
-        .entry-modal .tab-pane > input {
+        .entry-modal input, .entry-modal select, .entry-modal textarea {
             border-radius: 5px;
             font-size: 18px;
             background-color: #eff;
             color: #000;
+        }
+        .entry-modal .form-group .label {
+            display: block;
+        }
+        .entry-modal input {
+            width: 50%;
+        }
+        .entry-modal textarea {
+            width: 100%;
         }
         .entry-modal .result-display {
             padding: 5px;
@@ -227,7 +236,7 @@
     <script src="/welcome/static/GoJS-master/assets/js/highlight.js"></script>
     <script src="/welcome/static/GoJS-master/assets/js/bootstrap.min.js"></script>
     <!--<script src="{{=URL('static', 'js/knowledge.js')}}"></script>-->
-    <script>
+    <script type="application/javascript;version=1.7">
         var $$ = go.GraphObject.make;
 
         // This variation on ForceDirectedLayout does not move any selected Nodes
@@ -289,6 +298,7 @@
 
             this.currentLaw = -1;
             this.currentFramework = -1;
+            this.paletteFramework = null;
 
             this.frameworks = {};
             this.concepts = {};
@@ -355,13 +365,13 @@
                    self.predicates = data.predicates;
                    self.nextNodeId = parseInt(data.nextNodeId);
 
-                   self.nodes[-1] = {id: -1};
+                   self.nodes[0] = {id: 0};
                    $.each(self.nodes, function(id, node) {
                        node.values = self.convertValues(node.values, 'array');
                        node.children = {};
                    });
                    $.each(self.nodes, function(id, node) {
-                       self.nodes[node.head || -1].children[id] = true;
+                       self.nodes[node.head || 0].children[id] = true;
                    });
 
                    $.each(self.laws, function(id, law) {
@@ -491,6 +501,17 @@
             // a context menu is an Adornment with a bunch of buttons in them
             var partContextMenu =
               $$(go.Adornment, "Vertical",
+                    makeButton("Rename",
+                            function(e, obj) {
+                                let part = obj.part.adornedPart;
+                                if(!(part instanceof go.Node)) return;
+                                let name = prompt('Enter new name');
+                                if(name) self.setNodeData(part.data.id, 'name', name);
+                            },
+                            function(o) {
+                                let part = o.part.adornedPart;
+                                return part.diagram === self.diagram;
+                            }),
                     makeButton("Change Concept",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
@@ -548,7 +569,7 @@
                                 if(part.diagram !== self.diagram) return false;
                                 if(part instanceof go.Node) return self.inPredicate(parseInt(part.data.id));
                                 return false;
-                            }),
+                            })
               );
 
             let infoString = function(obj) {
@@ -574,6 +595,7 @@
                       )
                 },
                 new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+                new go.Binding("visible", "visible"),
                 new go.Binding("angle").makeTwoWay(),
                 // the main object is a Panel that surrounds a TextBlock with a Shape
                 $$(go.Panel, "Auto",
@@ -595,7 +617,17 @@
                       wrap: go.TextBlock.WrapFit,
                       editable: true
                     },
-                    new go.Binding("text", "name").makeTwoWay())
+                    new go.Binding("text", "", function(data, node) {
+                        if(node.diagram === self.palette) return self.concepts[data.concept].name;
+                        let text = '';
+                        if(typeof data.name == 'string' && data.name.length > 0) {
+                            text = data.name;
+                        } else if(data.concept && self.concepts.hasOwnProperty(data.concept)) {
+                            text = self.concepts[data.concept].name;
+                        }
+                        text += ' [' + data.id + ']';
+                        return text;
+                    }))
                 ),
                 //port on top for head/reference, port on bottom for properties/referrers
                 makePort("T", go.Spot.Top, true, true, 1, 1),
@@ -604,7 +636,7 @@
                     mouseEnter: function(e, node) { showSmallPorts(node, true); },
                     mouseLeave: function(e, node) { showSmallPorts(node, false); },
                     contextMenu: partContextMenu
-                },
+                }
             );
 
             // initialize the Palette that is on the left side of the page
@@ -613,6 +645,13 @@
                 maxSelectionCount: 1,
                 nodeTemplateMap: self.diagram.nodeTemplateMap,  // share the templates used by the diagram
             });
+
+            self.palette.layout.comparer = function(a, b) {
+                let c1 = a.data.concept, c2 = b.data.concept;
+                if(c1 && c2 && self.concepts.hasOwnProperty(c1) && self.concepts.hasOwnProperty(c2))
+                    return self.concepts[c1].name.localeCompare(self.concepts[c2].name);
+                return 0;
+            };
 
             self.setPaletteModel();
             self.clearDiagram();
@@ -648,10 +687,11 @@
 
 
         Relation.prototype.setNodeData = function(nodeId, attr, value) {
+            console.log('setting node ' + nodeId + ' ' + attr + ' to ' + value);
             let self = this, node = self.nodes[nodeId];
-            if(node && node.hasOwnProperty(attr)) node[attr] = value;
+            if(node) node[attr] = value;
             let data = self.diagram.model.findNodeDataForKey(nodeId);
-            if(data && data.hasOwnProperty(attr)) data[attr] = value;
+            if(data) self.diagram.model.set(data, attr, value);
         };
 
 
@@ -747,11 +787,11 @@
 
 
         Relation.prototype.setPaletteModel = function() {
-            var self = this, concepts = self.concepts;
-            var dataArray = [];
+            let self = this, concepts = self.concepts;
+            let dataArray = [];
             for(let id in concepts) {
                 let concept = concepts[id];
-                dataArray.push({concept: concept.id, name: concept.name});
+                dataArray.push({concept: concept.id, framework: concept.framework, visible: true});
             }
             self.palette.model = $$(go.GraphLinksModel, {
                 nodeDataArray: dataArray,
@@ -760,8 +800,17 @@
         };
 
 
+        Relation.prototype.filterPalette = function(framework) {
+            let self = this;
+            self.paletteFramework = framework;
+            self.palette.nodes.each(function(node) {
+                self.palette.model.set(node.data, 'visible', !framework || node.data.framework == framework);
+            })
+        }
+
+
         Relation.prototype.clearDiagram = function() {
-            var self = this;
+            let self = this;
             self.diagram.model = $$(go.GraphLinksModel,
             {
                 nodeKeyProperty: 'id',
@@ -811,7 +860,6 @@
                 if(node >= 0) {
                     self.drawNode(node, {
                         loc: '' + x + ' ' + y,
-                        text: self.concepts[self.nodes[node].concept].name + '[' + node + ']'
                     });
                 }
                 nodeMeta[node].children.forEach(function(child) {
@@ -845,9 +893,6 @@
 
             let nodeData = Object.assign({}, node, options, template);
             nodeData.values = self.convertValues(nodeData.values, 'string');
-            if(!nodeData.hasOwnProperty('name')) {
-                nodeData.name = self.concepts[node.concept].name + ' [' + nodeId + ']';
-            }
             if(!nodeData.hasOwnProperty('loc') && nodeData.head && nodeData.reference
               && self.nodes.hasOwnProperty(nodeData.head) && self.nodes.hasOwnProperty(nodeData.reference)) {
                 let head = self.diagram.model.findNodeDataForKey(nodeData.head),
@@ -1070,6 +1115,25 @@
             if(doInit) {
                 self.init(self.evaluate);
                 return;
+            } else {
+                self.diagram.nodes.each(function(graphNode) {
+                    let data = graphNode.data, id = data.id;
+                    if(isNaN(id)) return;
+                    id = parseInt(id);
+                    if(!self.nodes.hasOwnProperty(id)) self.nodes[id] = {};
+                    if(self.myNodes.indexOf(id) < 0) self.myNodes.push(id);
+                    let node = self.nodes[id];
+                    node.id = id;
+                    node.law = self.currentLaw;
+                    node.concept = data.concept;
+                    node.head = null;
+                    node.reference = null;
+                    node.values = self.convertValues(data.values, 'array');
+                    let head = graphNode.findNodesInto('T'),
+                        reference = graphNode.findNodesOutOf('T');
+                    if(head.count > 0) node.head = head.first().data.id;
+                    if(reference.count > 0) node.reference = reference.first().data.id;
+                });
             }
 
             self.nodesToCheck = self.myNodes.slice();
@@ -1087,15 +1151,6 @@
                    }
                });
             }
-
-            /*$.ajax({
-               url: "{{=URL('default', 'saveNodes', extension='json')}}",
-               type: 'post',
-               dataType: 'json',
-               data: JSON.stringify(self.newNodes),
-               success: function(data) {
-               },
-            });//*/
 
             $('#evaluate-msg').text('Done evaluating');
         };
@@ -1468,6 +1523,40 @@
         }
 
 
+        Relation.prototype.updateEntry = function(table, data) {
+            let self = this, entries = self.getTable(table), id = data.id;
+            if(!entries || !id || isNaN(id)) return;
+            id = parseInt(id);
+            if(!entries.hasOwnProperty(id)) entries[id] = data;
+            switch(table) {
+                case 'framework':
+                    break;
+                case 'law':
+                    break;
+                case 'concept':
+                    let graphs = [self.palette, self.diagram];
+                    for(let i = 0; i < graphs.length; i++) {
+                        let graph = graphs[i], found = false;
+                        graph.nodes.each(function(node) {
+                            if(node.data.concept == data.id) {
+                                found = true;
+                                graph.model.set(node.data, 'concept', data.id);
+                            }
+                        });
+                        if(graph === self.palette && !found) {
+                            graph.model.addNodeData({
+                                concept: data.id,
+                                framework: data.framework,
+                                visible: !self.paletteFramework || data.framework == self.paletteFramework
+                            });
+                        }
+                    }
+                    break;
+                default: break;
+            }
+        }
+
+
         Relation.prototype.addMultipleField = function($element, values) {
             let self = this, $template = $element.find('.multiple-template');
             //add a new copy of the template
@@ -1475,6 +1564,7 @@
             //update any input field choices according to the current data set
             self.updateFields($entry);
             //update the index, and values if given, on all sub-elements that have names for form submission
+            $element.find('.multiple-item').last().after($entry);
             let index = $entry.index();
             $entry.find('[name]').each(function() {
                 let $this = $(this), name = $this.attr('name');
@@ -1487,7 +1577,6 @@
                 if($(this).hasClass('disabled')) return;
                 $entry.remove();
             });
-            $element.find('.multiple-item').last().after($entry);
         };
 
 
@@ -1500,8 +1589,15 @@
             self.initDiagram();
             self.init(self.drawAll);
 
+            let $hideButton = null;
+            $('.entry-modal button[data-dismiss=modal]').click(function(e) {
+                $hideButton = $(this);
+            });
+            $('.entry-modal').on('show.bs.modal', function(e) {
+                $hideButton = null;
+            });
             $('.entry-modal').on('hide.bs.modal', function(e) {
-                let $this = $(this), $button = $(document.activeElement), callback = $this.data('callback');
+                let $this = $(this), $button = $hideButton || $(document.activeElement), callback = $this.data('callback');
                 let table = $this.attr('id').split('-')[0];
                 console.log('modal ' + $this.attr('id') + ' hidden');
                 if($button.hasClass('modal-cancel')) {
@@ -1519,7 +1615,10 @@
                         dataType: 'json',
                         data: JSON.stringify(obj),
                         success: function(data) {
-                            if(data.hasOwnProperty('id') && !isNaN(data.id)) callback.call(self, data.id);
+                            if(data.hasOwnProperty('id') && !isNaN(data.id)) {
+                                callback.call(self, data);
+                                self.updateEntry(table, data.entry);
+                            }
                         }
                     });
                 }
@@ -1536,16 +1635,16 @@
                 });
             });
 
-            $('.search-field').change(function(e) {
+            $('.search-field').on('keydown change', function(e) {
                 let self = relation, $this = $(this), text = $this.val().toLowerCase(), table = $this.attr('id').split('-')[0],
                     entries = self.getTable(table), results = [];
                 if(!entries) return;
                 let $results = $this.parent().children('.search-results');
-                for(let id in entries) {
-                    let entry = entries[id];
+                for(let i in entries) {
+                    let id = i, entry = entries[id];
                     if(entry.hasOwnProperty('name')) {
                         let name = entry.name.toLowerCase();
-                        if(name.includes(text)) {
+                        if(name.indexOf(text) >= 0) {
                             let result =
                                 '<div id="' + table + '-result-' + id + '" class="result-display">' +
                                 '<span class="result-name">' + entry.name + '</span>';

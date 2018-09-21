@@ -65,25 +65,18 @@ def saveEntry():
 
     ret = {'success': False}
 
-    tableName = None
+    table = None
     if 'table' in request_vars:
-        tableName = request_vars['table']
+        table = request_vars['table']
         del request_vars['table']
     else:
         return response.json(ret)
 
-    table = None
     depTable = None
-    if tableName == 'framework':
-        table = db.framework
-        depTable = db.framework_dependency
-    elif tableName == 'law':
-        table = db.law
-    elif tableName == 'concept':
-        table = db.concept
-        depTable = db.concept_dependency
-    else:
-        return response.json(ret)
+    if table == 'framework':
+        depTable = 'framework_dependency'
+    elif table == 'concept':
+        depTable = 'concept_dependency'
 
     deps = []
     ind = 1
@@ -103,13 +96,42 @@ def saveEntry():
     if 'dependency' in request_vars:
         del request_vars['dependency']
 
-    entryId = table.insert(**request_vars)
-    if entryId:
+    entryId = db[table].update_or_insert(**request_vars)
+    if entryId is None:
+        entryId = request_vars.id
+    if entryId and depTable:
+        if request_vars.id:
+            db(db[depTable][table] == request_vars.id).delete()
         for dep in deps:
-            depTable.insert(**{tableName: entryId, 'dependency': dep})
+            db[depTable].insert(**{tableName: entryId, 'dependency': dep})
 
+    ret['table'] = table
     ret['id'] = entryId
+    ret['entry'] = getEntry(table, entryId)
     ret['success'] = True
+    return response.json(ret)
+
+
+def getEntry(table, id):
+    ret = {}
+    rows = db(db[table].id == id).select()
+    entry = rows[0]
+    if not entry:
+        return response.json(ret)
+    if table == 'framework':
+        ret = \
+            {'id': id, 'name': entry.name, 'description': entry.description, 'dependencies': {}}
+        for dep in db(db.framework_dependency.framework == id).iterselect():
+            ret['dependencies'][dep.id] = True
+    elif table == 'concept':
+        ret = \
+            {'id': id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
+            'symmetric': entry.symmetric or False, 'dependencies': {}};
+        for dep in db(db.concept_dependency.concept == id).iterselect():
+            ret['dependencies'][dep.id] = True
+    elif table == 'law':
+        ret = \
+            {'id': id, 'name': entry.name, 'description': entry.description, 'nodes': []};
     return response.json(ret)
 
 

@@ -6,43 +6,53 @@
     <input type="hidden" name="id" id="{{=table}}-edit-id" value="">
     {{ pass }}
 
-    <input type="text" name="name" id="{{=table}}-{{=type}}-name" placeholder="Name">
-    <input type="text" name="description" id="{{=table}}-{{=type}}-description" placeholder="Description">
+    <div class="entry-name form-group">
+        <label for="{{=table}}-{{=type}}-name">Name</label>
+        <input type="text" name="name" id="{{=table}}-{{=type}}-name" placeholder="Name">
+    </div>
+    <div class="entry-description form-group">
+        <label for="{{=table}}-{{=type}}-description">Description</label>
+        <textarea name="description" id="{{=table}}-{{=type}}-description" placeholder="Description..." rows="3"></textarea>
+    </div>
 
     {{ if table == 'framework': }}
-    <div class="multiple-wrapper">
-    <div class="framework-{{=type}}-dep multiple-template">
-        <select name="dependency" class="multiple-required" select-table="framework">
-            <option value="">-- Select Required Frameworks --</option>
-        </select>
-        <button type="button" class="multiple-remove btn btn-primary">Remove</button>
-    </div>
-    <button type="button" class="multiple-add btn btn-secondary">Add</button>
+    <div class="multiple-wrapper form-group">
+        <label for="dependency">Required Frameworks</label>
+        <div class="framework-{{=type}}-dep multiple-item multiple-template">
+            <select name="dependency" class="multiple-required" select-table="framework">
+                <option value="">-- Select --</option>
+            </select>
+            <button type="button" class="multiple-remove btn btn-primary">Remove</button>
+        </div>
+        <button type="button" class="multiple-add btn btn-secondary">Add</button>
     </div>
 
     {{ elif table == 'concept': }}
-    <div class="concept-symmetric">
+    <div class="concept-symmetric form-group">
         <label for="symmetric">Symmetric</label>
         <input type="checkbox" name="symmetric">
     </div>
-    <div class="concept-head">
+    <div class="concept-head form-group">
+        <label for="head">Head Concept</label>
         <select name="head" select-table="concept">
-            <option value="">-- Select Head Concept --</option>
+            <option value="">-- Select --</option>
         </select>
     </div>
-    <div class="concept-reference">
-        <select name="head" select-table="concept">
-            <option value="">-- Select Reference Concept --</option>
+    <div class="concept-reference form-group">
+        <label for="reference">Reference Concept</label>
+        <select name="reference" select-table="concept">
+            <option value="">-- Select --</option>
         </select>
     </div>
-    <div class="concept-parents multiple-wrapper">
-    <div class="concept-{{=type}}-parent multiple-item multiple-template">
-        <select name="dependency" class="multiple-required" select-table="concept">
-            <option value="">-- Select Parent Concepts --</option>
-        </select>
-        <button type="button" class="multiple-remove btn btn-primary">Remove</button>
-    </div>
-    <button type="button" class="multiple-add btn btn-secondary">Add</button>
+    <div class="concept-parents multiple-wrapper form-group">
+        <label for="dependency">Parent Concepts</label>
+        <div class="concept-{{=type}}-parent multiple-item multiple-template">
+            <select name="dependency" class="multiple-required" select-table="concept">
+                <option value="">-- Select --</option>
+            </select>
+            <button type="button" class="multiple-remove btn btn-primary">Remove</button>
+        </div>
+        <button type="button" class="multiple-add btn btn-secondary">Add</button>
     </div>
     {{ pass }}
 

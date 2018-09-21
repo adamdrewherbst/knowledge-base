@@ -288,3 +288,7 @@ success!
 timestamp: 2018-07-11T19:09:04.789118
 ALTER TABLE node ADD node_values VARCHAR(512);
 success!
+timestamp: 2018-09-20T22:46:17.239432
+ALTER TABLE node ADD name VARCHAR(512);
+success!
+success!

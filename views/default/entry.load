@@ -17,9 +17,8 @@
     <div class="tab-content" id="{{=table}}-select-content">
         <div class="tab-pane fade active" id="{{=table}}-search" role="tabpanel" aria-labelledby="{{=table}}-search-tab">
             <input type="text" id="{{=table}}-search-field" class="search-field" placeholder="Enter name or key words">
-            <div id="{{=table}}-results" class="search-results">
+            <div id="{{=table}}-results" class="search-results"></div>
             <input type="hidden" id="{{=table}}-selected-id">
-            </div>
             <div class="tab-footer">
                 <button type="button" class="modal-select btn btn-primary" data-dismiss="modal">Select</button>
                 <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
