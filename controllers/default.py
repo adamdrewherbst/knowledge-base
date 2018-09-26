@@ -79,63 +79,72 @@ def saveEntry():
         depTable = 'concept_dependency'
 
     deps = []
-    ind = 1
-    name = 'dependency_' + str(ind)
-    while name in request_vars:
-        dep = request_vars[name]
-        try:
-            depId = int(dep)
-            if depId > 0:
-                deps.append(depId)
-        except ValueError:
-            pass
-        del request_vars[name]
-        ind += 1
-        name = 'dependency_' + str(ind)
+    for k,v in request_vars.items():
+        if k.startswith('dependency_'):
+            try:
+                depId = int(v)
+                if depId > 0:
+                    deps.append(depId)
+            except ValueError:
+                pass
+            del request_vars[k]
 
     if 'dependency' in request_vars:
         del request_vars['dependency']
 
-    entryId = db[table].update_or_insert(**request_vars)
-    if entryId is None:
-        entryId = request_vars.id
+    if 'id' in request_vars:
+        entryId = request_vars['id']
+        entry = db[table][entryId]
+        if entry:
+            print('UPDATING: {vars}').format(vars=request_vars)
+            entry.update_record(**request_vars)
+        else:
+            ret['error'] = 'No record with id ' + str(entryId)
+            return response.json(ret)
+    else:
+        entryId = db[table].insert(**request_vars)
+
     if entryId and depTable:
-        if request_vars.id:
-            db(db[depTable][table] == request_vars.id).delete()
+        if 'id' in request_vars:
+            db(db[depTable][table] == request_vars['id']).delete()
         for dep in deps:
-            db[depTable].insert(**{tableName: entryId, 'dependency': dep})
+            db[depTable].insert(**{table: entryId, 'dependency': dep})
 
     ret['table'] = table
     ret['id'] = entryId
-    ret['entry'] = getEntry(table, entryId)
+    ret['entry'] = {entryId: getEntry(table, entryId)}
     ret['success'] = True
     return response.json(ret)
 
 
-def getEntry(table, id):
+def getEntry(table, data):
     ret = {}
-    rows = db(db[table].id == id).select()
-    entry = rows[0]
+    if isinstance(data, int) or isinstance(data, unicode) or isinstance(data, str):
+        entry = db[table][data]
+    else:
+        entry = data
     if not entry:
         return response.json(ret)
     if table == 'framework':
-        ret = \
-            {'id': id, 'name': entry.name, 'description': entry.description, 'dependencies': {}}
-        for dep in db(db.framework_dependency.framework == id).iterselect():
-            ret['dependencies'][dep.id] = True
+        ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'dependencies': {}}
+        for dep in db(db.framework_dependency.framework == entry.id).iterselect():
+            ret['dependencies'][dep.dependency] = True
     elif table == 'concept':
-        ret = \
-            {'id': id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
-            'symmetric': entry.symmetric or False, 'dependencies': {}};
-        for dep in db(db.concept_dependency.concept == id).iterselect():
-            ret['dependencies'][dep.id] = True
+        ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
+            'symmetric': entry.symmetric or False, 'head': entry.head, 'reference': entry.reference, \
+            'symbol': entry.symbol, 'dependencies': {}};
+        for dep in db(db.concept_dependency.concept == entry.id).iterselect():
+            ret['dependencies'][dep.dependency] = True
     elif table == 'law':
-        ret = \
-            {'id': id, 'name': entry.name, 'description': entry.description, 'nodes': []};
-    return response.json(ret)
+        ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
+            'nodes': [], 'predicates': {}, 'notDeepNode': {}};
+    elif table == 'node':
+        ret = {'id': entry.id, 'law': entry.law, 'concept': entry.concept, 'head': entry.head, \
+            'reference': entry.reference, 'name': entry.name, 'values': entry.node_values};
+    return ret
 
 
-def initRelation():
+def getFramework():
 
     frameworkId = int(request.vars.framework)
     lawId = int(request.vars.law)
@@ -149,18 +158,11 @@ def initRelation():
 
     #include the metadata for all frameworks
     for framework in db(db.framework.id > 0).iterselect():
-        ret['frameworks'][framework.id] = \
-            {'id': framework.id, 'name': framework.name, 'description': framework.description, 'dependencies': {}}
-        for dep in db(db.framework_dependency.framework == framework.id).iterselect():
-            ret['frameworks'][framework.id]['dependencies'][dep.id] = True
-    for law in db(db.law.id > 0).iterselect():
-        ret['laws'][law.id] = {'id': law.id, 'name': law.name, 'description': law.description, 'nodes': [], 'predicates': {}, 'notDeepNode': {}};
+        ret['frameworks'][framework.id] = getEntry('framework', framework)
 
     #include all concepts not specific to any framework (ROOT and Anything)
     for concept in db(db.concept.framework == None).iterselect():
-        ret['concepts'][concept.id] = \
-            {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': concept.framework, \
-             'symmetric': concept.symmetric or False, 'dependencies': {}};
+        ret['concepts'][concept.id] = getEntry('concept', concept)
 
     frameworks = []
     if frameworkId > 0:
@@ -170,16 +172,13 @@ def initRelation():
 
     while frameworks:
         fid = frameworks.pop(0)
+        ret['frameworks'][fid]['loaded'] = True
         for concept in db(db.concept.framework == fid).iterselect():
-            ret['concepts'][concept.id] = \
-                {'id': concept.id, 'name': concept.name, 'description': concept.description, 'framework': fid, \
-                'symmetric': concept.symmetric or False, 'dependencies': {}};
-            for dep in db(db.concept_dependency.concept == concept.id).iterselect():
-                ret['concepts'][concept.id]['dependencies'][dep.id] = True
+            ret['concepts'][concept.id] = getEntry('concept', concept)
         for law in db(db.law.framework == fid).iterselect():
+            ret['laws'][law.id] = getEntry('law', law)
             for node in db(db.node.law == law.id).iterselect():
-                ret['nodes'][node.id] = \
-                    {'id': node.id, 'law': node.law, 'concept': node.concept, 'head': node.head, 'reference': node.reference, 'values': node.node_values};
+                ret['nodes'][node.id] = getEntry('node', node)
                 ret['laws'][law.id]['nodes'].append(node.id)
                 for predicate in db(db.predicate.node == node.id).iterselect():
                     if node.concept not in ret['predicates']:

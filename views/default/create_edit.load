@@ -6,6 +6,12 @@
     <input type="hidden" name="id" id="{{=table}}-edit-id" value="">
     {{ pass }}
 
+    {{ if table is 'law' or table is 'concept': }}
+    <select id="{{=table}}-{{=type}}-framework" class="framework-field" name="framework">
+        <option value="">-- Select --</option>
+    </select>
+    {{ pass }}
+
     <div class="entry-name form-group">
         <label for="{{=table}}-{{=type}}-name">Name</label>
         <input type="text" name="name" id="{{=table}}-{{=type}}-name" placeholder="Name">
