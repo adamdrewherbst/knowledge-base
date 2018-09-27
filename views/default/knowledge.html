@@ -37,6 +37,12 @@
         <h2>Build a relation with concepts</h2>
         <div id="graph-buttons" style="margin-bottom: 20px">
             <div id="graph-controls">
+                <div id="palette-controls">
+                    <button id="concept-create-button" type="button" class="btn btn-primary">New Concept</button>
+                    <select id="palette-concept-filter" class="framework-filter">
+                        <option value="-1">-- Filter --</option>
+                    </select>
+                </div>
                 <div id="predicate-controls">
                     <select id="set-predicate">
                         <option value="-1">Select Predicate</option>
@@ -705,11 +711,15 @@
             $element.find('select[select-table]').each(function() {
                 let $this = $(this), table = $this.attr('select-table');
                 $this.children().first().nextAll().remove();
-                let entries = self.getTable(table);
+                let entries = self.getTable(table), sorted = [];
                 for(let id in entries) {
-                    let entry = entries[id];
-                    $this.append('<option value="' + entry.id + '">' + entry.name + '</select>');
+                    let i = 0, name = entries[id].name;
+                    while(i < sorted.length && name.localeCompare(entries[sorted[i]].name) > 0) i++;
+                    sorted.splice(i, 0, id);
                 }
+                sorted.forEach(function(id) {
+                    $this.append('<option value="' + id + '">' + entries[id].name + '</select>');
+                });
             });
         };
 
@@ -819,7 +829,11 @@
             let dataArray = [];
             for(let id in concepts) {
                 let concept = concepts[id];
-                dataArray.push({concept: concept.id, framework: concept.framework, visible: true});
+                dataArray.push({
+                    concept: concept.id,
+                    framework: concept.framework,
+                    visible: self.currentFramework <= 0 || concept.framework == self.currentFramework
+                });
             }
             self.palette.model = $$(go.GraphLinksModel, {
                 nodeDataArray: dataArray,
@@ -832,7 +846,7 @@
             let self = this;
             self.paletteFramework = framework;
             self.palette.nodes.each(function(node) {
-                self.palette.model.set(node.data, 'visible', !framework || node.data.framework == framework);
+                self.palette.model.set(node.data, 'visible', framework < 0 || node.data.framework == framework);
             })
         }
 
@@ -903,6 +917,17 @@
                 });
             };
             drawLinks(-1);
+
+            self.predicateSets = [];
+            $('#set-predicate').children().slice(1, -1).remove();
+            if(self.law.predicates) {
+                for(let group in self.law.predicates) {
+                    $('#set-predicate > option:last-child').before('<option value="' + (group-1) + '">Predicate ' + group + '</option>');
+                    let obj = {};
+                    for(let node in self.law.predicates[group]) obj[node] = true;
+                    self.predicateSets.push(obj);
+                }
+            }
         };
 
 
@@ -1061,7 +1086,25 @@
                         self.updateFields();
                     }
                 });
+            } else {
+                self.setPaletteModel();
             }
+
+            let $filters = $('.framework-filter');
+            let options = [];
+            if(self.currentFramework > 0) options.push(self.currentFramework);
+            for(let i = 0; i < options.length; i++) {
+                let fw = options[i], framework = self.frameworks[fw];
+                for(let dep in framework.dependencies) {
+                    if(options.indexOf(dep) < 0) options.push(dep);
+                }
+            }
+            $filters.children().first().nextAll().remove();
+            options.forEach(function(option) {
+                el = '<option value="' + option + '">' + self.frameworks[option].name + '</option>';
+                $filters.append(el);
+            });
+            $filters.val(self.currentFramework);
         };
 
         Relation.prototype.useLaw = function(id) {
@@ -1084,16 +1127,6 @@
             self.setPaletteModel();
             if(self.law) {
                 self.draw();
-                self.predicateSets = [];
-                $('#set-predicate').children().slice(1, -1).remove();
-                if(self.law.predicates) {
-                    for(let group in self.law.predicates) {
-                        $('#set-predicate > option:last-child').before('<option value="' + (group-1) + '">Predicate ' + group + '</option>');
-                        let obj = {};
-                        for(let node in self.law.predicates[group]) obj[node] = true;
-                        self.predicateSets.push(obj);
-                    }
-                }
             }
         };
 
@@ -1542,10 +1575,19 @@
         Relation.prototype.getEntry = function(table, callback) {
             let self = this;
             let $modal = $('#' + table + '-select'), $form = $modal.find('#' + table + '-create-form');
-            if(table == 'law' || table == 'concept') {
-                self.setFrameworkField($modal);
-            }
+            $modal.find('#' + table + '-search-tab').show().tab('show');
+            $modal.find('.framework-filter').val(self.currentFramework);
             self.showSearchResults(table, '');
+            $modal.data('callback', callback);
+            $modal.modal('show');
+        };
+
+
+        Relation.prototype.createEntry = function(table, callback) {
+            let self = this, $modal = $('#' + table + '-select');
+            $modal.find('#' + table + '-search-tab').hide();
+            $modal.find('#' + table + '-create-tab').tab('show');
+            $modal.find('.framework-filter').val(self.currentFramework);
             $modal.data('callback', callback);
             $modal.modal('show');
         };
@@ -1559,9 +1601,7 @@
             $form.find('[name="id"]').val(id);
             $form.find('[name="name"]').val(entry.name);
             $form.find('[name="description"]').val(entry.description);
-            if(table == 'law' || table == 'concept') {
-                self.setFrameworkField($modal);
-            }
+            $modal.find('.framework-filter').val(entry.framework);
             if(table == 'concept') {
                 $form.find('[name="symmetric"]').attr('checked', entry.symmetric);
                 $form.find('[name="head"]').val(entry.head);
@@ -1580,30 +1620,6 @@
             $modal.data('callback', callback);
             $modal.modal('show');
         }
-
-
-        Relation.prototype.setFrameworkField = function($modal) {
-            let self = this, prefix = $modal.attr('id').replace('select', 'create'),
-                arr = prefix.split('-'), table = arr[0], type = arr[1];
-            let $form = $('#' + prefix + '-form');
-            if(self.currentFramework <= 0) return;
-            let $framework = $modal.find('select.framework-field');
-            if($framework.length == 0) return;
-            let options = [self.currentFramework];
-            for(let i = 0; i < options.length; i++) {
-                let fw = options[i], framework = self.frameworks[fw];
-                for(let dep in framework.dependencies) {
-                    if(options.indexOf(dep) < 0) options.push(dep);
-                }
-            }
-            $framework.children().first().nextAll().remove();
-            options.forEach(function(option) {
-                el = '<option value="' + option + '">' + self.frameworks[option].name + '</option>';
-                $framework.append(el);
-            });
-            $framework.val(self.currentFramework);
-            $framework.attr('disabled', false);
-        };
 
 
         Relation.prototype.addMultipleField = function($element, values) {
@@ -1635,13 +1651,13 @@
             let entries = self.getTable(table), results = [];
             if(!entries) return;
 
-            let $tab = $('#' + table + '-search.tab-pane'), $results = $tab.find('#' + table + '-results'),
-                $framework = $tab.find('.framework-field');
+            let $tab = $('#' + table + '-search-tab-content'), $results = $tab.find('#' + table + '-results'),
+                $framework = $tab.find('.framework-filter');
             let framework = $framework.val();
 
             for(let i in entries) {
                 let id = i, entry = entries[id];
-                if(framework && entry.framework != framework) continue;
+                if(framework > 0 && entry.framework != framework) continue;
                 if(entry.hasOwnProperty('name')) {
                     let name = entry.name.toLowerCase();
                     if(name.indexOf(text) >= 0) {
@@ -1693,7 +1709,7 @@
                     if(!id) return;
                     if(callback) callback.call(self, id);
                 } else if($button.hasClass('modal-save')) {
-                    let $form = $this.find('#' + prefix + '-form'), arr = $form.serializeArray(), obj = {};
+                    let $form = $this.find('form.entry-form'), arr = $form.serializeArray(), obj = {};
                     for(let i = 0; i < arr.length; i++) obj[arr[i]['name']] = arr[i]['value'];
                     $.ajax({
                         url: "{{=URL('default', 'saveEntry', extension='json')}}",
@@ -1702,11 +1718,24 @@
                         data: JSON.stringify(obj),
                         success: function(data) {
                             if(data.hasOwnProperty('id') && !isNaN(data.id)) {
-                                if(callback) callback.call(self, data);
                                 self.storeEntries(table, data.entry);
+                                if(callback) callback.call(self, data.id);
                             }
                         }
                     });
+                }
+            });
+
+            let $filters = $('.framework-filter');
+            $filters.change(function(e) {
+                let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal');
+                if($modal.length > 0) {
+                    let table = $modal.attr('id').split('-')[0];
+                    $modal.find('.framework-filter').val(framework);
+                    let type = $modal.attr('id').split('-')[1];
+                    if(type == 'select') self.showSearchResults(table, '');
+                } else if($this.attr('id') == 'palette-concept-filter') {
+                    self.filterPalette(framework);
                 }
             });
 
@@ -1719,6 +1748,10 @@
                 self.getEntry('law', function(law) {
                     self.useLaw(law);
                 });
+            });
+
+            $('#concept-create-button').click(function(e) {
+                self.createEntry('concept');
             });
 
             $('.search-field').on('keydown change', function(e) {

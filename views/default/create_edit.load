@@ -1,4 +1,4 @@
-<form id="{{=table}}-{{=type}}-form" action="javascript:void(0)">
+<form id="{{=table}}-{{=type}}-form" class="entry-form" action="javascript:void(0)">
 
     <input type="hidden" name="table" value="{{=table}}">
 
@@ -7,8 +7,8 @@
     {{ pass }}
 
     {{ if table is 'law' or table is 'concept': }}
-    <select id="{{=table}}-{{=type}}-framework" class="framework-field" name="framework">
-        <option value="">-- Select --</option>
+    <select id="{{=table}}-{{=type}}-framework" class="framework-filter" name="framework">
+        <option value="-1">-- Select --</option>
     </select>
     {{ pass }}
 

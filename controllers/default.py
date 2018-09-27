@@ -187,8 +187,6 @@ def getFramework():
                     if predicate.predicate_group not in ret['laws'][law.id]['predicates']:
                         ret['laws'][law.id]['predicates'][predicate.predicate_group] = {}
                     ret['laws'][law.id]['predicates'][predicate.predicate_group][node.id] = True
-                if law.id == lawId:
-                    ret['myNodes'].append(node.id)
                 if node.head:
                     ret['laws'][law.id]['notDeepNode'][node.head] = True
                 if node.reference:
