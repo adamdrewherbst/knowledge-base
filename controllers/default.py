@@ -57,66 +57,12 @@ def create_edit():
     return locals()
 
 
-def saveEntry():
-    import json, urllib
-    body = request.body.read()
-    body = urllib.unquote(body).decode('utf8')
-
-    print('{timestamp} -- saving entry').format(timestamp=datetime.utcnow().isoformat())
-    print('BODY: {body}').format(body=body)
-
-    request_vars = json.loads(body)
-
-    ret = {'success': False}
-
-    table = None
-    if 'table' in request_vars:
-        table = request_vars['table']
-        del request_vars['table']
-    else:
-        return response.json(ret)
-
-    depTable = None
-    if table == 'framework':
-        depTable = 'framework_dependency'
-    elif table == 'concept':
-        depTable = 'concept_dependency'
-
-    deps = []
-    for k,v in request_vars.items():
-        if k.startswith('dependency_'):
-            try:
-                depId = int(v)
-                if depId > 0:
-                    deps.append(depId)
-            except ValueError:
-                pass
-            del request_vars[k]
-
-    if 'dependency' in request_vars:
-        del request_vars['dependency']
-
-    if 'id' in request_vars:
-        entryId = request_vars['id']
-        entry = db[table][entryId]
-        if entry:
-            print('UPDATING: {vars}').format(vars=request_vars)
-            entry.update_record(**request_vars)
-        else:
-            ret['error'] = 'No record with id ' + str(entryId)
-            return response.json(ret)
-    else:
-        entryId = db[table].insert(**request_vars)
-
-    if entryId and depTable:
-        if 'id' in request_vars:
-            db(db[depTable][table] == request_vars['id']).delete()
-        for dep in deps:
-            db[depTable].insert(**{table: entryId, 'dependency': dep})
-
-    ret['id'] = entryId
-    ret['entries'] = {table: {entryId: getEntry(table, entryId)}}
-    ret['success'] = True
+def loadFramework():
+    frameworkId = int(request.vars.framework)
+    ret = {}
+    ret['entries'] = getFramework(frameworkId)
+    rows = db.executesql("select `auto_increment` from information_schema.tables where table_name = 'node'")
+    ret['nextNodeId'] = rows[0][0]
     return response.json(ret)
 
 
@@ -157,18 +103,11 @@ def getEntry(table, data):
     return ret
 
 
-def getFramework():
+def getFramework(frameworkId):
 
-    frameworkId = int(request.vars.framework)
-    lawId = int(request.vars.law)
-
-    relation = None
-    if lawId > 0:
-        rows = db(db.law.id == lawId).select()
-        relation = rows[0]
+    frameworkId = int(frameworkId)
 
     entries = {'framework': {}, 'concept': {}, 'law': {}, 'node': {}}
-    ret = {'predicates': {}, 'nextNodeId': -1}
 
     #include the metadata for all frameworks
     for framework in db(db.framework.id > 0).iterselect():
@@ -181,11 +120,11 @@ def getFramework():
     frameworks = []
     if frameworkId > 0:
         frameworks.append(frameworkId)
-    elif relation is not None:
-        frameworks.append(relation.framework)
 
+    loaded = {}
     while frameworks:
         fid = frameworks.pop(0)
+        loaded[fid] = True
         entries['framework'][fid]['loaded'] = True
         for concept in db(db.concept.framework == fid).iterselect():
             entries['concept'][concept.id] = getEntry('concept', concept)
@@ -193,16 +132,66 @@ def getFramework():
             entries['law'][law.id] = getEntry('law', law)
             for node in db(db.node.law == law.id).iterselect():
                 entries['node'][node.id] = getEntry('node', node)
-                if node.concept not in ret['predicates']:
-                    ret['predicates'][node.concept] = {}
-                ret['predicates'][node.concept][node.id] = True
         for dep in db(db.framework_dependency.framework == fid).iterselect(db.framework_dependency.dependency):
-            frameworks.append(dep.dependency)
+            if dep.dependency not in loaded:
+                frameworks.append(dep.dependency)
 
-    rows = db.executesql("select `auto_increment` from information_schema.tables where table_name = 'node'")
-    ret['nextNodeId'] = rows[0][0]
+    return entries
 
-    ret['entries'] = entries
+
+def saveEntry():
+    import json, urllib
+    body = request.body.read()
+    body = urllib.unquote(body).decode('utf8')
+
+    print('{timestamp} -- saving entry').format(timestamp=datetime.utcnow().isoformat())
+    print('BODY: {body}').format(body=body)
+
+    request_vars = json.loads(body)
+
+    ret = {'success': False, 'entries': {}}
+
+    table = None
+    if 'table' in request_vars:
+        table = request_vars['table']
+        del request_vars['table']
+    else:
+        return response.json(ret)
+
+    depTable = None
+    if table == 'framework':
+        depTable = 'framework_dependency'
+    elif table == 'concept':
+        depTable = 'concept_dependency'
+
+    deps = {}
+    if 'dependencies' in request_vars:
+        deps = request_vars['dependencies']
+        del request_vars['dependencies']
+
+    if 'id' in request_vars:
+        entryId = request_vars['id']
+        entry = db[table][entryId]
+        if entry:
+            print('UPDATING: {vars}').format(vars=request_vars)
+            entry.update_record(**request_vars)
+        else:
+            ret['error'] = 'No record with id ' + str(entryId)
+            return response.json(ret)
+    else:
+        entryId = db[table].insert(**request_vars)
+
+    if entryId and depTable:
+        if 'id' in request_vars:
+            db(db[depTable][table] == request_vars['id']).delete()
+        for dep,load in deps.items():
+            db[depTable].insert(**{table: entryId, 'dependency': dep})
+            if load:
+                if table == 'framework':
+                    ret['entries'].update(getFramework(dep))
+
+    ret['id'] = entryId
+    ret['entries'].update({table: {entryId: getEntry(table, entryId)}})
     ret['success'] = True
     return response.json(ret)
 

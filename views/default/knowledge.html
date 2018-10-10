@@ -17,18 +17,18 @@
 
         <!-- controls -->
         <div id="controls">
-            <div id="framework-wrapper">
-                <button id="framework-set-button" type="button" class="btn btn-primary">Select Framework</button>
-                <div id="framework-info" style="display:none">
-                    <div id="framework-msg">Using Framework <span id="framework-name"></span></div>
-                    <button id="framework-edit-button" type="button" class="btn btn-primary">Edit</button>
+            <div class="entry-wrapper" table="framework">
+                <button class="entry-set-button" type="button" class="btn btn-primary">Select Framework</button>
+                <div class="entry-info">
+                    <div class="entry-msg">Using Framework <span class="entry-name">NONE</span></div>
+                    <button class="entry-edit-button" type="button" class="btn btn-primary">Edit</button>
                 </div>
             </div>
-            <div id="law-wrapper">
-                <button id="law-set-button" type="button" class="btn btn-primary">Select Law</button>
-                <div id="law-info" style="display:none">
-                    <div id="law-msg">Using Law <span id="law-name"></span></div>
-                    <button id="law-edit-button" type="button" class="btn btn-primary">Edit</button>
+            <div class="entry-wrapper" table="law">
+                <button class="entry-set-button" type="button" class="btn btn-primary">Select Law</button>
+                <div class="entry-info">
+                    <div class="entry-msg">Using Law <span class="entry-name">NONE</span></div>
+                    <button class="entry-edit-button" type="button" class="btn btn-primary">Edit</button>
                 </div>
             </div>
         </div>
@@ -72,6 +72,9 @@
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'concept'}) }}
 
         <div id="visualization">
+            <div id="visualization-controls">
+                <button id="visualize-relation" type="button" class="btn btn-primary">Visualize</button>
+            </div>
             <canvas id="visualization-canvas">
             </canvas>
         </div>
@@ -90,12 +93,23 @@
             margin: 20px;
         }
 
-        #framework-wrapper {
+        .entry-wrapper {
             padding: 10px 0;
         }
-        #law-wrapper {
-            padding: 10px 0;
+        .entry-set-button {
+            display: inline-block;
         }
+        .entry-info {
+            display: inline-block;
+        }
+        .entry-msg {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        .entry-edit-button {
+            display: inline-block;
+        }
+
 
         .entry-modal .modal-dialog {
             width: 70%;
@@ -233,9 +247,12 @@
 
 
         #visualization {
-            border: 3px solid green;
+        }
+        #visualization-controls {
+            margin: 20px 0;
         }
         #visualization-canvas {
+            border: 3px solid green;
         }
 
     </style>
@@ -454,16 +471,16 @@
             this.paletteFrameworks = [];
 
             this.frameworks = {};
-            this.framework = new Framework();
-            this.framework.id = -1;
-            this.framework.relation = this;
+            this.frameworks[-1] = new Framework();
+            this.frameworks[-1].id = -1;
+            this.frameworks[-1].relation = this;
 
             this.concepts = {};
 
             this.laws = {};
-            this.law = new Law();
-            this.law.id = -1;
-            this.law.relation = this;
+            this.laws[-1] = new Law();
+            this.laws[-1].id = -1;
+            this.laws[-1].relation = this;
 
             this.nodes = {};
             this.nodes[0] = new Node();
@@ -545,13 +562,21 @@
                 }
 
                 //post-processing
+                let frameworkReset = false;
                 for(let id in saved) {
                     let entry = entries[id], oldId = data[id].oldId;
                     switch(table) {
-                        case 'framework': break;
+                        case 'framework':
+                            if(self.framework.id == id || self.framework.id == oldId) {
+                                self.setFramework(entry);
+                                frameworkReset = true;
+                            }
+                            break;
                         case 'law':
                             entry.predicateSets = [];
-                            if(self.law.id == entry.id || self.law.id == oldId) self.law = entry;
+                            if(self.law.id == entry.id || self.law.id == oldId) {
+                                self.setLaw(entry);
+                            }
                             $.each(entry.predicates, function(id, group) {
                                 let pset = [];
                                 for(let node in group) pset.push(parseInt(node));
@@ -587,10 +612,10 @@
                             }
                             break;
                         case 'node':
-                            console.log('for node ' + entry.id + ', converted values ' + entry.values + ' to ');
                             entry.values = self.convertValues(entry.values, 'array');
-                            console.info(entry.values);
                             entries[entry.head || 0].children[entry.id] = entry;
+                            if(!self.predicates.hasOwnProperty(entry.concept)) self.predicates[entry.concept] = {};
+                            self.predicates[entry.concept][entry.id] = true;
                             let nodeData = self.diagram.model.findNodeDataForKey(id);
                             if(!nodeData && oldId) nodeData = self.diagram.model.findNodeDataForKey(oldId);
                             if(nodeData) {
@@ -603,6 +628,7 @@
                         default: break;
                     }
                 }
+                if(frameworkReset) self.filterPalette();
             }
         }
 
@@ -916,6 +942,7 @@
                 $this.children().first().nextAll().remove();
                 let entries = self.getTable(table), sorted = [];
                 for(let id in entries) {
+                    if(id < 0) continue;
                     let i = 0, name = entries[id].name;
                     while(i < sorted.length && name.localeCompare(entries[sorted[i]].name) > 0) i++;
                     sorted.splice(i, 0, id);
@@ -1049,6 +1076,7 @@
         Relation.prototype.filterPalette = function(framework) {
             let self = this;
 
+            if(framework === undefined) framework = self.framework.id;
             self.paletteFramework = framework;
             let frameworks = [];
             if(framework < 0) {
@@ -1288,30 +1316,40 @@
 
         Relation.prototype.useFramework = function(id) {
             let self = this;
-            if(id >= 0) self.framework = self.frameworks[id];
+            self.setFramework(id);
 
             if(!self.framework.loaded) {
                 $.ajax({
-                    url: "{{=URL('default', 'getFramework', extension='json')}}",
+                    url: "{{=URL('default', 'loadFramework', extension='json')}}",
                     type: 'get',
                     dataType: 'json',
                     data: {
-                        framework: self.framework.id,
-                        law: self.law.id
+                        framework: self.framework.id
                     },
                     success: function(data) {
+                        self.predicates = {};
                         self.storeEntries(data);
 
-                        if(data.hasOwnProperty('predicates')) self.predicates = data.predicates;
                         if(data.hasOwnProperty('nextNodeId')) self.nextNodeId = parseInt(data.nextNodeId);
 
                         self.setPaletteModel();
+                        self.filterPalette();
                         self.updateFields();
                     }
                 });
             } else {
                 self.setPaletteModel();
+                self.filterPalette();
             }
+        };
+
+
+        Relation.prototype.setFramework = function(framework) {
+            let self = this;
+            if(!isNaN(framework)) framework = self.findEntry('framework', framework);
+            if(!framework) return;
+            self.framework = framework;
+            $('.entry-wrapper[table=framework] .entry-name').text(self.framework.name || 'None');
 
             let $filters = $('.framework-filter');
             let options = [];
@@ -1334,11 +1372,20 @@
         Relation.prototype.useLaw = function(id) {
             let self = this;
             if(self.law.id == id) return;
-            if(id >= 0) self.law = self.laws[id];
+            self.setLaw(id);
             if(self.law.framework != self.framework.id)
                 self.useFramework(self.law.framework);
             self.myNodes = self.law.nodes;
             self.draw();
+        };
+
+
+        Relation.prototype.setLaw = function(law) {
+            let self = this;
+            if(!isNaN(law)) law = self.findEntry('law', law);
+            if(!law) return;
+            self.law = law;
+            $('.entry-wrapper[table=law] .entry-name').text(self.law.name || 'None');
         };
 
 
@@ -1854,7 +1901,7 @@
                 $wrapper.find('.multiple-item').first().nextAll('.multiple-item').remove();
                 let depCount = 0;
                 for(let dep in entry.dependencies) {
-                    self.addMultipleField($wrapper, {dependency: dep});
+                    self.addMultipleField($wrapper, {dependencies: dep});
                     depCount++;
                 }
                 if(depCount == 0) self.addMultipleField($wrapper);
@@ -1992,9 +2039,8 @@
             let self = relation;
 
             self.initDiagram();
-            self.useFramework(self.framework.id);
-
-            self.visualize();
+            self.setLaw(-1);
+            self.useFramework(-1);
 
             let $hideButton = null;
             $('.entry-modal button[data-dismiss=modal]').click(function(e) {
@@ -2004,18 +2050,45 @@
                 $hideButton = null;
             });
             $('.entry-modal').on('hide.bs.modal', function(e) {
+
                 let $this = $(this), $button = $hideButton || $(document.activeElement), callback = $this.data('callback');
                 let prefix = $this.attr('id'), prefixArr = prefix.split('-'), table = prefixArr[0], type = prefixArr[1];
                 console.log('modal ' + $this.attr('id') + ' hidden');
+
                 if($button.hasClass('modal-cancel')) {
                     return;
+
                 } else if($button.hasClass('modal-select')) {
                     let id = $('#' + table + '-selected-id').val();
                     if(!id) return;
                     if(callback) callback.call(self, id);
+
                 } else if($button.hasClass('modal-save')) {
                     let $form = $this.find('form.entry-form'), arr = $form.serializeArray(), obj = {};
                     for(let i = 0; i < arr.length; i++) obj[arr[i]['name']] = arr[i]['value'];
+
+                    //convert any multiple fields to proper format
+                    $form.find('.multiple-template').each(function() {
+                        let $this = $(this), $fields = $this.find('[name]');
+                        $fields.each(function() {
+                            let name = $(this).attr('name');
+                            obj[name] = {};
+                            for(let key in obj) if(key.startsWith(name + '_')) {
+                                obj[name][obj[key]] = true;
+                                delete obj[key];
+                            }
+                        });
+                    });
+
+                    if(table == 'framework') {
+                        for(let dep in obj.dependencies) {
+                            let framework = self.findEntry('framework', dep);
+                            //when saving a framework, flag dependency frameworks that need to be loaded
+                            //so the server can send them
+                            obj.dependencies[dep] = framework && !framework.loaded;
+                        }
+                    }
+
                     console.log('saving entry');
                     console.info(obj);
                     $.ajax({
@@ -2046,14 +2119,21 @@
                 }
             });
 
-            $('#framework-set-button').click(function(e) {
-                self.selectEntry('framework', function(framework) {
-                    self.useFramework(framework);
+            $('.entry-wrapper').each(function() {
+                let $this = $(this), table = $this.attr('table');
+                $this.find('.entry-set-button').click(function(e) {
+                    self.selectEntry(table, function(id) {
+                        if(table == 'framework') self.useFramework(id);
+                        else if(table == 'law') self.useLaw(id);
+                        let entry = self.findEntry(table, id);
+                        $this.find('.entry-name').text(entry.name || 'None');
+                        $this.find('.entry-info').show();
+                    });
                 });
-            });
-            $('#law-set-button').click(function(e) {
-                self.selectEntry('law', function(law) {
-                    self.useLaw(law);
+                $this.find('.entry-edit-button').click(function(e) {
+                    let id = table == 'framework' ? self.framework.id : table == 'law' ? self.law.id : null;
+                    if(!id) return;
+                    self.editEntry(table, id);
                 });
             });
 
