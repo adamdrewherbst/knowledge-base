@@ -292,3 +292,7 @@ timestamp: 2018-09-20T22:46:17.239432
 ALTER TABLE node ADD name VARCHAR(512);
 success!
 success!
+timestamp: 2018-09-27T18:22:28.372813
+ALTER TABLE concept ADD inherits CHAR(1);
+success!
+success!

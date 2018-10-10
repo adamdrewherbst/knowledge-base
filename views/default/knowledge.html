@@ -71,10 +71,11 @@
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'law'}) }}
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'concept'}) }}
 
-        <div id="search-template" style="display: none">
-            <input type="text" class="search-field" placeholder="Enter name or key words"/>
-            <div class="search-results"/>
+        <div id="visualization">
+            <canvas id="visualization-canvas">
+            </canvas>
         </div>
+
     </body>
 
 
@@ -230,6 +231,13 @@
             padding: 0 20px;
         }
 
+
+        #visualization {
+            border: 3px solid green;
+        }
+        #visualization-canvas {
+        }
+
     </style>
     {{end page_css}}
 
@@ -294,6 +302,146 @@
         // end ContinuousForceDirectedLayout
 
 
+        function Entry() {
+        }
+
+        Entry.prototype.get = function(key) {
+            return this[key];
+        };
+
+        Entry.prototype.set = function(key, value) {
+            this[key] = value;
+        };
+
+        Entry.prototype.getId = function() {
+            return this.id;
+        };
+
+        Entry.prototype.findEntry = function(table, id) {
+            if(this.relation) return this.relation.findEntry(table, id);
+            return null;
+        };
+
+        Entry.prototype.findId = function(table, opts) {
+            let entries = this.relation.getTable(table);
+            for(let id in entries) {
+                let entry = entries[id], match = true;
+                for(let key in opts) {
+                    if(entry[key] != opts[key]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if(match) return id;
+            }
+            return null;
+        };
+
+
+        function Framework() {
+        }
+
+        Framework.prototype = Object.create(Entry.prototype);
+        Framework.prototype.constructor = Framework;
+        Framework.prototype.table = 'framework';
+
+
+        function Concept() {
+        }
+
+        Concept.prototype = Object.create(Entry.prototype);
+        Concept.prototype.constructor = Concept;
+        Concept.prototype.table = 'concept';
+
+        Concept.prototype.instanceOf = function(parent) {
+            if(typeof parent == 'string') parent = this.findId(this.table, {name: parent});
+            if(this.dependencies[parent]) return true;
+            for(let dep in this.dependencies) {
+                let concept = this.findEntry(this.table, dep);
+                if(concept.instanceOf(parent)) return true;
+            }
+            return false;
+        };
+
+
+        function Law() {
+            this.nodes = [];
+        }
+
+        Law.prototype = Object.create(Entry.prototype);
+        Law.prototype.constructor = Law;
+        Law.prototype.table = 'law';
+
+        Law.prototype.getNodesByConcept = function(concept) {
+            let nodes = [], self = this;
+            this.nodes.forEach(function(id) {
+                let node = self.findEntry('node', id);
+                if(!node) return;
+                let nodeConcept = node.getConcept();
+                if(!nodeConcept) return;
+                if((typeof concept == 'number' && nodeConcept.id == concept) || (typeof concept == 'string' && nodeConcept.name == concept))
+                    nodes.push(node);
+            });
+            return nodes;
+        };
+
+
+        function Node() {
+            this.children = {};
+        }
+
+        Node.prototype = Object.create(Entry.prototype);
+        Node.prototype.constructor = Node;
+        Node.prototype.table = 'node';
+
+        Node.prototype.getConcept = function() {
+            return this.findEntry('concept', this.concept);
+        };
+
+        Node.prototype.instanceOf = function(concept) {
+            return this.getConcept().instanceOf(concept);
+        };
+
+        Node.prototype.getValue = function() {
+            if(this.values && this.values.length == 1 && typeof this.values[0] == 'number')
+                return this.values[0];
+            return null;
+        };
+
+        Node.prototype.getHead = function() {
+            return this.findEntry(this.table, this.head);
+        };
+
+        Node.prototype.getReference = function() {
+            return this.findEntry(this.table, this.reference);
+        }
+
+        Node.prototype.addChild = function(node) {
+            this.children[node.getId()] = node;
+        };
+
+        Node.prototype.getChildren = function() {
+            let children = [];
+            for(let id in this.children) {
+                children.push(this.children[id]);
+            }
+            return children;
+        };
+
+        Node.prototype.getChildrenByConcept = function(concept) {
+            let children = [];
+            for(let id in this.children) {
+                let child = this.children[id];
+                if(child.instanceOf(concept)) children.push(child);
+            }
+            return children;
+        };
+
+        Node.prototype.removeChild = function(id) {
+            delete this.children[id];
+        };
+
+
         /*********   RELATION   *****************
 
         A wrapper class for all functionality on this page
@@ -302,15 +450,26 @@
 
         function Relation() {
 
-            this.currentLaw = -1;
-            this.currentFramework = -1;
             this.paletteFramework = null;
+            this.paletteFrameworks = [];
 
             this.frameworks = {};
+            this.framework = new Framework();
+            this.framework.id = -1;
+            this.framework.relation = this;
+
             this.concepts = {};
+
             this.laws = {};
-            this.law = null;
-            this.nodes = {0: {id: 0, children: {}}};
+            this.law = new Law();
+            this.law.id = -1;
+            this.law.relation = this;
+
+            this.nodes = {};
+            this.nodes[0] = new Node();
+            this.nodes[0].id = 0;
+            this.nodes[0].relation = this;
+
             this.predicates = {};
 
             this.myNodes = [];
@@ -346,90 +505,142 @@
         }
 
 
-        Relation.prototype.storeEntries = function(table, data) {
-            let self = this, entries = self.getTable(table);
-            if(!entries) return;
-            let saved = {};
+        Relation.prototype.storeEntries = function(ajaxData) {
+            let self = this;
+            if(!ajaxData || typeof ajaxData.entries != 'object') return;
+            console.log('storing entries');
+            console.info(ajaxData.entries);
+            for(let table in ajaxData.entries) {
+                let data = ajaxData.entries[table], entries = self.getTable(table);
+                if(!entries) return;
+                let saved = {};
 
-            //pre-processing
-            for(let id in data) {
-                if(isNaN(id)) continue;
-                id = parseInt(id);
-                if(!entries.hasOwnProperty(id)) entries[id] = {};
-                let entry = entries[id];
-                switch(table) {
-                    case 'framework': break;
-                    case 'law': break;
-                    case 'concept': break;
-                    case 'node':
-                        if(!entry.hasOwnProperty('children')) entry.children = {};
-                        if(data[id].head != entry.head) {
-                            let oldHead = entry.head || 0;
-                            if(entries.hasOwnProperty(oldHead) && entries[oldHead].hasOwnProperty('children'))
-                                delete entries[oldHead].children[id];
-                        }
-                        break;
-                    default: break;
+                //pre-processing
+                for(let id in data) {
+                    if(isNaN(id)) continue;
+                    id = parseInt(id);
+                    let oldId = data[id].oldId;
+                    if(!entries.hasOwnProperty(id)) {
+                        if(oldId && entries.hasOwnProperty(oldId)) {
+                            entries[id] = entries[oldId];
+                            delete entries[oldId];
+                        } else entries[id] = self.createEntry(table);
+                    }
+                    let entry = entries[id];
+                    switch(table) {
+                        case 'framework': break;
+                        case 'law': break;
+                        case 'concept': break;
+                        case 'node':
+                            let head = entry.getHead();
+                            if(head && data[id].head != head.id) head.removeChild(id);
+                            break;
+                        default: break;
+                    }
+                    //overwriting
+                    for(let key in data[id]) {
+                        entry.set(key, data[id][key]);
+                    }
+                    saved[id] = true;
                 }
-                //overwriting
-                for(let key in data[id]) {
-                    let val = data[id][key];
-                    //if(typeof val == 'number' || typeof val == 'string')
-                    entry[key] = val;
-                }
-                saved[id] = true;
-            }
 
-            //post-processing
-            for(let id in saved) {
-                let entry = entries[id];
-                switch(table) {
-                    case 'framework': break;
-                    case 'law':
-                        if(self.currentLaw && entry.id == self.currentLaw)
-                            self.law = entry;
-                        entry.predicateSets = [];
-                        $.each(entry.predicates, function(id, group) {
-                            let pset = [];
-                            for(let node in group) pset.push(parseInt(node));
-                            entry.predicateSets.push(pset);
-                        });
-                        entry.deepNodes = [];
-                        entry.nodes.forEach(function(node) {
-                            let n = parseInt(node);
-                            if(!entry.notDeepNode.hasOwnProperty(n)) {
-                                entry.deepNodes.push(n);
-                            }
-                        });
-                        break;
-                    case 'concept':
-                        let graphs = [self.palette, self.diagram];
-                        for(let i = 0; i < graphs.length; i++) {
-                            let graph = graphs[i], found = false;
-                            graph.nodes.each(function(node) {
-                                if(node.data.concept == id) {
-                                    found = true;
-                                    graph.model.set(node.data, 'concept', id);
-                                    graph.model.updateTargetBindings(node.data, 'concept');
+                //post-processing
+                for(let id in saved) {
+                    let entry = entries[id], oldId = data[id].oldId;
+                    switch(table) {
+                        case 'framework': break;
+                        case 'law':
+                            entry.predicateSets = [];
+                            if(self.law.id == entry.id || self.law.id == oldId) self.law = entry;
+                            $.each(entry.predicates, function(id, group) {
+                                let pset = [];
+                                for(let node in group) pset.push(parseInt(node));
+                                entry.predicateSets.push(pset);
+                            });
+                            entry.deepNodes = [];
+                            entry.nodes.forEach(function(node) {
+                                let n = parseInt(node);
+                                if(!entry.notDeepNode.hasOwnProperty(n)) {
+                                    entry.deepNodes.push(n);
                                 }
                             });
-                            if(graph === self.palette && !found) {
-                                graph.model.addNodeData({
-                                    concept: id,
-                                    framework: data.framework,
-                                    visible: !self.paletteFramework || data.framework == self.paletteFramework
+                            break;
+                        case 'concept':
+                            let graphs = [self.palette, self.diagram];
+                            for(let i = 0; i < graphs.length; i++) {
+                                let graph = graphs[i], found = false;
+                                graph.nodes.each(function(node) {
+                                    if(node.data.concept == id) {
+                                        found = true;
+                                        graph.model.set(node.data, 'concept', id);
+                                        graph.model.set(node.data, 'framework', data[id].framework);
+                                        graph.model.updateTargetBindings(node.data, 'concept');
+                                    }
                                 });
+                                if(graph === self.palette && !found) {
+                                    graph.model.addNodeData({
+                                        concept: id,
+                                        framework: data[id].framework,
+                                        visible: self.isVisibleInPalette(id)
+                                    });
+                                }
                             }
-                        }
-                        break;
-                    case 'node':
-                        entry.values = self.convertValues(entry.values, 'array');
-                        entries[entry.head || 0].children[entry.id] = true;
-                        break;
-                    default: break;
+                            break;
+                        case 'node':
+                            console.log('for node ' + entry.id + ', converted values ' + entry.values + ' to ');
+                            entry.values = self.convertValues(entry.values, 'array');
+                            console.info(entry.values);
+                            entries[entry.head || 0].children[entry.id] = entry;
+                            let nodeData = self.diagram.model.findNodeDataForKey(id);
+                            if(!nodeData && oldId) nodeData = self.diagram.model.findNodeDataForKey(oldId);
+                            if(nodeData) {
+                                for(let key in entry)
+                                    if(nodeData.hasOwnProperty(key))
+                                        self.diagram.model.set(nodeData, key, entry[key]);
+                                self.diagram.model.updateTargetBindings(nodeData);
+                            }
+                            break;
+                        default: break;
+                    }
                 }
             }
         }
+
+
+        Relation.prototype.createEntry = function(table) {
+            let self = this, entry = null;
+            switch(table) {
+                case 'framework': entry = new Framework(); break;
+                case 'law': entry = new Law(); break;
+                case 'concept': entry = new Concept(); break;
+                case 'node': entry = new Node(); break;
+                default: break;
+            }
+            if(entry) {
+                entry.relation = self;
+            }
+            return entry;
+        };
+
+
+        Relation.prototype.findEntry = function(table, id) {
+            let self = this, entries = self.getTable(table);
+            if(entries && entries.hasOwnProperty(id)) return entries[id];
+            return null;
+        };
+
+
+        Relation.prototype.getTable = function(name) {
+            let self = this;
+            switch(name) {
+                case 'concept': return self.concepts; break;
+                case 'framework': return self.frameworks; break;
+                case 'node': return self.nodes; break;
+                case 'law': return self.laws; break;
+                default: break;
+            }
+            return null;
+        };
 
 
         Relation.prototype.initDiagram = function() {
@@ -550,7 +761,7 @@
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
                                 if(!(part instanceof go.Node)) return;
-                                self.getEntry('concept', function(concept) {
+                                self.selectEntry('concept', function(concept) {
                                     if(concept && self.concepts.hasOwnProperty(concept))
                                         self.setNodeData(part.data.id, 'concept', concept);
                                 });
@@ -689,19 +900,11 @@
 
             self.setPaletteModel();
             self.clearDiagram();
-        };
 
-
-        Relation.prototype.getTable = function(name) {
-            let self = this;
-            switch(name) {
-                case 'concept': return self.concepts; break;
-                case 'framework': return self.frameworks; break;
-                case 'node': return self.nodes; break;
-                case 'law': return self.laws; break;
-                default: break;
-            }
-            return null;
+            let canvas = document.getElementById('visualization-canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            self.canvas = canvas.getContext('2d');
         };
 
 
@@ -735,7 +938,7 @@
 
         Relation.prototype.getNodeString = function(id) {
 
-            let self = this, node = self.nodes[id], law = self.laws[self.currentLaw];
+            let self = this, node = self.nodes[id], law = self.law;
             if(!node) return '';
 
             let lawStr = '';
@@ -759,7 +962,7 @@
                     for(let m in self.nodeMap[id][p]) {
                         let map = self.map[m], law = self.laws[map.lawId];
                         let mapStr = '';
-                        for(let n in map.idMap) if(self.nodes[n].law == self.currentLaw) mapStr += '' + n + ',';
+                        for(let n in map.idMap) if(self.nodes[n].law == law.id) mapStr += '' + n + ',';
                         mapStr = mapStr.substring(0, mapStr.length-1);
                         mappings += '' + p + ' [' + self.concepts[self.nodes[p].concept].name + ']' + "\n"
                             + '.  in ' + law.name + ' [' + law.id + ']' + "\n"
@@ -788,6 +991,7 @@
                 arr = v.split(';');
                 for(let i = 0; i < arr.length; i++) {
                     let str = arr[i];
+                    if(str == '') continue;
                     if(!isNaN(str)) {
                         values.push(parseFloat(str));
                         continue;
@@ -832,7 +1036,7 @@
                 dataArray.push({
                     concept: concept.id,
                     framework: concept.framework,
-                    visible: self.currentFramework <= 0 || concept.framework == self.currentFramework
+                    visible: self.framework.id <= 0 || concept.framework == self.framework.id
                 });
             }
             self.palette.model = $$(go.GraphLinksModel, {
@@ -844,11 +1048,36 @@
 
         Relation.prototype.filterPalette = function(framework) {
             let self = this;
+
             self.paletteFramework = framework;
+            let frameworks = [];
+            if(framework < 0) {
+                frameworks.push(undefined);
+                if(self.framework.id >= 0) frameworks.push(self.framework.id);
+                let ind = 1;
+                while(ind < frameworks.length) {
+                    let f = frameworks[ind];
+                    for(let dep in self.frameworks[f].dependencies) {
+                        if(frameworks.indexOf(dep) < 0) frameworks.push(dep);
+                    }
+                    ind++;
+                }
+            } else frameworks.push(framework);
+            self.paletteFrameworks = frameworks;
+
             self.palette.nodes.each(function(node) {
-                self.palette.model.set(node.data, 'visible', framework < 0 || node.data.framework == framework);
-            })
+                self.palette.model.set(node.data, 'visible', self.isVisibleInPalette(node.data.concept));
+            });
         }
+
+
+        Relation.prototype.isVisibleInPalette = function(conceptId) {
+            let self = this, concept = self.concepts[conceptId];
+            for(let i = 0; i < self.paletteFrameworks.length; i++)
+                if(self.paletteFrameworks[i] == concept.framework)
+                    return true;
+            return false;
+        };
 
 
         Relation.prototype.clearDiagram = function() {
@@ -1059,25 +1288,19 @@
 
         Relation.prototype.useFramework = function(id) {
             let self = this;
-            self.currentFramework = id;
+            if(id >= 0) self.framework = self.frameworks[id];
 
-            let framework = self.frameworks[self.currentFramework];
-            if(!framework || !framework.loaded) {
+            if(!self.framework.loaded) {
                 $.ajax({
                     url: "{{=URL('default', 'getFramework', extension='json')}}",
                     type: 'get',
                     dataType: 'json',
                     data: {
-                        framework: self.currentFramework,
-                        law: self.currentLaw
+                        framework: self.framework.id,
+                        law: self.law.id
                     },
                     success: function(data) {
-                        let map = {'framework': data.frameworks, 'law': data.laws, 'concept': data.concepts, 'node': data.nodes};
-                        for(let table in map) {
-                            self.storeEntries(table, map[table]);
-                        }
-
-                        if(!self.laws.hasOwnProperty(self.currentLaw)) self.law = null;
+                        self.storeEntries(data);
 
                         if(data.hasOwnProperty('predicates')) self.predicates = data.predicates;
                         if(data.hasOwnProperty('nextNodeId')) self.nextNodeId = parseInt(data.nextNodeId);
@@ -1092,7 +1315,7 @@
 
             let $filters = $('.framework-filter');
             let options = [];
-            if(self.currentFramework > 0) options.push(self.currentFramework);
+            if(self.framework.id > 0) options.push(self.framework.id);
             for(let i = 0; i < options.length; i++) {
                 let fw = options[i], framework = self.frameworks[fw];
                 for(let dep in framework.dependencies) {
@@ -1104,48 +1327,31 @@
                 el = '<option value="' + option + '">' + self.frameworks[option].name + '</option>';
                 $filters.append(el);
             });
-            $filters.val(self.currentFramework);
+            $filters.val(self.framework.id);
         };
+
 
         Relation.prototype.useLaw = function(id) {
             let self = this;
-            if(self.currentLaw == id) return;
-            self.currentLaw = id;
-            self.law = self.laws[id];
-            if(self.law) {
-                if(self.law.framework != self.currentFramework)
-                    self.useFramework(self.law.framework);
-                self.myNodes = self.law.nodes;
-            } else {
-                self.myNodes = [];
-            }
+            if(self.law.id == id) return;
+            if(id >= 0) self.law = self.laws[id];
+            if(self.law.framework != self.framework.id)
+                self.useFramework(self.law.framework);
+            self.myNodes = self.law.nodes;
             self.draw();
         };
 
-        Relation.prototype.drawAll = function() {
-            let self = this;
-            self.setPaletteModel();
-            if(self.law) {
-                self.draw();
-            }
-        };
 
         Relation.prototype.save = function() {
-            let self = this, id = self.currentLaw;
+            let self = this, id = self.law.id;
 
             let nodes = [], predicates = [];
-            self.diagram.nodes.each(function(node) {
-                let data = {
-                    'id': node.data['id'], 'law': id, 'concept': node.data['concept'],
-                    'head': null, 'reference': null, 'values': node.data['values'] || null,
-                };
-                let head = node.findNodesInto('T'),
-                    reference = node.findNodesOutOf('T');
-                if(head.count > 0) data['head'] = head.first().data['id'];
-                if(reference.count > 0) data['reference'] = reference.first().data['id'];
-                nodes.push(data);
+            self.syncGraph();
+            self.law.nodes.forEach(function(id) {
+                let node = self.findEntry('node', id);
+                if(node) nodes.push({id: node.id, concept: node.concept, name: node.name, head: node.head,
+                    reference: node.reference, values: self.convertValues(node.values, 'string')});
             });
-
             self.predicateSets.forEach(function(pset, i) {
                 for(let node in pset) {
                     predicates.push({'node': parseInt(node), 'predicate_group': i+1});
@@ -1156,12 +1362,40 @@
                 url: "{{=URL('default', 'saveRelation', extension='json')}}",
                 type: 'post',
                 dataType: 'json',
-                data: JSON.stringify({id: id, nodes: nodes, predicates: predicates}),
+                data: JSON.stringify({id: id, framework: self.framework.id, nodes: nodes, predicates: predicates}),
                 success: function(data) {
+                    self.storeEntries(data);
                     $('#law-save-msg').val('Relation saved').show(3000);
                 },
                 error: function() {
                 }
+            });
+        };
+
+
+        Relation.prototype.syncGraph = function() {
+            let self = this;
+            self.diagram.nodes.each(function(node) {
+                let id = parseInt(node.data['id']);
+                let entries = self.getTable('node');
+                if(!entries.hasOwnProperty(id)) entries[id] = self.createEntry('node');
+                let entry = entries[id];
+                entry.id = id;
+                entry.concept = node.data['concept'];
+                entry.name = node.data['name'] || null;
+                entry.head = entry.reference = null;
+                entry.values = node.data['values'] || null;
+                let head = node.findNodesInto('T'),
+                    reference = node.findNodesOutOf('T');
+                if(head.count > 0) entry.head = head.first().data['id'];
+                if(reference.count > 0) entry.reference = reference.first().data['id'];
+                entry.values = self.convertValues(entry.values, 'array');
+                if(self.law.nodes.indexOf(id) < 0) self.law.nodes.push(id);
+            });
+
+            self.law.nodes.forEach(function(id) {
+                let node = self.nodes[id];
+                self.nodes[node.head || 0].addChild(node);
             });
         };
 
@@ -1208,7 +1442,7 @@
                 if(self.myNodes.indexOf(id) < 0) self.myNodes.push(id);
                 let node = self.nodes[id];
                 node.id = id;
-                node.law = self.currentLaw;
+                node.law = self.law.id;
                 node.concept = data.concept;
                 node.head = null;
                 node.reference = null;
@@ -1250,10 +1484,17 @@
                 map = {lawId: predicate['law'], predicates: [predicateId], idMap: {}, values: {}, intersects: {}, children: []};
             }
 
-            //make sure this node's concept matches the predicate's concept
-            let match = node['concept'] == predicate['concept']
-                || predicate['concept'] == self.wildcardConcept
-                || self.concepts[node['concept']].dependencies[predicate['concept']];
+            //make sure at least one of this node's associated concepts matches the predicate's concept
+            let match = predicate.concept == self.wildcardConcept
+                || node.concept == predicate.concept
+                || self.concepts[node.concept].dependencies[predicate.concept]
+            if(!match && self.concepts[node.concept].inherits && node.head > 0 && self.nodes.hasOwnProperty(node.head)) {
+                let headConcept = self.nodes[node.head].concept;
+                if(headConcept > 0){
+                    match = headConcept == predicate.concept
+                            || self.concepts[headConcept].dependencies[predicate.concept];
+                }
+            }
             //and find the intersection of any values on the two nodes
             let values = null;
             if(match) values = self.intersectValues(node.values, predicate.values);
@@ -1542,12 +1783,13 @@
             }
 
             let newId = self.addNode({
-                'law': self.currentLaw,
+                'law': self.law.id,
                 'concept': node['concept'],
                 'head': parseInt(newHead),
                 'reference': parseInt(newReference),
                 'values': self.nodes[nodeId].values
             });
+            self.myNodes.push(newId);
             self.newNodes.push(newId);
             self.nodesToCheck.push(newId);
             map.idMap[nodeId] = newId;
@@ -1572,22 +1814,22 @@
         };
 
 
-        Relation.prototype.getEntry = function(table, callback) {
+        Relation.prototype.selectEntry = function(table, callback) {
             let self = this;
             let $modal = $('#' + table + '-select'), $form = $modal.find('#' + table + '-create-form');
             $modal.find('#' + table + '-search-tab').show().tab('show');
-            $modal.find('.framework-filter').val(self.currentFramework);
+            $modal.find('.framework-filter').val(self.framework.id);
             self.showSearchResults(table, '');
             $modal.data('callback', callback);
             $modal.modal('show');
         };
 
 
-        Relation.prototype.createEntry = function(table, callback) {
+        Relation.prototype.newEntry = function(table, callback) {
             let self = this, $modal = $('#' + table + '-select');
             $modal.find('#' + table + '-search-tab').hide();
             $modal.find('#' + table + '-create-tab').tab('show');
-            $modal.find('.framework-filter').val(self.currentFramework);
+            $modal.find('.framework-filter').val(self.framework.id);
             $modal.data('callback', callback);
             $modal.modal('show');
         };
@@ -1682,6 +1924,67 @@
         };
 
 
+        Relation.prototype.visualize = function() {
+            let self = this, canvas = self.canvas;
+            self.syncGraph();
+
+            canvas.strokeColor = 'red';
+            canvas.lineWidth = 4;
+            canvas.fillColor = 'blue';
+
+            //all the visualization objects will have been determined in the relation
+            let objects = self.law.getNodesByConcept('visual');
+            objects.forEach(function(object) {
+                let shapes = object.getChildrenByConcept('shape');
+                shapes.forEach(function(shape) {
+                    let shapeName = shape.getConcept().name, opt = self.getChildTree(shape);
+                    console.log('drawing shape ' + shapeName);
+                    console.info(opt);
+                    switch(shapeName) {
+                        case 'line':
+                            let x1 = null, y1 = null, x2 = null, y2 = null;
+                            if(opt.start) {
+                                if(opt.start.x) x1 = opt.start.x._value;
+                                if(opt.start.y) y1 = opt.start.y._value;
+                            }
+                            if(opt.end) {
+                                if(opt.end.x) x2 = opt.end.x._value;
+                                if(opt.end.y) y2 = opt.end.y._value;
+                            }
+                            if(typeof x1 == 'number' && typeof x2 == 'number' && typeof y1 == 'number' && typeof y2 == 'number') {
+                                canvas.beginPath();
+                                canvas.moveTo(x1, y1);
+                                canvas.lineTo(x2, y2);
+                                canvas.stroke();
+                            }
+                            break;
+                        case 'arrow':
+                            break;
+                        case 'arc':
+                            break;
+                        case 'circle':
+                            break;
+                        case 'triangle':
+                            break;
+                        case 'rectangle':
+                            break;
+                        default: break;
+                    }
+                });
+            });
+        };
+
+
+        Relation.prototype.getChildTree = function(node) {
+            let self = this, opts = {_value: node.getValue()};
+            let children = node.getChildren();
+            children.forEach(function(child) {
+                let concept = child.getConcept();
+                opts[concept.name] = self.getChildTree(child);
+            });
+            return opts;
+        };
+
 
         var relation;
         $(document).ready(function() {
@@ -1689,7 +1992,9 @@
             let self = relation;
 
             self.initDiagram();
-            self.useFramework(self.currentFramework);
+            self.useFramework(self.framework.id);
+
+            self.visualize();
 
             let $hideButton = null;
             $('.entry-modal button[data-dismiss=modal]').click(function(e) {
@@ -1711,6 +2016,8 @@
                 } else if($button.hasClass('modal-save')) {
                     let $form = $this.find('form.entry-form'), arr = $form.serializeArray(), obj = {};
                     for(let i = 0; i < arr.length; i++) obj[arr[i]['name']] = arr[i]['value'];
+                    console.log('saving entry');
+                    console.info(obj);
                     $.ajax({
                         url: "{{=URL('default', 'saveEntry', extension='json')}}",
                         type: 'post',
@@ -1718,7 +2025,7 @@
                         data: JSON.stringify(obj),
                         success: function(data) {
                             if(data.hasOwnProperty('id') && !isNaN(data.id)) {
-                                self.storeEntries(table, data.entry);
+                                self.storeEntries(data);
                                 if(callback) callback.call(self, data.id);
                             }
                         }
@@ -1740,18 +2047,18 @@
             });
 
             $('#framework-set-button').click(function(e) {
-                self.getEntry('framework', function(framework) {
+                self.selectEntry('framework', function(framework) {
                     self.useFramework(framework);
                 });
             });
             $('#law-set-button').click(function(e) {
-                self.getEntry('law', function(law) {
+                self.selectEntry('law', function(law) {
                     self.useLaw(law);
                 });
             });
 
             $('#concept-create-button').click(function(e) {
-                self.createEntry('concept');
+                self.newEntry('concept');
             });
 
             $('.search-field').on('keydown change', function(e) {
@@ -1781,6 +2088,9 @@
             $('#evaluate-relation').click(function(e) {
                 relation.evaluate();
             });
+            $('#visualize-relation').click(function(e) {
+                relation.visualize();
+            })
         });
 
     </script>

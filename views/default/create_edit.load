@@ -38,6 +38,10 @@
         <label for="symmetric">Symmetric</label>
         <input type="checkbox" name="symmetric">
     </div>
+    <div class="concept-inherits form-group">
+        <label for="inherits">Inherits</label>
+        <input type="checkbox" name="inherits">
+    </div>
     <div class="concept-head form-group">
         <label for="head">Head Concept</label>
         <select name="head" select-table="concept">
