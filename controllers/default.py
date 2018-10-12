@@ -227,15 +227,22 @@ def saveRelation():
             law=lawId, concept=node['concept'], node_values=node['values'])
         if nodeId is None:
             nodeId = node['id']
+        else:
+            row = db.node[nodeId]
+            print('Created node: {row}').format(row=row)
         idMap[node['id']] = nodeId
         allNodes[nodeId] = True
 
     print('Keeping nodes: {allNodes}').format(allNodes=allNodes)
 
+    deletedNodes = {}
     for node in db(db.node.law == lawId).iterselect():
         db(db.predicate.node == node.id).delete()
         if node.id not in allNodes:
-            node.delete()
+            deletedNodes[node.id] = True
+            node.delete_record()
+
+    print('Deleted nodes: {deletedNodes}').format(deletedNodes=deletedNodes)
 
     for node in nodes:
         newId = idMap[node['id']]

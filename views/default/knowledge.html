@@ -420,8 +420,8 @@
         };
 
         Node.prototype.getValue = function() {
-            if(this.values && this.values.length == 1 && typeof this.values[0] == 'number')
-                return this.values[0];
+            if(this.values && this.values.values.length == 1)
+                return this.values.values[0];
             return null;
         };
 
@@ -431,7 +431,19 @@
 
         Node.prototype.getReference = function() {
             return this.findEntry(this.table, this.reference);
-        }
+        };
+
+        Node.prototype.setHead = function(id) {
+            let currentHead = this.findEntry('node', this.head);
+            if(currentHead) currentHead.removeChild(this.id);
+            this.head = id;
+            let newHead = this.findEntry('node', this.head);
+            if(newHead) newHead.addChild(this);
+        };
+
+        Node.prototype.setReference = function(id) {
+            this.reference = id;
+        };
 
         Node.prototype.addChild = function(node) {
             this.children[node.getId()] = node;
@@ -456,6 +468,129 @@
 
         Node.prototype.removeChild = function(id) {
             delete this.children[id];
+        };
+
+        Node.prototype.remove = function() {
+            this.setHead(null);
+            if(this.relation) this.relation.removeEntry('node', this.id);
+        };
+
+
+
+        function Value(str) {
+            this.opts = {};
+            this.values = [];
+            if(typeof str == 'string') this.readValue(str);
+        }
+
+        Value.prototype.get = function(key) {
+            return this.opts[key];
+        }
+
+        Value.prototype.set = function(key, val) {
+            this.opts[key] = val;
+        };
+
+        Value.prototype.empty = function() {
+            return this.values.length == 0;
+        };
+
+        Value.prototype.addValue = function(value) {
+            if(value == null) return;
+            if(typeof value == 'object' && value.empty()) return;
+            this.values.push(value);
+        };
+
+        Value.prototype.toString = function() {
+            let str = '', delimStart = '', delimEnd = '';
+            switch(this.get('type')) {
+                case 'tuple':
+                    delimStart = '{';
+                    delimEnd = '}';
+                    break;
+                case 'interval':
+                    delimStart = this.get('include.start') ? '[' : '(';
+                    delimEnd = this.get('include.end') ? ']' : ')';
+                    break;
+                default: break;
+            }
+            str += delimStart;
+            this.values.forEach(function(value) {
+                if(typeof value == 'object')
+                    str += value.toString();
+                else str += value;
+                str += ',';
+            });
+            str = str.substring(0, str.length-1) + delimEnd;
+            return str;
+        };
+
+        Value.prototype.readValue = function(str) {
+            let self = this, arr = str.split(';');
+            arr.forEach(function(str) {
+                if(str == '') return;
+                if(!isNaN(str)) {
+                    self.addValue(parseFloat(str));
+                } else if(str[0] == '{') {
+                    self.readTuple(str);
+                } else if(str[0] == '(' || str[0] == '[') {
+                    self.readInterval(str);
+                }
+            });
+        };
+
+        Value.prototype.readTuple = function(str) {
+            let value = new Value();
+            value.set('type', 'tuple');
+            arr = str.substring(1, str.length-1).split(',');
+            arr.forEach(function(str, i) {
+                value.readValue(str);
+            });
+            this.addValue(value);
+        };
+
+        Value.prototype.readInterval = function(str) {
+            let value = new Value();
+            value.set('type', 'interval');
+            if(str[0] == '(') value.set('include.start', false);
+            else if(str[0] == '[') value.set('include.start', true);
+            if(str[str.length-1] == ')') value.set('include.end', false);
+            else if(str[str.length-1] == ']') value.set('include.end', true);
+            arr = str.substring(1, str.length-1).split(',');
+            value.readValue(arr[0]);
+            value.readValue(arr[1]);
+            this.addValue(value);
+        };
+
+        Value.prototype.includes = function(value) {
+            if(value == null) return false;
+            if(this.get('type') == value.get('type')) {
+                switch(this.get('type')) {
+                    case 'tuple':
+                        let match = this.values.length == value.values.length;
+                        if(match) for(let i = 0; i < this.values.length; i++) {
+                            if(this.values[i] != value.values[i]) match = false;
+                        }
+                        if(match) return true;
+                        break;
+                    case 'interval':
+                        let myStart = this.values[0], otherStart = value.values[0],
+                            myEnd = this.values[1], otherEnd = value.values[1],
+                            myIncludeStart = this.get('include.start'), myIncludeEnd = this.get('include.end'),
+                            otherIncludeStart = value.get('include.start'), otherIncludeEnd = value.get('include.end');
+                        let startIncluded = myStart < otherStart ||
+                            (myStart == otherStart && myIncludeStart || !otherIncludeStart);
+                        let endIncluded = myEnd > otherEnd ||
+                            (myEnd == otherEnd && myIncludeEnd || !otherIncludeEnd);
+                        if(startIncluded && endIncluded) return true;
+                        break;
+                    default: break;
+                }
+            }
+        };
+
+        Value.prototype.intersect = function(value) {
+            return new Value();
         };
 
 
@@ -612,7 +747,8 @@
                             }
                             break;
                         case 'node':
-                            entry.values = self.convertValues(entry.values, 'array');
+                            if(typeof entry.values == 'string') entry.values = new Value(entry.values);
+                            else if(!entry.values) entry.values = new Value();
                             entries[entry.head || 0].children[entry.id] = entry;
                             if(!self.predicates.hasOwnProperty(entry.concept)) self.predicates[entry.concept] = {};
                             self.predicates[entry.concept][entry.id] = true;
@@ -653,6 +789,12 @@
             let self = this, entries = self.getTable(table);
             if(entries && entries.hasOwnProperty(id)) return entries[id];
             return null;
+        };
+
+
+        Relation.prototype.removeEntry = function(table, id) {
+            let self = this, entries = self.getTable(table);
+            if(entries && entries.hasOwnProperty(id)) delete entries[id];
         };
 
 
@@ -810,8 +952,8 @@
                                 let part = obj.part.adornedPart;
                                 if(!(part instanceof go.Node)) return;
                                 let input = prompt("Enter a set of real numbers in interval notation, e.g. [0.5,2];5.7;[3,9);(9,17)");
-                                let values = self.convertValues(input, 'array');
-                                if(values == null) return;
+                                let values = new Value(input);
+                                if(values.empty()) return;
                                 part.data.values = input;
                                 if(self.nodes.hasOwnProperty(part.data.id)) self.nodes[part.data.id].values = values;
                             },
@@ -1003,55 +1145,9 @@
             msg = 'ID: ' + node.id + "\n"
                 + 'Law: ' + lawStr + "\n"
                 + 'Predicates: ' + predicates + "\n"
-                + 'Values: ' + self.convertValues(node.values, 'string') + "\n"
+                + 'Values: ' + node.values.toString() + "\n"
                 + 'Mappings: ' + mappings;
             return msg;
-        };
-
-
-        Relation.prototype.convertValues = function(v, newType) {
-            let self = this, values = null;
-            if(v == null) return null;
-            if(newType == 'array' && typeof v == 'string') {
-                values = [];
-                v = v.replace(new RegExp(' ','g'), '');
-                arr = v.split(';');
-                for(let i = 0; i < arr.length; i++) {
-                    let str = arr[i];
-                    if(str == '') continue;
-                    if(!isNaN(str)) {
-                        values.push(parseFloat(str));
-                        continue;
-                    }
-                    let inc1 = str[0], inc2 = str[str.length-1];
-                    inc1 = inc1 == '[' ? true : inc1 == '(' ? false : inc1;
-                    inc2 = inc2 == '[' ? true : inc2 == '(' ? false : inc2;
-                    if(typeof inc1 != 'boolean' || typeof inc2 != 'boolean') return;
-                    let limits = str.substring(1, str.length-1).split(',');
-                    if(limits.length != 2 || isNaN(limits[0]) || isNaN(limits[1])) return;
-                    let interval = [parseFloat(limit[0]), parseFloat(limits[1])];
-                    if(!inc1 || inc1 != inc2) interval[2] = inc1;
-                    if(inc1 != inc2) interval[3] = inc2;
-                    values.push(interval);
-                }
-            } else if(newType == 'string' && typeof v == 'object') {
-                values = '';
-                v.forEach(function(el, i) {
-                    let str = '';
-                    if(typeof el == 'number') {
-                        str = '' + el;
-                    } else if(typeof el == 'object') {
-                        if(!el.hasOwnProperty(2) || el[2]) str += '[';
-                        else str += '(';
-                        str += '' + el[0] + ',' + el[1];
-                        if(el[2] && !el.hasOwnProperty(3) || el[3]) str += ']';
-                        else str += ')';
-                    }
-                    values += str;
-                    if(i < values.length-1) values += ';'
-                });
-            }
-            return values;
         };
 
 
@@ -1202,7 +1298,7 @@
             delete options.template, options.drawLinks;
 
             let nodeData = Object.assign({}, node, options, template);
-            nodeData.values = self.convertValues(nodeData.values, 'string');
+            nodeData.values = node.values.toString();
             if(!nodeData.hasOwnProperty('loc') && nodeData.head && nodeData.reference
               && self.nodes.hasOwnProperty(nodeData.head) && self.nodes.hasOwnProperty(nodeData.reference)) {
                 let head = self.diagram.model.findNodeDataForKey(nodeData.head),
@@ -1397,7 +1493,7 @@
             self.law.nodes.forEach(function(id) {
                 let node = self.findEntry('node', id);
                 if(node) nodes.push({id: node.id, concept: node.concept, name: node.name, head: node.head,
-                    reference: node.reference, values: self.convertValues(node.values, 'string')});
+                    reference: node.reference, values: node.values.toString()});
             });
             self.predicateSets.forEach(function(pset, i) {
                 for(let node in pset) {
@@ -1421,7 +1517,7 @@
 
 
         Relation.prototype.syncGraph = function() {
-            let self = this;
+            let self = this, graphNodes = [];
             self.diagram.nodes.each(function(node) {
                 let id = parseInt(node.data['id']);
                 let entries = self.getTable('node');
@@ -1430,20 +1526,23 @@
                 entry.id = id;
                 entry.concept = node.data['concept'];
                 entry.name = node.data['name'] || null;
-                entry.head = entry.reference = null;
-                entry.values = node.data['values'] || null;
+                entry.values = new Value(node.data['values']);
                 let head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
-                if(head.count > 0) entry.head = head.first().data['id'];
-                if(reference.count > 0) entry.reference = reference.first().data['id'];
-                entry.values = self.convertValues(entry.values, 'array');
-                if(self.law.nodes.indexOf(id) < 0) self.law.nodes.push(id);
+                head = head.count > 0 ? head.first().data['id'] : null;
+                reference = reference.count > 0 ? reference.first().data['id'] : null;
+                entry.setHead(head);
+                entry.setReference(reference);
+                if(graphNodes.indexOf(id) < 0) graphNodes.push(id);
             });
 
             self.law.nodes.forEach(function(id) {
-                let node = self.nodes[id];
-                self.nodes[node.head || 0].addChild(node);
+                let node = self.findEntry('node', id);
+                if(node && graphNodes.indexOf(id) < 0) {
+                    node.remove();
+                }
             });
+            self.law.nodes = graphNodes;
         };
 
 
@@ -1479,29 +1578,8 @@
         Relation.prototype.evaluate = function() {
 
             $('#evaluate-msg').text('Evaluating...');
-
-            let self = this;
-            self.diagram.nodes.each(function(graphNode) {
-                let data = graphNode.data, id = data.id;
-                if(isNaN(id)) return;
-                id = parseInt(id);
-                if(!self.nodes.hasOwnProperty(id)) self.nodes[id] = {};
-                if(self.myNodes.indexOf(id) < 0) self.myNodes.push(id);
-                let node = self.nodes[id];
-                node.id = id;
-                node.law = self.law.id;
-                node.concept = data.concept;
-                node.head = null;
-                node.reference = null;
-                node.values = self.convertValues(data.values, 'array');
-                let head = graphNode.findNodesInto('T'),
-                    reference = graphNode.findNodesOutOf('T');
-                if(head.count > 0) node.head = head.first().data.id;
-                if(reference.count > 0) node.reference = reference.first().data.id;
-            });
-
+            self.syncGraph();
             self.nodesToCheck = self.myNodes.slice();
-
             while(self.nodesToCheck.length > 0) {
                //find any deep predicate nodes in included frameworks
                //that have the same concept as this node
@@ -1515,7 +1593,6 @@
                    }
                });
             }
-
             $('#evaluate-msg').text('Done evaluating');
         };
 
@@ -1544,7 +1621,7 @@
             }
             //and find the intersection of any values on the two nodes
             let values = null;
-            if(match) values = self.intersectValues(node.values, predicate.values);
+            if(match) values = node.values.intersect(predicate.values);
             if(!match || (values && values.length == 0)) return false;
 
             map.idMap[nodeId] = predicateId;
@@ -1670,64 +1747,6 @@
             map.children = [];
 
             return map;
-        };
-
-
-        Relation.prototype.intersectValues = function(v1, v2) {
-            let self = this;
-
-            let v1all = v1 == null || v1.length == 0,
-                v2all = v2 == null || v2.length == 0;
-            if(v1all && v2all) return null;
-            if(v1all) return v2;
-            if(v2all) return v1;
-
-            let sorted = [];
-            for(let i = 0; i < 2; i++) {
-                let arr = i == 0 ? v1 : v2;
-                if(typeof arr == 'object') arr.forEach(function(el) {
-                    if(typeof el == 'number') {
-                        sorted.push([el, i, true, false]);
-                    } else if(typeof el == 'object') {
-                        sorted.push([el[0], i, el.length > 2 ? el[2] : true, true]);
-                        sorted.push([el[1], i, el.length > 3 ? el[3] : el.length > 2 ? el[2] : true, false]);
-                    }
-                });
-            }
-            sorted.sort(function(a, b) {
-                if(a[0] == b[0]) {
-                    let apos = (a[2] ? 6 : 9) & (a[3] ? 12 : 3),
-                        bpos = (b[2] ? 6 : 9) & (b[3] ? 12 : 3);
-                    return apos < bpos ? -1 : 1;
-                }
-                return a[0] < b[0] ? -1 : 1;
-            });
-
-            let values = [];
-            let inside = [false, false], begin = null;
-            sorted.forEach(function(arr, ind) {
-                let other = (arr[1]+1)%2;
-                if(!arr[3]) {
-                    if(inside[other]) {
-                        if(!inside[arr[1]] && arr[2]) values.push(arr[0]);
-                        if(inside[arr[1]]) {
-                            let interval = [begin[0], arr[0]];
-                            if(!begin[2] || begin[2] != arr[2]) interval[2] = begin[2];
-                            if(begin[2] != arr[2]) interval[3] = arr[2];
-                            values.push(interval);
-                        }
-                    } else {
-                        if(arr[2] && ind < sorted.length-1 && sorted[ind+1][1] == other
-                        && sorted[ind+1][0] == arr[0] && sorted[ind+1][2])
-                            values.push(arr[0]);
-                    }
-                } else {
-                    begin = arr;
-                }
-                inside[arr[1]] = arr[3];
-            });
-
-            return values;
         };
 
 
@@ -1990,13 +2009,13 @@
                     switch(shapeName) {
                         case 'line':
                             let x1 = null, y1 = null, x2 = null, y2 = null;
-                            if(opt.start) {
-                                if(opt.start.x) x1 = opt.start.x._value;
-                                if(opt.start.y) y1 = opt.start.y._value;
+                            if(opt.start && opt.start._value) {
+                                x1 = opt.start._value.values[0];
+                                y1 = opt.start._value.values[1];
                             }
-                            if(opt.end) {
-                                if(opt.end.x) x2 = opt.end.x._value;
-                                if(opt.end.y) y2 = opt.end.y._value;
+                            if(opt.end && opt.end._value) {
+                                x2 = opt.end._value.values[0];
+                                y2 = opt.end._value.values[1];
                             }
                             if(typeof x1 == 'number' && typeof x2 == 'number' && typeof y1 == 'number' && typeof y2 == 'number') {
                                 canvas.beginPath();
