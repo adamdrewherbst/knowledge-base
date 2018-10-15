@@ -12,6 +12,14 @@
     </select>
     {{ pass }}
 
+    {{ if table is 'concept': }}
+    <div class="concept-law-specific form-group">
+        <label for="law_specific">Specific to this law</label>
+        <input type="checkbox" name="law_specific">
+        <input type="hidden" name="law" value="">
+    </div>
+    {{ pass }}
+
     <div class="entry-name form-group">
         <label for="{{=table}}-{{=type}}-name">Name</label>
         <input type="text" name="name" id="{{=table}}-{{=type}}-name" placeholder="Name">

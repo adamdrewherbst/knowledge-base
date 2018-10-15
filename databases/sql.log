@@ -296,3 +296,37 @@ timestamp: 2018-09-27T18:22:28.372813
 ALTER TABLE concept ADD inherits CHAR(1);
 success!
 success!
+timestamp: 2018-10-15T17:40:29.747693
+CREATE TABLE relation(
+    id INT AUTO_INCREMENT NOT NULL,
+    parent INT  , INDEX parent__idx (parent), FOREIGN KEY (parent) REFERENCES relation (id) ON DELETE CASCADE,
+    name VARCHAR(512),
+    description VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-10-15T17:40:29.797733
+CREATE TABLE relation_dependency(
+    id INT AUTO_INCREMENT NOT NULL,
+    relation INT  , INDEX relation__idx (relation), FOREIGN KEY (relation) REFERENCES relation (id) ON DELETE CASCADE,
+    dependency INT  , INDEX dependency__idx (dependency), FOREIGN KEY (dependency) REFERENCES relation (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2018-10-15T17:40:29.846876
+ALTER TABLE concept ADD relation INT  , ADD INDEX relation__idx (relation), ADD FOREIGN KEY (relation) REFERENCES relation (id) ON DELETE CASCADE;
+success!
+timestamp: 2018-10-15T17:40:30.032721
+ALTER TABLE concept DROP COLUMN framework;
+timestamp: 2018-10-15T18:39:28.093012
+ALTER TABLE concept ADD law INT  , ADD INDEX law__idx (law), ADD FOREIGN KEY (law) REFERENCES law (id) ON DELETE CASCADE;
+success!
+timestamp: 2018-10-15T18:39:28.209802
+ALTER TABLE concept DROP COLUMN relation;
+timestamp: 2018-10-15T18:48:31.093971
+ALTER TABLE concept DROP COLUMN relation;
+timestamp: 2018-10-15T18:50:30.427779
+ALTER TABLE concept DROP COLUMN relation;
+timestamp: 2018-10-15T18:52:01.670703
+ALTER TABLE concept DROP COLUMN relation;
+success!

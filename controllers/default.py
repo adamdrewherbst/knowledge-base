@@ -80,7 +80,7 @@ def getEntry(table, data):
             ret['dependencies'][dep.dependency] = True
     elif table == 'concept':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
-            'symmetric': entry.symmetric or False, 'head': entry.head, 'reference': entry.reference, \
+            'law': entry.law, 'symmetric': entry.symmetric or False, 'head': entry.head, 'reference': entry.reference, \
             'symbol': entry.symbol, 'inherits': entry.inherits or False, 'dependencies': {}};
         for dep in db(db.concept_dependency.concept == entry.id).iterselect():
             ret['dependencies'][dep.dependency] = True
@@ -168,6 +168,11 @@ def saveEntry():
     if 'dependencies' in request_vars:
         deps = request_vars['dependencies']
         del request_vars['dependencies']
+
+    if table == 'concept' and 'law_specific' in request_vars:
+        if 'law_specific' is 'off':
+            request_vars['law'] = None
+        del request_vars['law_specific']
 
     if 'id' in request_vars:
         entryId = request_vars['id']
