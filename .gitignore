@@ -4,3 +4,5 @@
 /static/jquery-ui-1.12.1.custom.zip
 /sessions/*
 /errors/*
+/databases/*_relation.table
+/databases/*_relation_dependency.table

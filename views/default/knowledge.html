@@ -475,6 +475,67 @@
             if(this.relation) this.relation.removeEntry('node', this.id);
         };
 
+        Node.prototype.getSymbol = function() {
+            let self = this;
+            if(self.symbol != '') return self.symbol;
+            let commands = self.getConcept().symbol.split(';'), waiting = false;
+            let parents = {'A': self.getHead(), 'B': self.getReference()};
+
+            //the symbol code is a ;-separated list of commands, one for this node and optionally
+            //one to modify the symbol of each parent
+            commands.forEach(function(command) {
+
+                //first see if this command is modifying a parent node
+                let modify = null, invalid = false;
+                nodeNames.forEach(function(name) {
+                    let modifyParent = self.symbol.match(new RegExp('^' + name + "\\s*=\\s*(.*)"));
+                    if(modifyParent.length > 0) {
+                        modify = parents[name];
+                        //make sure the parent node exists
+                        if(modify == null) invalid = true;
+                        command = modifyParent[1];
+                    }
+                });
+                if(invalid) return;
+
+                //then apply the
+                nodeNames.forEach(function(name) {
+                    if(parents[name] == null) return;
+                    let key = '{{' + name + '}}';
+                    if(command.match(key)) {
+                        command.replace(new RegExp(key, 'g'), '{{' + parent.id + '}}');
+                        if(modify) parent.registerSymbol(modify, command);
+                        else parent.registerSymbol(self);
+                    }
+                    if(!modify) self.symbol = command;
+                });
+            });
+            if(!waiting) {
+                for(let node in self.symbolTriggers)
+                    node.updateSymbol(self, self.symbolTriggers[node]);
+                return self.symbol;
+            }
+            return null;
+        };
+
+        Node.prototype.updateSymbol = function(node, data) {
+            if(data) this.symbol = data.replace(new RegExp('{{' + this.id + '}}', 'g'), this.symbol);
+            else this.symbol.replace(new RegExp('{{' + node.id + '}}', 'g'), node.symbol);
+            node.unregisterSymbol(this);
+        };
+
+        Node.prototype.registerSymbol = function(node, data) {
+            this.symbolTriggers[node] = data;
+        };
+        Node.prototype.unregisterSymbol = function(node) {
+            this.symbolTriggers[node] = false;
+        }
+
+        Node.prototype.clearSymbol = function(node) {
+            this.symbol = '';
+            this.symbolTriggers = {};
+        }
+
 
 
         function Value(str) {
@@ -1152,7 +1213,9 @@
             if(mappings == '') mappings = 'none';
             else mappings = "\n" + mappings;
 
-            msg = 'ID: ' + node.id + "\n"
+            msg = node.getSymbol() + "\n";
+
+            msg += 'ID: ' + node.id + "\n"
                 + 'Law: ' + lawStr + "\n"
                 + 'Predicates: ' + predicates + "\n"
                 + 'Values: ' + node.values.toString() + "\n"
@@ -2080,6 +2143,21 @@
                 opts[concept.name] = self.getChildTree(child);
             });
             return opts;
+        };
+
+
+        Relation.prototype.symbolize = function() {
+            let self = this;
+            //go recursively up from each deep node
+            if(!self.law.deepNodes) return;
+            self.law.nodes.forEach(function(id) {
+                let node = self.findEntry('node', id);
+                if(node) node.clearSymbol();
+            });
+            self.law.deepNodes.forEach(function(id) {
+                let node = self.findEntry('node', id);
+                if(node) node.symbolize();
+            });
         };
 
 
