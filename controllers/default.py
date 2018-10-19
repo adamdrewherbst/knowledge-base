@@ -78,6 +78,9 @@ def getEntry(table, data):
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'dependencies': {}}
         for dep in db(db.framework_dependency.framework == entry.id).iterselect():
             ret['dependencies'][dep.dependency] = True
+        #include the visualization and symbolization frameworks by default
+        for framework in db(db.framework.name == 'Visualization' or db.framework.name == 'Symbolization').iterselect():
+            ret['dependencies'][framework.id] = True
     elif table == 'concept':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
             'law': entry.law, 'symmetric': entry.symmetric or False, 'head': entry.head, 'reference': entry.reference, \
@@ -120,6 +123,10 @@ def getFramework(frameworkId):
     frameworks = []
     if frameworkId > 0:
         frameworks.append(frameworkId)
+    else:
+        #include the visualization and symbolization frameworks by default
+        for framework in db(db.framework.name == 'Visualization' or db.framework.name == 'Symbolization').iterselect():
+            frameworks.append(framework.id)
 
     loaded = {}
     while frameworks:
@@ -132,9 +139,9 @@ def getFramework(frameworkId):
             entries['law'][law.id] = getEntry('law', law)
             for node in db(db.node.law == law.id).iterselect():
                 entries['node'][node.id] = getEntry('node', node)
-        for dep in db(db.framework_dependency.framework == fid).iterselect(db.framework_dependency.dependency):
-            if dep.dependency not in loaded:
-                frameworks.append(dep.dependency)
+        for dep in entries['framework'][fid]['dependencies']:
+            if dep not in frameworks and dep not in loaded:
+                frameworks.append(dep)
 
     return entries
 

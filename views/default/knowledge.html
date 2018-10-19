@@ -71,6 +71,14 @@
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'law'}) }}
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'concept'}) }}
 
+        <div id="symbolization">
+            <div id="sybolization-controls">
+                <button id="symbolize-relation" type="button" class="btn btn-primary">Symbolize</button>
+            </div>
+            <div id="symbolization-wrapper">
+            </div>
+        </div>
+
         <div id="visualization">
             <div id="visualization-controls">
                 <button id="visualize-relation" type="button" class="btn btn-primary">Visualize</button>
@@ -245,6 +253,16 @@
             padding: 0 20px;
         }
 
+
+        #symbolization {
+        }
+        #symbolization-controls {
+            margin: 20px 0;
+        }
+        #symbolization-wrapper {
+            width: 100%;
+            text-align: center;
+        }
 
         #visualization {
         }
@@ -2135,6 +2153,48 @@
         };
 
 
+        Relation.prototype.symbolize = function() {
+            let self = this;
+            let symbols = [{}, {}];
+            if(self.law.rootNodes) {
+                self.law.rootNodes.forEach(function(id) {
+                    symbols[0][id] = true;
+                });
+            }
+            if(self.law.deepNodes) {
+                self.law.deepNodes.forEach(function(id) {
+                    symbols[1][id] = true;
+                });
+            }
+            $('#symbolization-wrapper').children().remove();
+            let ops = [
+                {op: 'name', el: 'mi'},
+                {op: 'over', el: 'mover'},
+                {op: 'sub', el: 'msub'},
+                {op: 'sup', el: 'msup'}
+            ];
+            for(let type = 0; type < symbols.length; type++) {
+                for(let id in symbols[type]) {
+                    let symbolRoot = self.findEntry('node', id), opts = self.getChildTree(symbolRoot), symbol = '';
+                    ops.forEach(function(op) {
+                        if(opts.hasOwnProperty(op.op)) {
+                            symbol = '<' + op.el + '>' + symbol + opts[op.op]._value + '</' + op.el + '>';
+                        }
+                    });
+                    $('#symbolization-wrapper').append('<p><math>' + symbol + '</math></p>');
+                }
+            }
+        };
+
+
+        Node.prototype.mapChildTree = function(mapFunction) {
+            for(let child in this.children) {
+                child.mapChildTree(mapFunction);
+            }
+            return mapFunction.call(this);
+        };
+
+
         Relation.prototype.getChildTree = function(node) {
             let self = this, opts = {_value: node.getValue()};
             let children = node.getChildren();
@@ -2143,21 +2203,6 @@
                 opts[concept.name] = self.getChildTree(child);
             });
             return opts;
-        };
-
-
-        Relation.prototype.symbolize = function() {
-            let self = this;
-            //go recursively up from each deep node
-            if(!self.law.deepNodes) return;
-            self.law.nodes.forEach(function(id) {
-                let node = self.findEntry('node', id);
-                if(node) node.clearSymbol();
-            });
-            self.law.deepNodes.forEach(function(id) {
-                let node = self.findEntry('node', id);
-                if(node) node.symbolize();
-            });
         };
 
 
@@ -2298,6 +2343,9 @@
             });
             $('#visualize-relation').click(function(e) {
                 relation.visualize();
+            })
+            $('#symbolize-relation').click(function(e) {
+                relation.symbolize();
             })
         });
 
