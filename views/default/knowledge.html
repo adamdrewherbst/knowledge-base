@@ -605,7 +605,7 @@
         };
 
         Value.prototype.readValue = function(str) {
-            let self = this, arr = str.split(';');
+            let self = this, arr = str.split(',');
             arr.forEach(function(str) {
                 if(str == '') return;
                 if(!isNaN(str)) {
@@ -614,6 +614,8 @@
                     self.readTuple(str);
                 } else if(str[0] == '(' || str[0] == '[') {
                     self.readInterval(str);
+                } else {
+                    self.addValue(str);
                 }
             });
         };
@@ -2153,37 +2155,92 @@
         };
 
 
+        Node.prototype.initSymbol = function() {
+            let self = this;
+            let symbol = self.getConcept().symbol, commands = symbol.split("\n");
+            let head = self.getHead(), ref = self.getReference(), children = self.getChildren();
+            commands.forEach(function(command) {
+                let dep = command.match(/\s*^{{([^{}]+)}}\s*:\s*{{([^{}]+)}}(.+)$/);
+                if(!dep || dep.length < 3) return;
+                let nodes = [];
+                for(let i = 0; i <= 1; i++) {
+                    switch(dep[i+1][0]) {
+                        case 'A': //head
+                            nodes[i] = [head];
+                            break;
+                        case 'B': //reference
+                            nodes[i] = [reference];
+                            break;
+                        case 'C':
+                            nodes[i] = children;
+                            break;
+                        case 'S':
+                            nodes[i] = [self];
+                            break;
+                        default: return;
+                    }
+                }
+                nodes[0].forEach(function(target) {
+                    nodes[1].forEach(function(source) {
+                        source.trigger.symbol[target] = dep[3];
+                        target.waiting.symbol[source] = dep[3];
+                    });
+                });
+            });
+        };
+
+
         Relation.prototype.symbolize = function() {
             let self = this;
-            let symbols = [{}, {}];
-            if(self.law.rootNodes) {
-                self.law.rootNodes.forEach(function(id) {
-                    symbols[0][id] = true;
+            //determine what nodes each node's symbol depends on
+            self.law.nodes.forEach(function(id) {
+                self.nodes[id].trigger.symbol = {};
+                self.nodes[id].waiting.symbol = {};
+            });
+            self.law.nodes.forEach(function(id) {
+                self.nodes[id].initSymbol();
+            });
+            do {
+                //start from nodes with no dependencies
+                self.law.nodes.forEach(function(id) {
+                    if(Object.keys(self.nodes[id].waiting.symbol).length == 0) {
+
+                    }
                 });
             }
-            if(self.law.deepNodes) {
-                self.law.deepNodes.forEach(function(id) {
-                    symbols[1][id] = true;
-                });
-            }
+        };
+
+
+        Relation.prototype.symbolize2 = function() {
+            let self = this;
             $('#symbolization-wrapper').children().remove();
             let ops = [
-                {op: 'name', el: 'mi'},
-                {op: 'over', el: 'mover'},
-                {op: 'sub', el: 'msub'},
-                {op: 'sup', el: 'msup'}
+                {op: 'name', outer: 'mi'},
+                {op: 'over', outer: 'mover', inner: 'mo'},
+                {op: 'sub', outer: 'msub', inner: 'mi'},
+                {op: 'sup', outer: 'msup', inner: 'mi'}
             ];
-            for(let type = 0; type < symbols.length; type++) {
-                for(let id in symbols[type]) {
-                    let symbolRoot = self.findEntry('node', id), opts = self.getChildTree(symbolRoot), symbol = '';
-                    ops.forEach(function(op) {
-                        if(opts.hasOwnProperty(op.op)) {
-                            symbol = '<' + op.el + '>' + symbol + opts[op.op]._value + '</' + op.el + '>';
-                        }
-                    });
-                    $('#symbolization-wrapper').append('<p><math>' + symbol + '</math></p>');
+            let symbols = self.law.getNodesByConcept('symbol');
+            symbols.forEach(function(symbolNode) {
+                //start with the default symbol of the parent node
+                let symbol = '', head = symbolNode.getHead();
+                if(head) {
+                    let conceptSymbol = head.getConcept().symbol;
+                    if(conceptSymbol) symbol = '<mi>' + conceptSymbol + '</mi>';
                 }
-            }
+                //and add all modifications according to the symbol node subtree
+                let opts = self.getChildTree(symbolNode);
+                ops.forEach(function(op) {
+                    if(opts.hasOwnProperty(op.op)) {
+                        let html = '';
+                        if(op.inner && opts[op.op]._value) html = '<' + op.inner + '>' + opts[op.op]._value + '</' + op.inner + '>';
+                        html = symbol + html;
+                        if(op.outer) html = '<' + op.outer + '>' + html + '</' + op.outer + '>';
+                        symbol = html;
+                    }
+                });
+                $('#symbolization-wrapper').append('<p><math scriptlevel="-3">' + symbol + '</math></p>');
+            });
         };
 
 

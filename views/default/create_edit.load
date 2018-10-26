@@ -42,6 +42,10 @@
     </div>
 
     {{ elif table == 'concept': }}
+    <div class="concept-symbol form-group">
+        <label for="symbol">Symbol</label>
+        <input type="text" name="symbol">
+    </div>
     <div class="concept-symmetric form-group">
         <label for="symmetric">Symmetric</label>
         <input type="checkbox" name="symmetric">

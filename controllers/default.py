@@ -79,7 +79,7 @@ def getEntry(table, data):
         for dep in db(db.framework_dependency.framework == entry.id).iterselect():
             ret['dependencies'][dep.dependency] = True
         #include the visualization and symbolization frameworks by default
-        for framework in db(db.framework.name == 'Visualization' or db.framework.name == 'Symbolization').iterselect():
+        for framework in db((db.framework.name == 'Visualization') | (db.framework.name == 'Symbolization')).iterselect():
             ret['dependencies'][framework.id] = True
     elif table == 'concept':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
@@ -125,7 +125,7 @@ def getFramework(frameworkId):
         frameworks.append(frameworkId)
     else:
         #include the visualization and symbolization frameworks by default
-        for framework in db(db.framework.name == 'Visualization' or db.framework.name == 'Symbolization').iterselect():
+        for framework in db((db.framework.name == 'Visualization') | (db.framework.name == 'Symbolization')).iterselect():
             frameworks.append(framework.id)
 
     loaded = {}
