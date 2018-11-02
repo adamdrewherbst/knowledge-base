@@ -44,7 +44,7 @@
     {{ elif table == 'concept': }}
     <div class="concept-symbol form-group">
         <label for="symbol">Symbol</label>
-        <input type="text" name="symbol">
+        <textarea name="symbol" placeholder="Enter symbol commands here..." rows="3"></textarea>
     </div>
     <div class="concept-symmetric form-group">
         <label for="symmetric">Symmetric</label>

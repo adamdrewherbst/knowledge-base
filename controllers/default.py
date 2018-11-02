@@ -177,7 +177,7 @@ def saveEntry():
         del request_vars['dependencies']
 
     if table == 'concept' and 'law_specific' in request_vars:
-        if 'law_specific' is 'off':
+        if 'law_specific' is not 'on':
             request_vars['law'] = None
         del request_vars['law_specific']
 

@@ -398,6 +398,29 @@
             return false;
         };
 
+        Concept.prototype.getAllConcepts = function(obj) {
+            let self = this;
+            if(!obj) obj = {};
+            if(obj.hasOwnProperty(self.id)) return;
+            obj[self.id] = self;
+            for(let id in this.dependencies) {
+                let concept = this.findEntry('concept', id);
+                if(concept) concept.getAllConcepts(obj);
+            }
+            return obj;
+        };
+
+        //compile symbols of this concept and all dependencies into one
+        Concept.prototype.getCommands = function(type) {
+            let self = this, str = self[type], commands = [];
+            let concepts = self.getAllConcepts();
+            for(let id in concepts) {
+                let str = concepts[id][type];
+                if(str) commands = commands.concat(str.trim().split("\n"));
+            }
+            return commands;
+        };
+
 
         function Law() {
             this.nodes = [];
@@ -406,6 +429,15 @@
         Law.prototype = Object.create(Entry.prototype);
         Law.prototype.constructor = Law;
         Law.prototype.table = 'law';
+
+        Law.prototype.eachNode = function(callback) {
+            let self = this;
+            self.nodes.forEach(function(id) {
+                let node = self.findEntry('node', id);
+                if(!node) return;
+                callback.call(node, node);
+            });
+        };
 
         Law.prototype.getNodesByConcept = function(concept) {
             let nodes = [], self = this;
@@ -420,9 +452,44 @@
             return nodes;
         };
 
+        Law.prototype.propagateData = function(type) {
+            let self = this;
+            //determine what nodes each node's data depends on
+            self.eachNode(function(node) {
+                node.initData(type);
+            });
+            self.eachNode(function(node) {
+                node.setupData(type);
+            });
+            let count = 0;
+            do {
+                //find all nodes that have now had their dependencies resolved,
+                //and pass their data to their dependents in turn
+                count = 0;
+                self.eachNode(function(node) {
+                    let data = node.data[type];
+                    if(data.known) return;
+                    if(Object.getOwnPropertyNames(data.waiting).length == 0) {
+                        count++;
+                        data.known = true;
+                        for(let id in data.trigger) {
+                            data.trigger[id].resolveDataDependency(type, node);
+                        }
+                    }
+                });
+            } while(count > 0);
+        };
+
 
         function Node() {
-            this.children = {};
+            let self = this;
+            self.children = {};
+            self.symbol = new Symbol();
+            self.value = new Value();
+            self.data = {
+                'symbol': self.symbol,
+                'value': self.value
+            }
         }
 
         Node.prototype = Object.create(Entry.prototype);
@@ -493,66 +560,129 @@
             if(this.relation) this.relation.removeEntry('node', this.id);
         };
 
-        Node.prototype.getSymbol = function() {
-            let self = this;
-            if(self.symbol != '') return self.symbol;
-            let commands = self.getConcept().symbol.split(';'), waiting = false;
-            let parents = {'A': self.getHead(), 'B': self.getReference()};
-
-            //the symbol code is a ;-separated list of commands, one for this node and optionally
-            //one to modify the symbol of each parent
-            commands.forEach(function(command) {
-
-                //first see if this command is modifying a parent node
-                let modify = null, invalid = false;
-                nodeNames.forEach(function(name) {
-                    let modifyParent = self.symbol.match(new RegExp('^' + name + "\\s*=\\s*(.*)"));
-                    if(modifyParent.length > 0) {
-                        modify = parents[name];
-                        //make sure the parent node exists
-                        if(modify == null) invalid = true;
-                        command = modifyParent[1];
+        //use string shorthand to find connected nodes, eg. C.C means all my childrens' children
+        //or H.R means my head's reference
+        Node.prototype.getConnectedNodes = function(str) {
+            let chain = str.split('.'), nodes = [this];
+            chain.forEach(function(name) {
+                let arr = [];
+                nodes.forEach(function(node) {
+                    switch(name[0]) {
+                        case 'S': arr.push(node); break;
+                        case 'A': arr.push(node.getHead()); break;
+                        case 'B': arr.push(node.getReference()); break;
+                        case 'C': arr = arr.concat(node.getChildren()); break;
+                        default: break;
                     }
                 });
-                if(invalid) return;
+                nodes = arr;
+            });
+            return nodes;
+        };
 
-                //then apply the
-                nodeNames.forEach(function(name) {
-                    if(parents[name] == null) return;
-                    let key = '{{' + name + '}}';
-                    if(command.match(key)) {
-                        command.replace(new RegExp(key, 'g'), '{{' + parent.id + '}}');
-                        if(modify) parent.registerSymbol(modify, command);
-                        else parent.registerSymbol(self);
+        Node.prototype.initData = function(type) {
+            let self = this, data = self.data[type];
+            data.waiting = {};
+            data.trigger = {};
+            data.blocks = {};
+            data.known = false;
+
+            switch(type) {
+                case 'symbol':
+                    if(self.name) data.blocks['text'] = [{text: self.name, args: []}];
+                    break;
+            }
+        };
+
+        Node.prototype.setupData = function(type) {
+            let self = this, input = null;
+            let commands = self.getConcept().getCommands(type);
+            commands.forEach(function(command) {
+                let match = command.match(new RegExp("^\\s*(?:\{\{([^}{]+)\}\}\\s*:\\s*)*(.*)"));
+                if(!match || match.length < 3) return;
+                let targetName = match[1] || 'S', args = match[2].split(' '), block = args.shift();
+
+                let targets = self.getConnectedNodes(targetName);
+                targets.forEach(function(target) {
+                    let regex = new RegExp("\{\{([^}{])\}\}", 'g'), arr = [], sources = [], text = block;
+                    while((arr = regex.exec(block)) !== null) {
+                        let source = target.getConnectedNodes(arr[1])[0];
+                        if(!source) continue;
+                        if(sources.indexOf(source) < 0) sources.push(source);
+                        text = text.replace("\{\{" + arr[1] + "\}\}", "\{\{" + source.id + "\}\}");
                     }
-                    if(!modify) self.symbol = command;
+                    if(args.length == 0) args[0] = 'text';
+                    target.createDataDependency(type, sources, text, args);
                 });
             });
-            if(!waiting) {
-                for(let node in self.symbolTriggers)
-                    node.updateSymbol(self, self.symbolTriggers[node]);
-                return self.symbol;
+        };
+
+        Node.prototype.createDataDependency = function(type, sources, text, args) {
+            let self = this, data = self.data[type];
+            let blockType = args.shift();
+            if(!blockType || blockType.trim() == '') return;
+            if(!data.blocks.hasOwnProperty(blockType)) data.blocks[blockType] = [];
+            if(blockType == 'text' && data.blocks[blockType].length > 0) return;
+            data.blocks[blockType].push({text: text, args: args});
+            let blockId = data.blocks[blockType].length - 1;
+            sources.forEach(function(source) {
+                let sourceId = source.id;
+                if(!data.waiting.hasOwnProperty(sourceId)) data.waiting[sourceId] = {};
+                if(!data.waiting[sourceId].hasOwnProperty(blockType)) data.waiting[sourceId][blockType] = {};
+                data.waiting[sourceId][blockType][blockId] = true;
+                source.data[type].trigger[self.id] = self;
+            })
+        };
+
+        Node.prototype.resolveDataDependency = function(type, node) {
+            let self = this, data = self.data[type];
+            for(let blockType in data.waiting[node.id]) {
+                for(let blockId in data.waiting[node.id][blockType]) {
+                    let block = data.blocks[blockType][blockId];
+                    block.text = block.text.replace("\{\{" + node.id + "\}\}", node.data[type].toString());
+                }
             }
-            return null;
+            delete data.waiting[node.id];
+            delete node.data[type].trigger[self.id];
         };
 
-        Node.prototype.updateSymbol = function(node, data) {
-            if(data) this.symbol = data.replace(new RegExp('{{' + this.id + '}}', 'g'), this.symbol);
-            else this.symbol.replace(new RegExp('{{' + node.id + '}}', 'g'), node.symbol);
-            node.unregisterSymbol(this);
-        };
 
-        Node.prototype.registerSymbol = function(node, data) {
-            this.symbolTriggers[node] = data;
-        };
-        Node.prototype.unregisterSymbol = function(node) {
-            this.symbolTriggers[node] = false;
+        function Symbol() {
         }
 
-        Node.prototype.clearSymbol = function(node) {
-            this.symbol = '';
-            this.symbolTriggers = {};
-        }
+        Symbol.prototype.toString = function() {
+            let self = this;
+            let types = ['text', 'over', 'sub', 'super', 'arg'];
+            types.forEach(function(type) {
+                if(!self.blocks.hasOwnProperty(type) || self.blocks[type].length < 1) return;
+                let str = '';
+                for(let id in self.blocks[type]) {
+                    let block = self.blocks[type][id];
+                    str += block.text + ',';
+                }
+                str = str.substring(0, str.length-1);
+                str = '<mrow>' + str + '</mrow>';
+                switch(type) {
+                    case 'text':
+                        self.text = str;
+                        break;
+                    case 'over':
+                        self.text = '<mover>' + self.text + str + '</mover>';
+                        break;
+                    case 'sub':
+                        self.text = '<msub>' + self.text + str + '</msub>';
+                        break;
+                    case 'super':
+                        self.text = '<msup>' + self.text + str + '</msup>';
+                        break;
+                    case 'arg':
+                        self.text += '<mrow>' + self.text + '<mfenced>' + str + '</mfenced></mrow>';
+                        break;
+                    default: break;
+                }
+            });
+            return self.text;
+        };
 
 
 
@@ -928,14 +1058,20 @@
             });
 
             function onSelectionChanged(e) {
-                var node = e.diagram.selection.first();
-                if (!(node instanceof go.Node)) return;
-                var data = node.data;
+                var graphNode = e.diagram.selection.first();
+                if (!(graphNode instanceof go.Node)) return;
+                var data = graphNode.data;
                 var title = document.getElementById('node-title');
                 var description = document.getElementById('node-description');
 
+                let node = self.findEntry('node', data.id);
+                if(!node) return;
+
                 title.textContent = "Node Info";
-                description.innerHTML = self.getNodeString(data.id).replace(new RegExp("\n", 'g'), "<br>");
+                description.innerHTML = self.getNodeString(node.id).replace(new RegExp("\n", 'g'), "<br>");
+
+                if(node.symbol.known)
+                    $('#symbolization-wrapper').html('<p><math display="block" scriptlevel="-3">' + node.symbol.toString() + '</math></p>');
             }
 
             // dragging a node invalidates the Diagram.layout, causing a layout during the drag
@@ -1233,9 +1369,7 @@
             if(mappings == '') mappings = 'none';
             else mappings = "\n" + mappings;
 
-            msg = node.getSymbol() + "\n";
-
-            msg += 'ID: ' + node.id + "\n"
+            msg = 'ID: ' + node.id + "\n"
                 + 'Law: ' + lawStr + "\n"
                 + 'Predicates: ' + predicates + "\n"
                 + 'Values: ' + node.values.toString() + "\n"
@@ -2025,6 +2159,7 @@
             if(table == 'concept') {
                 $form.find('[name="law_specific"]').attr('checked', entry.law > 0);
                 $form.find('[name="law"]').val(self.law.id);
+                $form.find('[name="symbol"]').val(entry.symbol);
                 $form.find('[name="symmetric"]').attr('checked', entry.symmetric);
                 $form.find('[name="head"]').val(entry.head);
                 $form.find('[name="reference"]').val(entry.reference);
@@ -2155,100 +2290,16 @@
         };
 
 
-        Node.prototype.initSymbol = function() {
-            let self = this;
-            let symbol = self.getConcept().symbol, commands = symbol.split("\n");
-            let head = self.getHead(), ref = self.getReference(), children = self.getChildren();
-            commands.forEach(function(command) {
-                let dep = command.match(/\s*^{{([^{}]+)}}\s*:\s*{{([^{}]+)}}(.+)$/);
-                if(!dep || dep.length < 3) return;
-                let nodes = [];
-                for(let i = 0; i <= 1; i++) {
-                    switch(dep[i+1][0]) {
-                        case 'A': //head
-                            nodes[i] = [head];
-                            break;
-                        case 'B': //reference
-                            nodes[i] = [reference];
-                            break;
-                        case 'C':
-                            nodes[i] = children;
-                            break;
-                        case 'S':
-                            nodes[i] = [self];
-                            break;
-                        default: return;
-                    }
-                }
-                nodes[0].forEach(function(target) {
-                    nodes[1].forEach(function(source) {
-                        source.trigger.symbol[target] = dep[3];
-                        target.waiting.symbol[source] = dep[3];
-                    });
-                });
-            });
-        };
-
-
         Relation.prototype.symbolize = function() {
             let self = this;
-            //determine what nodes each node's symbol depends on
-            self.law.nodes.forEach(function(id) {
-                self.nodes[id].trigger.symbol = {};
-                self.nodes[id].waiting.symbol = {};
+            self.law.propagateData('symbol');
+            self.law.deepNodes.forEach(function(id) {
+                let node = self.nodes[id];
+/*                if(node.symbol.known) {
+                    let symbol = '<p><math scriptlevel="-3">' + node.symbol.toString() + '</math></p>';
+                    $('#symbolization-wrapper').append(symbol);
+                }//*/
             });
-            self.law.nodes.forEach(function(id) {
-                self.nodes[id].initSymbol();
-            });
-            do {
-                //start from nodes with no dependencies
-                self.law.nodes.forEach(function(id) {
-                    if(Object.keys(self.nodes[id].waiting.symbol).length == 0) {
-
-                    }
-                });
-            }
-        };
-
-
-        Relation.prototype.symbolize2 = function() {
-            let self = this;
-            $('#symbolization-wrapper').children().remove();
-            let ops = [
-                {op: 'name', outer: 'mi'},
-                {op: 'over', outer: 'mover', inner: 'mo'},
-                {op: 'sub', outer: 'msub', inner: 'mi'},
-                {op: 'sup', outer: 'msup', inner: 'mi'}
-            ];
-            let symbols = self.law.getNodesByConcept('symbol');
-            symbols.forEach(function(symbolNode) {
-                //start with the default symbol of the parent node
-                let symbol = '', head = symbolNode.getHead();
-                if(head) {
-                    let conceptSymbol = head.getConcept().symbol;
-                    if(conceptSymbol) symbol = '<mi>' + conceptSymbol + '</mi>';
-                }
-                //and add all modifications according to the symbol node subtree
-                let opts = self.getChildTree(symbolNode);
-                ops.forEach(function(op) {
-                    if(opts.hasOwnProperty(op.op)) {
-                        let html = '';
-                        if(op.inner && opts[op.op]._value) html = '<' + op.inner + '>' + opts[op.op]._value + '</' + op.inner + '>';
-                        html = symbol + html;
-                        if(op.outer) html = '<' + op.outer + '>' + html + '</' + op.outer + '>';
-                        symbol = html;
-                    }
-                });
-                $('#symbolization-wrapper').append('<p><math scriptlevel="-3">' + symbol + '</math></p>');
-            });
-        };
-
-
-        Node.prototype.mapChildTree = function(mapFunction) {
-            for(let child in this.children) {
-                child.mapChildTree(mapFunction);
-            }
-            return mapFunction.call(this);
         };
 
 
