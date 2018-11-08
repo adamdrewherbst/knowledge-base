@@ -235,8 +235,12 @@ def saveRelation():
     idMap = {None: None}
     allNodes = {}
     for node in nodes:
+        nodeName = None
+        if 'name' in node:
+            nodeName = node['name']
         nodeId = db.node.update_or_insert(db.node.id == node['id'],
-            law=lawId, concept=node['concept'], node_values=node['values'])
+            law=lawId, concept=node['concept'], node_values=node['values'],
+            name=nodeName, head=None, reference=None)
         if nodeId is None:
             nodeId = node['id']
         else:
