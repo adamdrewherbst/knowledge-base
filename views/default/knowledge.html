@@ -599,7 +599,14 @@
 
             switch(type) {
                 case 'symbol':
-                    if(self.name) data.blocks['text'] = [{text: self.name, args: []}];
+                    if(self.name) {
+                        data.blocks['text'] = [{text: self.name}];
+                    }
+                    break;
+                case 'value':
+                    if(self.getValue() !== null) {
+                        data.blocks['text'] = [{text: '' + self.getValue()}];
+                    }
                     break;
             }
         };
@@ -651,11 +658,15 @@
             for(let blockType in data.waiting[node.id]) {
                 for(let blockId in data.waiting[node.id][blockType]) {
                     let block = data.blocks[blockType][blockId], text = node.data[type].toString();
-                    if(type == 'symbol') {
-                        let op = self.getConcept().getOperationIndex(), nodeOp = node.getConcept().getOperationIndex();
-                        if(op >= 0 && nodeOp >= 0 && op < nodeOp) {
-                            text = '<mfenced>' + text + '</mfenced>';
-                        }
+                    switch(type) {
+                        case 'symbol': {
+                            let op = self.getConcept().getOperationIndex(), nodeOp = node.getConcept().getOperationIndex();
+                            if(op >= 0 && nodeOp >= 0 && op < nodeOp) {
+                                text = '<mfenced>' + text + '</mfenced>';
+                            }
+                        } break;
+                        case 'value':
+                            break;
                     }
                     block.text = block.text.replace("\{\{" + node.id + "\}\}", text);
                 }
@@ -729,6 +740,25 @@
         };
 
         Value.prototype.toString = function() {
+            let self = this, text = self.blocks['text'][0];
+            let arr = text.split(/\s+/);
+            let ops = ['^', '*', '/', '+', '-'];
+            let str = '';
+            if(!isNaN(arr[0]) && ops.indexOf(arr[1]) >= 0 && !isNaN(arr[2])) {
+                let a = parseFloat(arr[0]), b = parseFloat(arr[2]), c = null;
+                switch(arr[1]) {
+                    case '^': c = Math.pow(a, b); break;
+                    case '*': c = a * b; break;
+                    case '/': c = a / b; break;
+                    case '+': c = a + b; break;
+                    case '-': c = a - b; break;
+                }
+                if(typeof c === 'number') str = '' + c;
+            }
+            return str;
+        };
+
+        Value.prototype.writeValue = function() {
             let str = '', delimStart = '', delimEnd = '';
             switch(this.get('type')) {
                 case 'tuple':
@@ -744,7 +774,7 @@
             str += delimStart;
             this.values.forEach(function(value) {
                 if(typeof value == 'object')
-                    str += value.toString();
+                    str += value.writeValue();
                 else str += value;
                 str += ',';
             });
@@ -998,17 +1028,20 @@
         }
 
 
-        Relation.prototype.createEntry = function(table) {
+        Relation.prototype.createEntry = function(table, data) {
             let self = this, entry = null;
             switch(table) {
-                case 'framework': entry = new Framework(); break;
-                case 'law': entry = new Law(); break;
-                case 'concept': entry = new Concept(); break;
-                case 'node': entry = new Node(); break;
+                case 'framework': entry = new Framework(data); break;
+                case 'law': entry = new Law(data); break;
+                case 'concept': entry = new Concept(data); break;
+                case 'node': entry = new Node(data); break;
                 default: break;
             }
             if(entry) {
                 entry.relation = self;
+                if(typeof data == 'object') {
+                    for(let key in data) entry[key] = data[key];
+                }
             }
             return entry;
         };
@@ -1088,7 +1121,7 @@
                 title.textContent = "Node Info";
                 description.innerHTML = self.getNodeString(node.id).replace(new RegExp("\n", 'g'), "<br>");
 
-                if(node.symbol.known)
+                if(node.symbol && node.symbol.known)
                     $('#symbolization-wrapper').html('<p><math display="block" scriptlevel="-3">' + node.symbol.toString() + '</math></p>');
             }
 
@@ -1544,12 +1577,14 @@
             delete options.template, options.drawLinks;
 
             let nodeData = Object.assign({}, node, options, template);
-            nodeData.values = node.values.toString();
-            if(!nodeData.hasOwnProperty('loc') && nodeData.head && nodeData.reference
-              && self.nodes.hasOwnProperty(nodeData.head) && self.nodes.hasOwnProperty(nodeData.reference)) {
-                let head = self.diagram.model.findNodeDataForKey(nodeData.head),
-                    reference = self.diagram.model.findNodeDataForKey(nodeData.reference);
-                let headLoc = head.loc.split(' '), refLoc = reference.loc.split(' ');
+            nodeData.values = node.values.writeValue();
+            if(!nodeData.hasOwnProperty('loc') && nodeData.head && self.nodes.hasOwnProperty(nodeData.head)) {
+                let head = self.diagram.model.findNodeDataForKey(nodeData.head), headLoc = head.loc.split(' '), refLoc = null;
+                if(nodeData.reference) {
+                    let reference = self.diagram.model.findNodeDataForKey(nodeData.reference);
+                    let refLoc = reference.loc.split(' ');
+                }
+                if(!refLoc) refLoc = headLoc;
                 let x = (parseFloat(headLoc[0]) + parseFloat(refLoc[0])) / 2,
                     y = Math.max(parseFloat(headLoc[1]), parseFloat(refLoc[1])) + 75;
                 nodeData.loc = '' + x + ' ' + y;
@@ -1739,7 +1774,7 @@
             self.law.nodes.forEach(function(id) {
                 let node = self.findEntry('node', id);
                 if(node) nodes.push({id: node.id, concept: node.concept, name: node.name, head: node.head,
-                    reference: node.reference, values: node.values.toString()});
+                    reference: node.reference, values: node.values.writeValue()});
             });
             self.predicateSets.forEach(function(pset, i) {
                 for(let node in pset) {
@@ -1825,6 +1860,7 @@
         Relation.prototype.evaluate = function(opts) {
 
             let self = this;
+            if(!opts) opts = {};
 
             $('#evaluate-msg').text('Evaluating...');
             self.syncGraph();
@@ -1840,8 +1876,9 @@
                        let predicateNode = self.nodes[predicateId];
                        if(node.law == predicateNode.law) continue;
                        let law = self.findEntry('law', predicateNode.law);
-                       console.log('concept matches ' + predicateId + ' in ' + law.name + ' [' + law.id + ']');
                        if(opts.frameworks && opts.frameworks.indexOf(law.framework) < 0) continue;
+                       if(opts.useLaw && !opts.useLaw.call(self, law)) continue;
+                       console.log('node ' + nodeId + ' matches ' + predicateId + ' in ' + law.name + ' [' + law.id + ']');
                        self.checkPredicate(nodeId, predicateId);
                    }
                }
@@ -1928,22 +1965,7 @@
                 });
                 if(satisfied) console.log('   satisfied');
                 maps.forEach(function(map) {
-                    let count = 0, id = self.nextMapId;
-                    for(let n in map.idMap) {
-                        let p = map.idMap[n];
-                        if(!self.nodeMap.hasOwnProperty(n)) self.nodeMap[n] = {};
-                        if(!self.nodeMap[n].hasOwnProperty(p)) self.nodeMap[n][p] = {};
-                        if(!self.nodeMap.hasOwnProperty(p)) self.nodeMap[p] = {};
-                        if(!self.nodeMap[p].hasOwnProperty(n)) self.nodeMap[p][n] = {};
-                        self.nodeMap[n][p][id] = 1;
-                        self.nodeMap[p][n][id] = 1;
-                        count++;
-                    }
-                    if(count > 0) {
-                        map.id = id;
-                        self.map[self.nextMapId++] = map;
-                        newMaps++;
-                    }
+                    if(!self.includeMap(map)) return;
                     if(satisfied) {
                         self.appendLaw(map);
                     } else {
@@ -1954,6 +1976,26 @@
                 });
             }
             return true;
+        };
+
+
+        Relation.prototype.includeMap = function(map) {
+            let self = this, count = 0, id = self.nextMapId;
+            for(let n in map.idMap) {
+                let p = map.idMap[n];
+                if(!self.nodeMap.hasOwnProperty(n)) self.nodeMap[n] = {};
+                if(!self.nodeMap[n].hasOwnProperty(p)) self.nodeMap[n][p] = {};
+                if(!self.nodeMap.hasOwnProperty(p)) self.nodeMap[p] = {};
+                if(!self.nodeMap[p].hasOwnProperty(n)) self.nodeMap[p][n] = {};
+                self.nodeMap[n][p][id] = true;
+                count++;
+            }
+            if(count > 0) {
+                map.id = id;
+                self.map[self.nextMapId++] = map;
+                return true;
+            }
+            return false;
         };
 
 
@@ -2051,7 +2093,7 @@
 
             //at this point they do intersect, so create a new map by merging these two
             let map = self.mergeMaps(map1, map2);
-            self.map[self.nextMapId++] = map;
+            if(!self.includeMap(map)) return false;
 
             //if the law has been satisfied, use the map to append the knowledge of the law to our relation
             if(match) {
@@ -2074,8 +2116,12 @@
 
             //start at each deep node of the law
             var law = self.laws[map.lawId];
+            console.log('appending ' + law.name);
             law.deepNodes.forEach(function(nodeId) {
-               self.appendLawHelper(map, nodeId);
+               let newId = self.appendLawHelper(map, nodeId);
+               if(newId == null) {
+                   console.err("couldn't append deep node " + nodeId + ' [' + self.nodes[nodeId].getConcept().name + ']');
+               }
             });
         };
 
@@ -2084,19 +2130,24 @@
             if(map.idMap.hasOwnProperty(nodeId)) return map.idMap[nodeId];
 
             let self = this, node = self.nodes[nodeId], head = node['head'], reference = node['reference'],
-                newHead = self.appendLawHelper(map, head), newReference = self.appendLawHelper(map, reference);
+                newHead = null, newReference = null;
 
-            if(newHead == null || newReference == null) return null;
-
+            newHead = self.appendLawHelper(map, head);
+            if(newHead == null) return null;
             for(let child in self.nodes[newHead].children) {
                 if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newReference) {
                     return child;
                 }
             }
-            if(self.concepts[node.concept].symmetric) {
-                for(let child in self.nodes[newReference].children) {
-                    if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newHead) {
-                        return child;
+
+            if(reference) {
+                newReference = self.appendLawHelper(map, reference);
+                if(newReference == null) return null;
+                if(self.concepts[node.concept].symmetric) {
+                    for(let child in self.nodes[newReference].children) {
+                        if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newHead) {
+                            return child;
+                        }
                     }
                 }
             }
@@ -2105,7 +2156,7 @@
                 'law': self.law.id,
                 'concept': node['concept'],
                 'head': parseInt(newHead),
-                'reference': parseInt(newReference),
+                'reference': newReference ? parseInt(newReference) : null,
                 'values': self.nodes[nodeId].values
             });
             self.myNodes.push(newId);
@@ -2125,10 +2176,10 @@
         Relation.prototype.addNode = function(data) {
             let self = this, newId = self.nextNodeId;
             self.nextNodeId++;
-            let node = self.nodes[newId] = Object.assign({id: newId, children: {}}, data);
-            if(node.head && self.nodes.hasOwnProperty(node.head)) {
-                self.nodes[node.head].children[node.id] = true;
-            }
+            let node = self.nodes[newId] = self.createEntry('node', data);
+            node.id = newId;
+            node.setHead(node.head);
+            node.setReference(node.reference);
             return newId;
         };
 
@@ -2185,6 +2236,7 @@
                 $form.find('[name="law_specific"]').attr('checked', entry.law > 0);
                 $form.find('[name="law"]').val(self.law.id);
                 $form.find('[name="symbol"]').val(entry.symbol);
+                $form.find('[name="value"]').val(entry.value);
                 $form.find('[name="symmetric"]').attr('checked', entry.symmetric);
                 $form.find('[name="head"]').val(entry.head);
                 $form.find('[name="reference"]').val(entry.reference);
@@ -2268,8 +2320,11 @@
             let self = this, canvas = self.canvas;
 
             //self.syncGraph();
-            let visFramework = self.framework.findId('framework', {name: 'Visualization'});
-            if(visFramework) self.evaluate([visFramework]);
+            self.evaluate({
+                useLaw: function(law) {
+                    return law.name.match(/^Visualization/) !== null;
+                }
+            });
 
             canvas.strokeColor = 'red';
             canvas.lineWidth = 4;
@@ -2409,6 +2464,8 @@
                             //so the server can send them
                             obj.dependencies[dep] = framework && !framework.loaded;
                         }
+                    } else if(table == 'concept') {
+                        obj.law = null;
                     }
 
                     console.log('saving entry');

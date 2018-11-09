@@ -330,3 +330,7 @@ ALTER TABLE concept DROP COLUMN relation;
 timestamp: 2018-10-15T18:52:01.670703
 ALTER TABLE concept DROP COLUMN relation;
 success!
+timestamp: 2018-11-09T01:40:54.226910
+ALTER TABLE concept ADD value VARCHAR(512);
+success!
+success!

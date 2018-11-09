@@ -46,6 +46,10 @@
         <label for="symbol">Symbol</label>
         <textarea name="symbol" placeholder="Enter symbol commands here..." rows="3"></textarea>
     </div>
+    <div class="concept-value form-group">
+        <label for="value">Value</label>
+        <textarea name="value" placeholder="Enter value commands here..." rows="3"></textarea>
+    </div>
     <div class="concept-symmetric form-group">
         <label for="symmetric">Symmetric</label>
         <input type="checkbox" name="symmetric">
