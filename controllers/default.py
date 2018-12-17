@@ -102,7 +102,7 @@ def getEntry(table, data):
                 ret['notDeepNode'][node.reference] = True
     elif table == 'node':
         ret = {'id': entry.id, 'law': entry.law, 'concept': entry.concept, 'head': entry.head, \
-            'reference': entry.reference, 'name': entry.name, 'values': entry.node_values};
+            'reference': entry.reference, 'name': entry.name, 'value': entry.node_values};
     return ret
 
 
@@ -239,7 +239,7 @@ def saveRelation():
         if 'name' in node:
             nodeName = node['name']
         nodeId = db.node.update_or_insert(db.node.id == node['id'],
-            law=lawId, concept=node['concept'], node_values=node['values'],
+            law=lawId, concept=node['concept'], node_values=node['value'],
             name=nodeName, head=None, reference=None)
         if nodeId is None:
             nodeId = node['id']

@@ -281,11 +281,12 @@
 
     {{block page_js}}
     {{include 'web2py_ajax.html'}}
-    <script src="/welcome/static/GoJS-master/release/go.js"></script>
-    <script src="/welcome/static/GoJS-master/assets/js/highlight.js"></script>
-    <script src="/welcome/static/GoJS-master/assets/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="/welcome/static/GoJS-master/release/go.js"></script>
+    <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/highlight.js"></script>
+    <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/bootstrap.min.js"></script>
     <!--<script src="{{=URL('static', 'js/knowledge.js')}}"></script>-->
-    <script type="application/javascript;version=1.7">
+    <script type="text/javascript">
+        console.log('starting script');
         var $$ = go.GraphObject.make;
 
         // This variation on ForceDirectedLayout does not move any selected Nodes
@@ -506,6 +507,15 @@
         Node.prototype.constructor = Node;
         Node.prototype.table = 'node';
 
+        Node.prototype.set = function(key, value) {
+            switch(key) {
+                case 'value':
+                    this.setValue(value);
+                    break;
+                default: this[key] = value; break;
+            }
+        };
+
         Node.prototype.getConcept = function() {
             return this.findEntry('concept', this.concept);
         };
@@ -515,10 +525,16 @@
         };
 
         Node.prototype.getValue = function() {
-            if(this.values && this.values.values.length == 1)
-                return this.values.values[0];
+            if(this.value && this.value.values.length == 1)
+                return this.value.values[0];
             return null;
         };
+
+        Node.prototype.setValue = function(value) {
+            if(value == null) return;
+            if(typeof value == 'string') this.value.readValue(value);
+            else if(typeof value == 'object') this.value.readValue(value.writeValue());
+        }
 
         Node.prototype.getHead = function() {
             return this.findEntry(this.table, this.head);
@@ -574,13 +590,16 @@
         //or H.R means my head's reference
         Node.prototype.getConnectedNodes = function(str) {
             let chain = str.split('.'), nodes = [this];
+            let symmetric = this.getConcept().symmetric;
             chain.forEach(function(name) {
                 let arr = [];
                 nodes.forEach(function(node) {
                     switch(name[0]) {
                         case 'S': arr.push(node); break;
                         case 'A': arr.push(node.getHead()); break;
+                            //if(symmetric) arr.push(node.getReference()); break;
                         case 'B': arr.push(node.getReference()); break;
+                            //if(symmetric) arr.push(node.getHead()); break;
                         case 'C': arr = arr.concat(node.getChildren()); break;
                         default: break;
                     }
@@ -613,28 +632,41 @@
 
         Node.prototype.setupData = function(type) {
             let self = this, input = null;
+            let symmetric = self.getConcept().symmetric;
             let commands = self.getConcept().getCommands(type);
             let variable = "\{\{([^}{]+)\}\}", word = "([^}{]+)";
             commands.forEach(function(command) {
-                let match = command.match(new RegExp("^\\s*(?:" + variable + "\\s*:\\s*)*(.*)"));
-                if(!match || match.length < 3) return;
-                let targetName = match[1] || 'S', args = match[2].split(' ');
-                let block = args[0], blockType = args[1] || 'text';
-
-                let targetContext = targetName[targetName.length-1] == ':';
-                if(targetContext) targetName = targetName.substring(0, targetName.length-1);
-
-                let targets = self.getConnectedNodes(targetName);
-                targets.forEach(function(target) {
-                    let regex = new RegExp("\{\{([^}{])\}\}", 'g'), arr = [], sources = [], text = block;
-                    while((arr = regex.exec(block)) !== null) {
-                        let source = (targetContext ? target : self).getConnectedNodes(arr[1])[0];
-                        if(!source) continue;
-                        if(sources.indexOf(source) < 0) sources.push(source);
-                        text = text.replace("\{\{" + arr[1] + "\}\}", "\{\{" + source.id + "\}\}");
+                for(let i = 0; i < (symmetric ? 2 : 1); i++) {
+                    let str = command;
+                    if(i == 1) {
+                        str = str.replace(/\{\{A\}\}/g, "\{\{a\}\}").replace(/\{\{B\}\}/g, "\{\{A\}\}").replace(/\{\{a\}\}/g, "\{\{B\}\}");
                     }
-                    target.createDataDependency(type, sources, text, blockType);
-                });
+
+                    let match = str.match(new RegExp("^\\s*(?:" + variable + "\\s*:\\s*)*(.*)"));
+                    if(!match || match.length < 3) return;
+                    let targetName = match[1] || 'S';
+
+                    switch(type) {
+                        case 'symbol': args = match[2].split(' '); break;
+                        case 'value': args = [match[2]]; break;
+                    }
+                    let block = args[0], blockType = args[1] || 'text';
+
+                    let targetContext = targetName[targetName.length-1] == ':';
+                    if(targetContext) targetName = targetName.substring(0, targetName.length-1);
+
+                    let targets = self.getConnectedNodes(targetName);
+                    targets.forEach(function(target) {
+                        let regex = new RegExp("\{\{([^}{])\}\}", 'g'), arr = [], sources = [], text = block;
+                        while((arr = regex.exec(block)) !== null) {
+                            let source = (targetContext ? target : self).getConnectedNodes(arr[1])[0];
+                            if(!source) continue;
+                            if(sources.indexOf(source) < 0) sources.push(source);
+                            text = text.replace("\{\{" + arr[1] + "\}\}", "\{\{" + source.id + "\}\}");
+                        }
+                        target.createDataDependency(type, sources, text, blockType);
+                    });
+                }
             });
         };
 
@@ -740,10 +772,11 @@
         };
 
         Value.prototype.toString = function() {
-            let self = this, text = self.blocks['text'][0];
-            let arr = text.split(/\s+/);
+            let self = this;
+            if(!self.blocks || !self.blocks.hasOwnProperty('text')) return '';
+            let text = self.blocks['text'][0].text, arr = text.split(/\s+/);
             let ops = ['^', '*', '/', '+', '-'];
-            let str = '';
+            let str = text;
             if(!isNaN(arr[0]) && ops.indexOf(arr[1]) >= 0 && !isNaN(arr[2])) {
                 let a = parseFloat(arr[0]), b = parseFloat(arr[2]), c = null;
                 switch(arr[1]) {
@@ -784,6 +817,7 @@
 
         Value.prototype.readValue = function(str) {
             let self = this, arr = str.split(',');
+            self.values = [];
             arr.forEach(function(str) {
                 if(str == '') return;
                 if(!isNaN(str)) {
@@ -886,6 +920,7 @@
             this.myNodes = [];
             this.nodesToCheck = [];
             this.newNodes = [];
+            this.evaluated = {};
 
             this.tempIdMap = null;
             this.nodeMap = {};
@@ -1006,8 +1041,6 @@
                             }
                             break;
                         case 'node':
-                            if(typeof entry.values == 'string') entry.values = new Value(entry.values);
-                            else if(!entry.values) entry.values = new Value();
                             entries[entry.head || 0].children[entry.id] = entry;
                             if(!self.predicates.hasOwnProperty(entry.concept)) self.predicates[entry.concept] = {};
                             self.predicates[entry.concept][entry.id] = true;
@@ -1040,7 +1073,7 @@
             if(entry) {
                 entry.relation = self;
                 if(typeof data == 'object') {
-                    for(let key in data) entry[key] = data[key];
+                    for(let key in data) entry.set(key, data[key]);
                 }
             }
             return entry;
@@ -1230,10 +1263,10 @@
                                 let part = obj.part.adornedPart;
                                 if(!(part instanceof go.Node)) return;
                                 let input = prompt("Enter a set of real numbers in interval notation, e.g. [0.5,2];5.7;[3,9);(9,17)");
-                                let values = new Value(input);
-                                if(values.empty()) return;
-                                part.data.values = input;
-                                if(self.nodes.hasOwnProperty(part.data.id)) self.nodes[part.data.id].values = values;
+                                let value = new Value(input);
+                                if(value.empty()) return;
+                                part.data.value = input;
+                                if(self.nodes.hasOwnProperty(part.data.id)) self.nodes[part.data.id].setValue(input);
                             },
                             function(o) {
                                 let part = o.part.adornedPart;
@@ -1423,7 +1456,7 @@
             msg = 'ID: ' + node.id + "\n"
                 + 'Law: ' + lawStr + "\n"
                 + 'Predicates: ' + predicates + "\n"
-                + 'Values: ' + node.values.toString() + "\n"
+                + 'Values: ' + node.value.toString() + "\n"
                 + 'Mappings: ' + mappings;
             return msg;
         };
@@ -1577,7 +1610,7 @@
             delete options.template, options.drawLinks;
 
             let nodeData = Object.assign({}, node, options, template);
-            nodeData.values = node.values.writeValue();
+            nodeData.value = node.value.writeValue();
             if(!nodeData.hasOwnProperty('loc') && nodeData.head && self.nodes.hasOwnProperty(nodeData.head)) {
                 let head = self.diagram.model.findNodeDataForKey(nodeData.head), headLoc = head.loc.split(' '), refLoc = null;
                 if(nodeData.reference) {
@@ -1774,7 +1807,7 @@
             self.law.nodes.forEach(function(id) {
                 let node = self.findEntry('node', id);
                 if(node) nodes.push({id: node.id, concept: node.concept, name: node.name, head: node.head,
-                    reference: node.reference, values: node.values.writeValue()});
+                    reference: node.reference, value: node.value.writeValue()});
             });
             self.predicateSets.forEach(function(pset, i) {
                 for(let node in pset) {
@@ -1807,7 +1840,7 @@
                 entry.id = id;
                 entry.concept = node.data['concept'];
                 entry.name = node.data['name'] || null;
-                entry.values = new Value(node.data['values']);
+                entry.value.readValue(node.data['value']);
                 let head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
                 head = head.count > 0 ? head.first().data['id'] : null;
@@ -1861,6 +1894,7 @@
 
             let self = this;
             if(!opts) opts = {};
+            if(opts.tag) self.evaluated[opts.tag] = false;
 
             $('#evaluate-msg').text('Evaluating...');
             self.syncGraph();
@@ -1883,6 +1917,10 @@
                    }
                }
             }
+            if(opts.tag) self.evaluated[opts.tag] = true;
+            if(opts.propagate) {
+                for(let type in opts.propagate) self.law.propagateData(type);
+            }
             $('#evaluate-msg').text('Done evaluating');
         };
 
@@ -1895,7 +1933,7 @@
             //if this is the first recursion step, initialize aggregators
             let firstLevel = !map;
             if(firstLevel) {
-                map = {lawId: predicate['law'], predicates: [predicateId], idMap: {}, values: {}, intersects: {}, children: []};
+                map = {lawId: predicate['law'], predicates: [predicateId], idMap: {}, value: {}, intersects: {}, children: []};
             }
 
             //make sure at least one of this node's associated concepts matches the predicate's concept
@@ -1910,13 +1948,13 @@
                 }
             }
             //and find the intersection of any values on the two nodes
-            let values = null;
-            if(match) values = node.values.intersect(predicate.values);
-            if(!match || (values && values.length == 0)) return false;
+            let value = null;
+            if(match) value = node.value; //.intersect(predicate.values);
+            if(!match) return false; // || (value && value.length == 0)) return false;
 
             map.idMap[nodeId] = predicateId;
             map.idMap[predicateId] = nodeId;
-            map.values[nodeId] = values;
+            map.value[nodeId] = value;
 
             //note any prior mappings between this node and predicate node - used later to test for intersections
             if(self.nodeMap.hasOwnProperty(nodeId) && self.nodeMap[nodeId].hasOwnProperty(predicateId)) {
@@ -1930,8 +1968,8 @@
             let nh = node.head, nr = node.reference, ph = predicate.head, pr = predicate.reference, twoMaps = false;
             if(symmetric && ((ph && nh) || (pr && nr))) {
                 twoMaps = true;
-                fwdMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, values: {}, intersects: {}, children: [], parent: map};
-                revMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, values: {}, intersects: {}, children: [], parent: map};
+                fwdMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, value: {}, intersects: {}, children: [], parent: map};
+                revMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, value: {}, intersects: {}, children: [], parent: map};
             }
 
             //check recursively on this node's head and reference
@@ -2005,7 +2043,7 @@
                 if(map.idMap.hasOwnProperty(n) && map.idMap[n] != submap.idMap[n]) return false;
                 map.idMap[n] = submap.idMap[n];
             }
-            for(let n in submap.values) map.values[n] = submap.values[n];
+            for(let n in submap.value) map.value[n] = submap.value[n];
             for(let m in submap.intersects) map.intersects[m] = submap.intersects[m];
             map.children = map.children.concat(submap.children);
         };
@@ -2036,7 +2074,7 @@
                 if(map2.idMap.hasOwnProperty(n) && map2.idMap[n] != map1.idMap[n]) return false;
             }
             map.idMap = Object.assign({}, map1.idMap, map2.idMap);
-            map.values = Object.assign({}, map1.values, map2.values);
+            map.value = Object.assign({}, map1.value, map2.value);
             map.intersects = Object.assign({}, map1.intersects, map2.intersects);
             map.predicates = map1.predicates.concat(map2.predicates);
             map.children = [];
@@ -2110,8 +2148,8 @@
             var self = this;
 
             //update our relation with all value intersections calculated during the mapping
-            for(let node in map.values) {
-                self.nodes[node].values = map.values[node];
+            for(let node in map.value) {
+                //self.nodes[node].value = map.value[node];
             }
 
             //start at each deep node of the law
@@ -2157,7 +2195,7 @@
                 'concept': node['concept'],
                 'head': parseInt(newHead),
                 'reference': newReference ? parseInt(newReference) : null,
-                'values': self.nodes[nodeId].values
+                'value': self.nodes[nodeId].value
             });
             self.myNodes.push(newId);
             self.newNodes.push(newId);
@@ -2236,7 +2274,7 @@
                 $form.find('[name="law_specific"]').attr('checked', entry.law > 0);
                 $form.find('[name="law"]').val(self.law.id);
                 $form.find('[name="symbol"]').val(entry.symbol);
-                $form.find('[name="value"]').val(entry.value);
+                $form.find('[name="value"]').val(entry.value.writeValue());
                 $form.find('[name="symmetric"]').attr('checked', entry.symmetric);
                 $form.find('[name="head"]').val(entry.head);
                 $form.find('[name="reference"]').val(entry.reference);
@@ -2320,11 +2358,15 @@
             let self = this, canvas = self.canvas;
 
             //self.syncGraph();
-            self.evaluate({
-                useLaw: function(law) {
-                    return law.name.match(/^Visualization/) !== null;
-                }
-            });
+            if(!self.evaluated['Visualization']) {
+                self.evaluate({
+                    tag: 'Visualization',
+                    useLaw: function(law) {
+                        return law.name.match(/^Visualization/) !== null;
+                    },
+                    propagate: {value: true}
+                });
+            }
 
             canvas.strokeColor = 'red';
             canvas.lineWidth = 4;
@@ -2338,6 +2380,9 @@
                     let opt = self.getChildTree(originNode);
                     if(opt.x && opt.y) origin = {x: opt.x._value, y: opt.y._value};
                 }
+                let head = object.getHead();
+                console.log('visualizing ' + head.getConcept().name + ' [' + head.id + ']');
+                if(origin) console.log('from (' + origin.x + ', ' + origin.y + ')');
                 let shapes = object.getChildrenByConcept('shape');
                 shapes.forEach(function(shape) {
                     let shapeName = shape.getConcept().name, opt = self.getChildTree(shape);
@@ -2350,19 +2395,20 @@
                                 x1 = origin.x;
                                 y1 = origin.y;
                             }
-                            if(opt.start && opt.start._value) {
-                                x1 += opt.start._value.values[0];
-                                y1 += opt.start._value.values[1];
+                            if(opt.start && opt.start.x && opt.start.y) {
+                                x1 += opt.start.x._value;
+                                y1 += opt.start.y._value;
                             }
-                            if(opt.end && opt.end._value) {
-                                x2 = opt.end._value.values[0];
-                                y2 = opt.end._value.values[1];
+                            if(opt.end && opt.end.x && opt.end.y) {
+                                x2 = opt.end.x._value;
+                                y2 = opt.end.y._value;
                             }
-                            else if(opt.delta) {
+                            else if(opt.delta && opt.delta.x && opt.delta.y) {
                                 x2 = x1 + opt.delta.x._value;
                                 y2 = y1 + opt.delta.y._value;
                             }
                             if(typeof x1 == 'number' && typeof x2 == 'number' && typeof y1 == 'number' && typeof y2 == 'number') {
+                                console.log('line from (' + x1 + ',' + y1 + ') to (' + x2 + ',' + y2 + ')');
                                 canvas.beginPath();
                                 canvas.moveTo(x1, y1);
                                 canvas.lineTo(x2, y2);
@@ -2374,6 +2420,11 @@
                         case 'arc':
                             break;
                         case 'circle':
+                            if(origin && opt.radius) {
+                                canvas.beginPath();
+                                canvas.arc(origin.x, origin.y, opt.radius._value, 0, 2*Math.PI);
+                                canvas.stroke();
+                            }
                             break;
                         case 'triangle':
                             break;
@@ -2400,7 +2451,9 @@
 
 
         Relation.prototype.getChildTree = function(node) {
-            let self = this, opts = {_value: node.getValue()};
+            let self = this, val = node.value.toString();
+            if(!isNaN(val)) val = parseFloat(val);
+            let opts = {_value: val};
             let children = node.getChildren();
             children.forEach(function(child) {
                 let concept = child.getConcept();
