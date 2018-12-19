@@ -1,0 +1,81 @@
+PURPOSE
+
+This is a website that is an aid for students learning physics.  It could potentially be used for other subjects as well.  I am publishing it under the GNU General Public License version 3.  I am asking anyone interested to help me with this site, as I believe it can be valuable but it could really use strong coders to keep it going.
+
+
+CONCEPT
+
+The idea is that a problem can be modeled as a tree-like graph, where many of the nodes have two parents, which they relate together in a directed way.  Each node is an instance of an existing concept.  A concept in turn can be an instance of one or more other concepts.  A concept may also be symmetric.
+
+We solve a problem by first describing the situation, then searching for general laws that can be applied to that situation.  Both stages can be handled through this tree-graph structure, as explained below.
+
+
+SPEFIC KNOWLEDGE - DESCRIBING THE PROBLEM
+
+The ROOT node of the tree represents the entire universe, or at least the region being considered in the problem.
+
+The immediate children of ROOT are the first-level entities being analyzed.  In physics, these are often material bodies or fields.  In Newtonian physics, time and space could also be considered first-level entities.
+
+The children of the primary entities are their typically their physical properties.  For example, a body can have mass and charge.  That is, a node in the tree of concept 'body' can have a child node of concept 'mass' and another of concept 'charge'.
+
+A body can also have a position.  The position, however, is measured relative to some reference.  That reference could be a coordinate system, or another body, or maybe something else.  This is what is meant by saying a node can have two parents which it relates.  The statement "Body A has a position relative to Body B" is encapsulated by giving node A (which is of concept 'body') a child, which is of concept 'position', whose second parent is node B (also a 'body').  The link between A and position means 'A has position', and the link between position and B means 'position relative to B'.  The concept 'position' is not symmetric: the two parent-child relationships have different meanings.
+
+The same goes for velocity and acceleration: these are generally relative properties of bodies.
+
+In a word problem, certain bodies and their properties are explicitly mentioned - for example: "a parachutist falls at 12 m/s downward."  This statement indicates a node 'parachutist' of concept 'body' and its child node of concept 'velocity'.
+
+Of course, velocity is a vector, which means it has a magnitude and direction, or alternatively coordinate components.  Hence the 'velocity' node can have a 'magnitude' child property and also 'direction'.  To enable this, the 'velocity' concept is an instance of the 'vector' concept, and 'magnitude' is an instance of 'scalar'.  Also, a 'direction' node can have an 'angle' property relative to another 'direction' node.
+
+Some of these properties can have a numerical value.  A 'vector' cannot, but its 'magnitude' can, and the 'angle' between two 'directions' also can.
+
+Once the properties of bodies and fields have been enumerated, there may be mathematical relations between these properties.  For example, two boxes bound by a rope across a pulley may have the constraint that their accelerations are equal in magnitude.  For this, we would have a child node of 'Body A => acceleration => magnitude' which is of concept 'equal' and whose other parent is 'Body B => acceleration => magnitude'.  The concept 'equal' is symmetric, because when one thing equals another, the reverse is also true.  So there is no primary and secondary parent.
+
+Other mathematical operators include comparisons such as 'less than', 'less than or equal', 'greater than', 'greater than or equal', etc.  Then there are arithmetic operators: 'sum', 'product', 'ratio', 'difference', 'derivative', 'integral', etc.  Of those listed, only 'sum' and 'product' are symmetric.  Notice that all of these concepts are relative; just as velocity is a property of a body relative to a reference point, an integral is a property of an integrand relative to the variable of integration, and a product is a property of one scalar relative to another.  That is the big idea that lets us express an entire problem statement using a simple data structure.
+
+If all of these concepts are relative, what about the concepts that aren't?  Mass and charge, for example, are intrinsic properties, not dependent on a reference body.  But we can declare that any 'absolute' concept is in fact relative to the ROOT node, that is, the universe.  The meaning in this rule is debatable, but take for example the shape of a body, which seems to be an absolute property.  An object that is a sphere in one universe would no longer be a sphere if we deformed the space the body resides in.  In any case, the utility of this rule will become apparent in the next section.
+
+Once we add this requirement, the structure becomes simpler.  A tree is constructed from a root node by adding children; that is, the fundamental element is the child along with the link to its parent, ie. the parent-child relationship.  By contrast, in this structure, the fundamental element is the child with links to its two parents, ie. the parent-child-parent relationship.  For asymmetric concepts, such as 'velocity', it matters which is the first parent and which is the second.  So we call the first parent the 'head', and the second parent the 'reference'.  Following the above language, if H and R are the head and reference nodes of node A, then A is a property of H relative to R.  But again, the meaning varies according to the node's concept.
+
+In general a single problem description may consist of more than one of these tree-graphs.  Each graph in some sense represents a distinct statement or set of statements within that description.  One example might be a problem where we are comparing two hypothetical variations of the same physical process.  Maybe we want to consider the same electron moving in two different magnetic field strengths, and find the ratio of its acceleration in the first field to that in the second field.  We could have two graphs, each describing one of the cases, and simply add a 'ratio' node between the two 'acceleration => magnitude' nodes in the two graphs.  There could be a way express this situation with a single graph using suitable concepts, but we don't have to.
+
+
+GENERAL KNOWLEDGE - SOLVING THE PROBLEM
+
+Once we have described the physical situation, we have to find general laws that apply to it.  Many physics problems are half math, so the laws we seek are those of both physics and mathematics.
+
+Here 'law' refers to any piece of general knowledge, including for example those we think of as definitions.
+
+A law is expressed similarly to the tree-graph above, but it doesn't need a ROOT node.  ROOT anchors the problem to a specific world/situation, but a general law is not anchored.  Instead, it descends from a set of unconnected nodes, which must exist in the problem graph if the law is to be applied.  For example, the law of addition of velocities says that 'The velocity of A relative to C equals the velocity of A relative to B plus the velocity of B relative to C."  In short, Vac = Vab + Vbc.  As a minimum, this requires three separate 'body' nodes (A, B, and C) to exist.  But really, there is no reason we would use this law unless at least two of the relative velocities were also present in the problem.  So we declare that the law is applied when there are three body nodes connected by two relative velocity nodes.  And what does applying the law do?  It adds the rest of the nodes in the equation, namely the third relative velocity node, the 'sum' node between two of them, and the 'equal' node between that 'sum' node and the third 'velocity' node.  The original five required nodes are labeled the 'predicate' of the law.
+
+That leads to a key hypothesis of the project: every law has a connected predicate.  When we find that predicate in a problem graph, it will then be a connected subgraph, and we simply append the rest of the nodes in the law to it.
+
+In some laws there may not be one clear predicate, and there may be multiple possibilities.  An example is Newton's 2nd Law, which says 'the net force on a body is equal to its mass times its acceleration.'  There must be a 'body' node, but it's not clear whether any or all of force, mass, or acceleration must be present.  We might simply append F = ma to all bodies, and let the force, mass, acceleration, product, and equal nodes dangle there if they turn out not to be needed.  Or we could require any two of F, m, a.  Regardless, the entire predicate is connected to the body node.
+
+A notable law that may seem to violate connectivity is Newton's law of gravitation, F = G*M1*M2 / r^2.  This law applies to any two bodies with mass, regardless of any existing connection between the two bodies.  But remember the stipulation that mass is a property of a body *relative to ROOT*.  That means the mass nodes both connect to the same ROOT node, ie. the predicate is connected through ROOT.  So by enforcing the relativity of concepts, we simplify the application of laws.
+
+
+
+THE ALGORITHM
+
+First all applicable laws for a given topic must be formulated as tree-graphs as above.
+
+Then the specific problem must be formulated as a tree-graph.  Approaches to help the user do this are discussed in the next section.
+
+The challenge is then to find the general knowledge we can append to the graph.  The approach is based on the following:
+
+Because each node has two parents, the set of ancestors of a node is a kind of binary tree.  However, the number of ancestors does not double with every step up the chain, because two ancestors might share the same parent.  For example, node A might have parents B and C, but B and C could both be children of node D.  Anyway, this set of ancestors represents the 'context' of the node.
+
+Since a law has no ROOT node, it contains nodes with no parents.  Any predicate of the law must include all these 'top-level' nodes, and it must include a set of nodes that connects those top-level nodes to each other.  Some of these predicate nodes will have no children within the predicate (though they may have children within the law, that are not part of the predicate).  Call these 'deep predicate nodes'.  The entire predicate is just the deep predicate nodes plus their 'context' (ancestors).  This is a refinement of the claim that the predicate is connected.
+
+As a result, we can really just identify a given predicate with its deep nodes, understanding that the contexts of those nodes are also part of the predicate.
+
+
+This leads to the following algorithm for finding laws to apply to a problem:
+
+
+THE INTERFACE
+
+In order to use this tool, a user must first re-formulate the problem as a tree-graph described above.  To do this by hand would be too tedious, so we need a visual interface to speed up the process.  I envision a canvas, 
+
+
+Developed with web2py.
