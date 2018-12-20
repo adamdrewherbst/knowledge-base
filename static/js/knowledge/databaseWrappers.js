@@ -110,6 +110,11 @@
             });
         };
 
+        Law.prototype.removeNode = function(id) {
+            let ind = this.nodes.indexOf(id);
+            if(ind >= 0) this.nodes.splice(ind, 1);
+        };
+
         Law.prototype.hasTag = function(tag) {
             return this.hashtags.hasOwnProperty(tag) && this.hashtags[tag];
         }
@@ -250,10 +255,12 @@
         Node.prototype.remove = function() {
             this.setHead(null);
             if(this.relation) this.relation.removeEntry('node', this.id);
+            let law = this.findEntry('law', this.law);
+            if(law) law.removeNode(this.id);
         };
 
         Node.prototype.isPredicate = function() {
-            let law = this.getEntry('law', this.law);
+            let law = this.findEntry('law', this.law);
             for(let p in law.predicates) {
                 for(let n in law.predicates[p]) {
                     if(n == this.id) return true;
@@ -366,7 +373,8 @@
             for(let blockType in data.waiting[node.id]) {
                 for(let blockId in data.waiting[node.id][blockType]) {
                     let block = data.blocks[blockType][blockId], text = node.data[type].toString();
-                    switch(type) {
+                    if(!text || text == null || text == undefined) text = '';
+                    else switch(type) {
                         case 'symbol': {
                             let op = self.getConcept().getOperationIndex(), nodeOp = node.getConcept().getOperationIndex();
                             if(op >= 0 && nodeOp >= 0 && op < nodeOp) {
@@ -654,7 +662,8 @@
                                     if(self.nodes[node]) {
                                         let concept = self.nodes[node].concept;
                                         self.predicateNodes[node] = concept;
-                                        self.predicates[concept] = node;
+                                        if(!self.predicates.hasOwnProperty(concept)) self.predicates[concept] = {};
+                                        self.predicates[concept][node] = true;
                                     }
                                 }
                                 entry.predicateSets.push(pset);
@@ -733,6 +742,23 @@
         Relation.prototype.removeEntry = function(table, id) {
             let self = this, entries = self.getTable(table);
             if(entries && entries.hasOwnProperty(id)) delete entries[id];
+            switch(table) {
+                case 'framework': break;
+                case 'concept': break;
+                case 'law': break;
+                case 'node':
+                    let graphNode = self.diagram.findNodeForKey(id);
+                    if(graphNode) {
+                        let links = graphNode.findLinksConnected(), linkData = [];
+                        while(links.next())
+                            linkData.push(links.value.data);
+                        linkData.forEach(function(data) {
+                            self.diagram.model.removeLinkData(data);
+                        });
+                        self.diagram.model.removeNodeData(graphNode.data);
+                    }
+                    break;
+            }
         };
 
 

@@ -42,6 +42,7 @@
             });
 
             self.stats.evaluate.nodesChecked = 0;
+            self.stats.evaluate.nodesAppended = 0;
 
             while(self.nodesToCheck.length > 0) {
                //find any deep predicate nodes in included frameworks
@@ -81,7 +82,25 @@
             console.log('');
             console.log('Checked ' + self.stats.evaluate.nodesChecked + ' nodes');
             console.log('Created ' + self.nextMapId + ' maps');
+            console.log('Appended ' + self.stats.evaluate.nodesAppended + ' nodes');
         };
+
+
+        Relation.prototype.clearMaps = function() {
+            let self = this;
+            for(let m in self.map)
+                delete self.map[m];
+            self.nextMapId = 0;
+            self.nodesToCheck = [];
+            self.nodeMap = {};
+            self.tempIdMap = null;
+            for(let n in self.nodes) {
+                if(self.nodes[n].appended)
+                    self.nodes[n].remove();
+                else self.nodes[n].evaluated = {};
+            }
+        };
+
 
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
         Relation.prototype.checkPredicate = function(nodeID, predicateID, map) {
@@ -379,9 +398,11 @@
                 'head': parseInt(newHead),
                 'reference': newReference ? parseInt(newReference) : null,
                 'value': self.nodes[nodeId].value,
-                'tentative': tentative
+                'tentative': tentative,
+                'appended': true
             });
             self.law.nodes.push(newId);
+            self.stats.evaluate.nodesAppended++;
 
             if(!tentative) self.nodesToCheck.push(newId);
             map.idMap[nodeId] = newId;

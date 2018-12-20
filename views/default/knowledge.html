@@ -54,6 +54,7 @@
                 <div id="relation-controls">
                     <button id="save-relation" type="button" class="btn btn-primary">Save Relation</button>
                     <button id="evaluate-relation" type="button" class="btn btn-primary">Evaluate</button>
+                    <button id="reset-relation" type="button" class="btn btn-primary">Reset</button>
                     <label id="evaluate-msg"></label>
                 </div>
             </div>
@@ -288,10 +289,15 @@
             font-weight: bold;
             float: left;
         }
+        .suggestion-symbol {
+            margin-left: 5%;
+            font-size: 18px;
+            color: #606;
+        }
         .suggestion-accept {
             color: white;
             background-color: #080;
-            float: right;
+            margin-left: 5%;
         }
 
         hr {
@@ -348,7 +354,6 @@
             this.predicates = {};
             this.predicateNodes = {};
 
-            this.myNodes = [];
             this.nodesToCheck = [];
             this.newNodes = [];
             this.evaluated = {};
@@ -542,6 +547,9 @@
             });
             $('#evaluate-relation').click(function(e) {
                 relation.evaluate({});
+            });
+            $('#reset-relation').click(function(e) {
+                relation.clearMaps();
             });
             $('#visualize-relation').click(function(e) {
                 relation.visualize();

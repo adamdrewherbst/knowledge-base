@@ -28,11 +28,21 @@ Relation.prototype.suggest = function() {
         let map = self.map[mapId];
         if(!map.tentative || !map.satisfied) continue;
 
-        let law = self.laws[map.lawId];
+        let law = self.laws[map.lawId], symbols = [];
+        for(let i = 0; i < law.deepNodes.length; i++) {
+            let n = law.deepNodes[i], lawNode = self.nodes[n];
+            if(!lawNode || lawNode.isPredicate()) continue;
+            let node = self.nodes[map.idMap[n]];
+            if(!node) continue;
+            console.log('adding symbol for node ' + n);
+            symbols.push('<math scriptlevel="-1">' + node.symbol.toString() + '</math>');
+        }
 
         let $entry = $('<div class="suggestion"></div>');
         $entry.append('<span class="suggestion-name">' + law.name + '</span>');
+        $entry.append('<span class="suggestion-symbol">' + symbols.join(',  ') + '</span>')
         $entry.append('<button class="suggestion-accept btn btn-primary" type="button">Accept</button>');
         $('#suggestion-wrapper').append('<hr>').append($entry);
     }
 };
+
