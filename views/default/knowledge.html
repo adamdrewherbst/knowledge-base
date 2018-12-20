@@ -74,8 +74,11 @@
         <div id="symbolization">
             <div id="sybolization-controls">
                 <button id="symbolize-relation" type="button" class="btn btn-primary">Symbolize</button>
+                <button id="suggest-step" type="button" class="btn btn-primary">Suggest</button>
             </div>
             <div id="symbolization-wrapper">
+            </div>
+            <div id="suggestion-wrapper">
             </div>
         </div>
 
@@ -273,6 +276,32 @@
             border: 3px solid green;
         }
 
+        #suggestion-wrapper {
+            display: table;
+            width: 100%;
+        }
+        .suggestion {
+            display: table-cell;
+        }
+        .suggestion-name {
+            font-size: 28px;
+            font-weight: bold;
+            float: left;
+        }
+        .suggestion-accept {
+            color: white;
+            background-color: #080;
+            float: right;
+        }
+
+        hr {
+            display: block;
+            height: 1px;
+            border: 0;
+            border-top: 1px solid #ccc;
+            margin: 1em 0;
+            padding: 0;
+        }
     </style>
     {{end page_css}}
 
@@ -284,7 +313,6 @@
     <script type="text/javascript" src="/welcome/static/GoJS-master/release/go.js"></script>
     <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/highlight.js"></script>
     <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/bootstrap.min.js"></script>
-    <!--<script src="{{=URL('static', 'js/knowledge.js')}}"></script>-->
     <script type="text/javascript">
 
         var $$ = go.GraphObject.make;
@@ -318,6 +346,7 @@
             this.nodes[0].relation = this;
 
             this.predicates = {};
+            this.predicateNodes = {};
 
             this.myNodes = [];
             this.nodesToCheck = [];
@@ -342,6 +371,10 @@
                 'appended': {
                     shape: 'RoundedRectangle',
                     fill: '#FF66AA'
+                },
+                'tentative': {
+                    shape: 'RoundedRectangle',
+                    fill: '#8888FF'
                 }
             };
 
@@ -350,528 +383,29 @@
 
             this.predicateSets = [];
             this.currentPredicate = -1;
+
+            this.options = {
+                evaluate: {}
+            };
+            this.stats = {
+                evaluate: {}
+            };
         }
 
         Relation.prototype.loadFrameworkURL = "{{=URL('default', 'loadFramework', extension='json')}}";
         Relation.prototype.saveEntryURL = "{{=URL('default', 'saveEntry', extension='json')}}";
         Relation.prototype.saveRelationURL = "{{=URL('default', 'saveRelation', extension='json')}}";
-
-
-
-
-
-        Relation.prototype.updateFields = function(element) {
-            let self = this;
-            let $element = element ? $(element) : $(document);
-            $element.find('select[select-table]').each(function() {
-                let $this = $(this), table = $this.attr('select-table');
-                $this.children().first().nextAll().remove();
-                let entries = self.getTable(table), sorted = [];
-                for(let id in entries) {
-                    if(id < 0) continue;
-                    let i = 0, name = entries[id].name;
-                    while(i < sorted.length && name.localeCompare(entries[sorted[i]].name) > 0) i++;
-                    sorted.splice(i, 0, id);
-                }
-                sorted.forEach(function(id) {
-                    $this.append('<option value="' + id + '">' + entries[id].name + '</select>');
-                });
-            });
-        };
-
-
-        Relation.prototype.setNodeData = function(nodeId, attr, value) {
-            console.log('setting node ' + nodeId + ' ' + attr + ' to ' + value);
-            let self = this, node = self.nodes[nodeId];
-            if(node) node[attr] = value;
-            let data = self.diagram.model.findNodeDataForKey(nodeId);
-            if(data) self.diagram.model.set(data, attr, value);
-        };
-
-
-        Relation.prototype.getNodeString = function(id) {
-
-            let self = this, node = self.nodes[id], law = self.law;
-            if(!node) return '';
-
-            let lawStr = '';
-            if(law) lawStr = law.name + ' [' + law.id + ']';
-            else lawStr = 'none';
-
-            let predicates = '';
-            for(let group in self.predicateSets) {
-                if(self.predicateSets[group].hasOwnProperty(id)) {
-                    let groupStr = '';
-                    for(let n in self.predicateSets[group]) groupStr += '' + n + ',';
-                    predicates += groupStr.substring(0, groupStr.length-1) + '; ';
-                }
-            }
-            if(predicates == '') predicates = 'none';
-            else predicates = predicates.substring(0, predicates.length-2);
-
-            let mappings = '';
-            if(self.nodeMap.hasOwnProperty(id)) {
-                for(let p in self.nodeMap[id]) {
-                    for(let m in self.nodeMap[id][p]) {
-                        let map = self.map[m], law = self.laws[map.lawId];
-                        let mapStr = '';
-                        for(let n in map.idMap) if(self.nodes[n].law == law.id) mapStr += '' + n + ',';
-                        mapStr = mapStr.substring(0, mapStr.length-1);
-                        mappings += '' + p + ' [' + self.concepts[self.nodes[p].concept].name + ']' + "\n"
-                            + '.  in ' + law.name + ' [' + law.id + ']' + "\n"
-                            + '.  ' + mapStr + ' (map ' + m + ')' + "\n";
-                    }
-                }
-            }
-            if(mappings == '') mappings = 'none';
-            else mappings = "\n" + mappings;
-
-            msg = 'ID: ' + node.id + "\n"
-                + 'Law: ' + lawStr + "\n"
-                + 'Predicates: ' + predicates + "\n"
-                + 'Values: ' + node.value.toString() + "\n"
-                + 'Mappings: ' + mappings;
-            return msg;
-        };
-
-
-
-
-        Relation.prototype.setPredicate = function(predicate) {
-            let self = this;
-            //first un-highlight any selected predicate nodes
-            self.diagram.nodes.each(function(node) {
-                self.setNodeTemplate(node.data, 'default');
-            });
-
-            if(predicate < 0) {
-                $('#remove-predicate, #predicate-help').hide();
-                return;
-            }
-
-            //create a new empty predicate set if requested
-            if(predicate == 'new') {
-                predicate = self.predicateSets.length;
-                self.predicateSets.push({});
-                let $select = $('#set-predicate');
-                $select.find('[value="new"]').before('<option value="' + predicate + '">Predicate ' + (predicate+1) + '</option>');
-                $select.val(predicate);
-            }
-
-            $('#remove-predicate, #predicate-help').show();
-
-            //now highlight nodes that are part of the chosen predicate
-            for(let node in self.predicateSets[predicate]) {
-                self.setNodeTemplate(node, 'predicate');
-            }
-            self.currentPredicate = predicate;
-        };
-
-
-        Relation.prototype.removePredicate = function(predicate) {
-            let self = this;
-            if(predicate === undefined) predicate = self.currentPredicate;
-            if(isNaN(predicate)) return false;
-            if(self.currentPredicate == predicate) {
-                self.setPredicate(-1);
-                $('#set-predicate').val(0);
-            }
-            self.predicateSets.splice(predicate, 1);
-            let $option = $('#set-predicate > option[value="' + predicate + '"]').val("");
-            $option.nextAll().each(function(i, el) {
-                el.value = parseInt(el.value) - 1;
-                el.text = 'Predicate ' + el.value;
-            });
-            $option.remove();
-        };
-
-
-        Relation.prototype.togglePredicate = function(node, include) {
-            let self = this;
-            if(!self.predicateSets.hasOwnProperty(self.currentPredicate)) return false;
-            if(include) {
-                self.predicateSets[self.currentPredicate][node] = true;
-                self.setNodeTemplate(node, 'predicate');
-            } else {
-                delete self.predicateSets[self.currentPredicate][node];
-                self.setNodeTemplate(node, 'default');
-            }
-        };
-
-
-        Relation.prototype.inPredicate = function(node) {
-            let self = this;
-            if(isNaN(node)) return false;
-            return self.predicateSets.hasOwnProperty(self.currentPredicate)
-                && self.predicateSets[self.currentPredicate].hasOwnProperty(node);
-        };
-
-
-        Relation.prototype.useFramework = function(id) {
-            let self = this;
-            self.setFramework(id);
-
-            if(!self.framework.loaded) {
-                $.ajax({
-                    url: self.loadFrameworkURL,
-                    type: 'get',
-                    dataType: 'json',
-                    data: {
-                        framework: self.framework.id
-                    },
-                    success: function(data) {
-                        self.predicates = {};
-                        self.storeEntries(data);
-
-                        if(data.hasOwnProperty('nextNodeId')) self.nextNodeId = parseInt(data.nextNodeId);
-
-                        self.setPaletteModel();
-                        self.filterPalette();
-                        self.updateFields();
-                    }
-                });
-            } else {
-                self.setPaletteModel();
-                self.filterPalette();
-            }
-        };
-
-
-        Relation.prototype.setFramework = function(framework) {
-            let self = this;
-            if(!isNaN(framework)) framework = self.findEntry('framework', framework);
-            if(!framework) return;
-            self.framework = framework;
-            $('.entry-wrapper[table=framework] .entry-name').text(self.framework.name || 'None');
-
-            let $filters = $('.framework-filter');
-            let options = [];
-            if(self.framework.id > 0) options.push(self.framework.id);
-            for(let i = 0; i < options.length; i++) {
-                let fw = options[i], framework = self.frameworks[fw];
-                for(let dep in framework.dependencies) {
-                    if(options.indexOf(dep) < 0) options.push(dep);
-                }
-            }
-            $filters.children().first().nextAll().remove();
-            options.forEach(function(option) {
-                el = '<option value="' + option + '">' + self.frameworks[option].name + '</option>';
-                $filters.append(el);
-            });
-            $filters.val(self.framework.id);
-        };
-
-
-        Relation.prototype.useLaw = function(id) {
-            let self = this;
-            if(self.law.id == id) return;
-            self.setLaw(id);
-            if(self.law.framework != self.framework.id)
-                self.useFramework(self.law.framework);
-            self.myNodes = self.law.nodes;
-            self.draw();
-        };
-
-
-        Relation.prototype.setLaw = function(law) {
-            let self = this;
-            if(!isNaN(law)) law = self.findEntry('law', law);
-            if(!law) return;
-            self.law = law;
-            $('.entry-wrapper[table=law] .entry-name').text(self.law.name || 'None');
-        };
-
-
-        Relation.prototype.save = function() {
-            let self = this, id = self.law.id;
-
-            let nodes = [], predicates = [];
-            self.syncGraph();
-            self.law.nodes.forEach(function(id) {
-                let node = self.findEntry('node', id);
-                if(node) nodes.push({id: node.id, concept: node.concept, name: node.name, head: node.head,
-                    reference: node.reference, value: node.value.writeValue()});
-            });
-            self.predicateSets.forEach(function(pset, i) {
-                for(let node in pset) {
-                    predicates.push({'node': parseInt(node), 'predicate_group': i+1});
-                }
-            });
-
-            $.ajax({
-                url: self.saveRelationURL,
-                type: 'post',
-                dataType: 'json',
-                data: JSON.stringify({id: id, framework: self.framework.id, nodes: nodes, predicates: predicates}),
-                success: function(data) {
-                    self.storeEntries(data);
-                    $('#law-save-msg').val('Relation saved').show(3000);
-                },
-                error: function() {
-                }
-            });
-        };
-
-
-        Relation.prototype.syncGraph = function() {
-            let self = this, graphNodes = [];
-            self.diagram.nodes.each(function(node) {
-                let id = parseInt(node.data['id']);
-                let entries = self.getTable('node');
-                if(!entries.hasOwnProperty(id)) entries[id] = self.createEntry('node');
-                let entry = entries[id];
-                entry.id = id;
-                entry.concept = node.data['concept'];
-                entry.name = node.data['name'] || null;
-                entry.value.readValue(node.data['value']);
-                let head = node.findNodesInto('T'),
-                    reference = node.findNodesOutOf('T');
-                head = head.count > 0 ? head.first().data['id'] : null;
-                reference = reference.count > 0 ? reference.first().data['id'] : null;
-                entry.setHead(head);
-                entry.setReference(reference);
-                if(graphNodes.indexOf(id) < 0) graphNodes.push(id);
-            });
-
-            self.law.nodes.forEach(function(id) {
-                let node = self.findEntry('node', id);
-                if(node && graphNodes.indexOf(id) < 0) {
-                    node.remove();
-                }
-            });
-            self.law.nodes = graphNodes;
-            self.myNodes = self.law.nodes;
-        };
-
-
-        Relation.prototype.selectEntry = function(table, callback, opts) {
-            let self = this;
-            let options = Object.assign({
-                tab: 'search',
-                framework: self.framework.id,
-                fields: {}
-            }, opts);
-            let $modal = $('#' + table + '-select'), $form = $modal.find('#' + table + '-create-form');
-            $modal.find('#' + table + '-' + options.tab + '-tab').show().tab('show');
-            $modal.find('.framework-filter').val(options.framework);
-            self.showSearchResults(table, '');
-            $modal.data('callback', callback);
-            $form.find('input,select').each(function(i, el) {
-                let $el = $(el), name = $el.attr('name');
-                if(name == 'table') return;
-                let value = options.fields[name] || (name == 'framework' ? '-1' : '');
-                let $multiple = $el.parents('.multiple-wrapper');
-                if($el.is('input[type=checkbox]')) $el.attr('checked', value ? true : false);
-                else if($multiple.length > 0) {
-                    $multiple.find('.multiple-item').first().nextAll('.multiple-item').remove();
-                    if(typeof value == 'object') value.forEach(function(row) {
-                        self.addMultipleField($multiple, row);
-                    });
-                } else $el.val(value);
-            });
-            $modal.modal('show');
-        };
-
-
-        Relation.prototype.newEntry = function(table, callback) {
-            let self = this, $modal = $('#' + table + '-select');
-            $modal.find('#' + table + '-search-tab').hide();
-            $modal.find('#' + table + '-create-tab').tab('show');
-            $modal.find('.framework-filter').val(self.framework.id);
-            $modal.data('callback', callback);
-            $modal.modal('show');
-        };
-
-
-        Relation.prototype.editEntry = function(table, id, callback) {
-            let self = this, entries = self.getTable(table);
-            if(!entries.hasOwnProperty(id)) return;
-            let entry = entries[id];
-            let $modal = $('#' + table + '-edit'), $form = $modal.find('#' + table + '-edit-form');
-            $form.find('[name="id"]').val(id);
-            $form.find('[name="name"]').val(entry.name);
-            $form.find('[name="description"]').val(entry.description);
-            $modal.find('.framework-filter').val(entry.framework);
-            if(table == 'concept') {
-                $form.find('[name="law_specific"]').attr('checked', entry.law > 0);
-                $form.find('[name="law"]').val(self.law.id);
-                $form.find('[name="symbol"]').val(entry.symbol);
-                $form.find('[name="value"]').val(entry.value);
-                $form.find('[name="symmetric"]').attr('checked', entry.symmetric);
-                $form.find('[name="head"]').val(entry.head);
-                $form.find('[name="reference"]').val(entry.reference);
-            }
-            if(table == 'framework' || table == 'concept') {
-                let $wrapper = $form.find('.multiple-wrapper');
-                $wrapper.find('.multiple-item').first().nextAll('.multiple-item').remove();
-                let depCount = 0;
-                for(let dep in entry.dependencies) {
-                    self.addMultipleField($wrapper, {dependencies: dep});
-                    depCount++;
-                }
-                if(depCount == 0) self.addMultipleField($wrapper);
-            }
-            $modal.data('callback', callback);
-            $modal.modal('show');
-        }
-
-
-        Relation.prototype.addMultipleField = function($element, values) {
-            let self = this, $template = $element.find('.multiple-template');
-            //add a new copy of the template
-            let $entry = $template.clone().removeClass('multiple-template');
-            //update any input field choices according to the current data set
-            self.updateFields($entry);
-            //update the index, and values if given, on all sub-elements that have names for form submission
-            $element.find('.multiple-item').last().after($entry);
-            let index = $entry.index();
-            $entry.find('[name]').each(function() {
-                let $this = $(this), name = $this.attr('name');
-                $this.attr('name', name + '_' + index);
-                if(typeof values == 'object' && values.hasOwnProperty(name)) $this.val(values[name]);
-            });
-            //add listener to the REMOVE button
-            let $required = $entry.find('.multiple-required'), $removeButton = $entry.find('.multiple-remove');
-            $removeButton.click(function(e) {
-                if($(this).hasClass('disabled')) return;
-                $entry.remove();
-            });
-        };
-
-
-        Relation.prototype.showSearchResults = function(table, text) {
-            let self = this;
-
-            let entries = self.getTable(table), results = [];
-            if(!entries) return;
-
-            let $tab = $('#' + table + '-search-tab-content'), $results = $tab.find('#' + table + '-results'),
-                $framework = $tab.find('.framework-filter');
-            let framework = $framework.val();
-
-            for(let i in entries) {
-                let id = i, entry = entries[id];
-                if(framework > 0 && entry.framework != framework) continue;
-                if(entry.hasOwnProperty('name')) {
-                    let name = entry.name.toLowerCase();
-                    if(name.indexOf(text) >= 0) {
-                        let result =
-                            '<div id="' + table + '-result-' + id + '" class="result-display">' +
-                            '<span class="result-name">' + entry.name + '</span>';
-                        if(entry.hasOwnProperty('description'))
-                            result += '<span class="result-description">' + entry.description + '</span>';
-                        result += '</div>';
-                        let $result = $(result);
-                        $result.click(function(e) {
-                            $('#' + table + '-selected-id').val(id);
-                            $results.children().removeClass('selected');
-                            $(this).addClass('selected');
-                        });
-                        results.push($result);
-                    }
-                }
-            }
-            $results.empty();
-            results.forEach(function($res) { $results.append($res); });
-        };
-
-
-        Relation.prototype.visualize = function() {
-            let self = this, canvas = self.canvas;
-
-            //self.syncGraph();
-            if(!self.evaluated['Visualization']) {
-                self.evaluate({
-                    tag: 'Visualization',
-                    useLaw: function(law) {
-                        return law.name.match(/^Visualization/) !== null;
-                    },
-                    propagate: {value: true}
-                });
-            }
-
-            canvas.strokeColor = 'red';
-            canvas.lineWidth = 4;
-            canvas.fillColor = 'blue';
-
-            //all the visualization objects will have been determined in the relation
-            let objects = self.law.getNodesByConcept('visual');
-            objects.forEach(function(object) {
-                let originNode = object.getChildrenByConcept('origin')[0], origin = null;
-                if(originNode) {
-                    let opt = self.getChildTree(originNode);
-                    if(opt.x && opt.y) origin = {x: opt.x._value, y: opt.y._value};
-                }
-                let head = object.getHead();
-                console.log('visualizing ' + head.getConcept().name + ' [' + head.id + ']');
-                if(origin) console.log('from (' + origin.x + ', ' + origin.y + ')');
-                let shapes = object.getChildrenByConcept('shape');
-                shapes.forEach(function(shape) {
-                    let shapeName = shape.getConcept().name, opt = self.getChildTree(shape);
-                    console.log('drawing shape ' + shapeName);
-                    console.info(opt);
-                    switch(shapeName) {
-                        case 'line':
-                            let x1 = null, y1 = null, x2 = null, y2 = null;
-                            if(origin) {
-                                x1 = origin.x;
-                                y1 = origin.y;
-                            }
-                            if(opt.start && opt.start.x && opt.start.y) {
-                                x1 += opt.start.x._value;
-                                y1 += opt.start.y._value;
-                            }
-                            if(opt.end && opt.end.x && opt.end.y) {
-                                x2 = opt.end.x._value;
-                                y2 = opt.end.y._value;
-                            }
-                            else if(opt.delta && opt.delta.x && opt.delta.y) {
-                                x2 = x1 + opt.delta.x._value;
-                                y2 = y1 + opt.delta.y._value;
-                            }
-                            if(typeof x1 == 'number' && typeof x2 == 'number' && typeof y1 == 'number' && typeof y2 == 'number') {
-                                console.log('line from (' + x1 + ',' + y1 + ') to (' + x2 + ',' + y2 + ')');
-                                canvas.beginPath();
-                                canvas.moveTo(x1, y1);
-                                canvas.lineTo(x2, y2);
-                                canvas.stroke();
-                            }
-                            break;
-                        case 'arrow':
-                            break;
-                        case 'arc':
-                            break;
-                        case 'circle':
-                            if(origin && opt.radius) {
-                                canvas.beginPath();
-                                canvas.arc(origin.x, origin.y, opt.radius._value, 0, 2*Math.PI);
-                                canvas.stroke();
-                            }
-                            break;
-                        case 'triangle':
-                            break;
-                        case 'rectangle':
-                            break;
-                        default: break;
-                    }
-                });
-            });
-        };
-
-
-        Relation.prototype.getChildTree = function(node) {
-            let self = this, val = node.value.toString();
-            if(!isNaN(val)) val = parseFloat(val);
-            let opts = {_value: val};
-            let children = node.getChildren();
-            children.forEach(function(child) {
-                let concept = child.getConcept();
-                opts[concept.name] = self.getChildTree(child);
-            });
-            return opts;
-        };
-
-
+    </script>
+
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/databaseWrappers.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/diagram.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/interface.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/evaluate.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/symbolize.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/visualize.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/suggest.js')}}"></script>
+
+    <script type="text/javascript">
         var relation;
         $(document).ready(function() {
             relation = new Relation();
@@ -1007,7 +541,7 @@
                 relation.save();
             });
             $('#evaluate-relation').click(function(e) {
-                relation.evaluate();
+                relation.evaluate({});
             });
             $('#visualize-relation').click(function(e) {
                 relation.visualize();
@@ -1015,8 +549,10 @@
             $('#symbolize-relation').click(function(e) {
                 relation.symbolize();
             })
+            $('#suggest-step').click(function(e) {
+                relation.suggest();
+            })
         });
-
     </script>
     {{end page_js}}
 

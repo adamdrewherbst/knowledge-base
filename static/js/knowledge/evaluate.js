@@ -30,16 +30,24 @@
         Relation.prototype.evaluate = function(opts) {
 
             let self = this;
-            if(!opts) opts = {};
-            if(opts.tag) self.evaluated[opts.tag] = false;
+            if(opts) self.options.evaluate = opts;
+            opts = self.options.evaluate;
 
             $('#evaluate-msg').text('Evaluating...');
             self.syncGraph();
-            self.nodesToCheck = self.myNodes.slice();
+            self.nodesToCheck = [];
+            self.law.nodes.forEach(function(nodeId) {
+                let node = self.nodes[nodeId];
+                if(node && !node.evaluated[opts.tag || 'all']) self.nodesToCheck.push(nodeId);
+            });
+
+            self.stats.evaluate.nodesChecked = 0;
+
             while(self.nodesToCheck.length > 0) {
                //find any deep predicate nodes in included frameworks
                //that have the same concept as this node
                let nodeId = self.nodesToCheck.shift(), node = self.nodes[nodeId], concepts = node.getConcept().getAllConcepts();
+               if(node.tentative) continue;
                console.log('checking node ' + nodeId);
                for(let concept in concepts) {
                    if(!self.predicates.hasOwnProperty(concept)) continue;
@@ -47,18 +55,32 @@
                        let predicateNode = self.nodes[predicateId];
                        if(node.law == predicateNode.law) continue;
                        let law = self.findEntry('law', predicateNode.law);
+                       if(law.hasTag('inactive')) continue;
                        if(opts.frameworks && opts.frameworks.indexOf(law.framework) < 0) continue;
                        if(opts.useLaw && !opts.useLaw.call(self, law)) continue;
+                       if(opts.tag && !law.hasTag(opts.tag)) continue;
+                       else if(!opts.tag && (law.hasTag('visualization'))) continue;
                        console.log('node ' + nodeId + ' matches ' + predicateId + ' in ' + law.name + ' [' + law.id + ']');
                        self.checkPredicate(nodeId, predicateId);
                    }
                }
+               node.evaluated[opts.tag || 'all'] = true;
+
+               self.stats.evaluate.nodesChecked++;
+
+               if(self.nextMapId > 100) {
+                   console.log('');
+                   console.error('TOO MANY MAPS - ABORTING');
+                   break;
+               }
             }
-            if(opts.tag) self.evaluated[opts.tag] = true;
             if(opts.propagate) {
                 for(let type in opts.propagate) self.law.propagateData(type);
             }
             $('#evaluate-msg').text('Done evaluating');
+            console.log('');
+            console.log('Checked ' + self.stats.evaluate.nodesChecked + ' nodes');
+            console.log('Created ' + self.nextMapId + ' maps');
         };
 
         //see if the relation matches the predicate by recursively tracing the law up to its wildcards
@@ -185,7 +207,9 @@
             map.children = map.children.concat(submap.children);
         };
 
-
+        /*
+        From every symmetric node, there are two possible maps.
+        */
         Relation.prototype.splitMaps = function(map) {
             let self = this, maps = [];
 
@@ -213,7 +237,13 @@
             map.idMap = Object.assign({}, map1.idMap, map2.idMap);
             map.value = Object.assign({}, map1.value, map2.value);
             map.intersects = Object.assign({}, map1.intersects, map2.intersects);
-            map.predicates = map1.predicates.concat(map2.predicates);
+            map.predicates = [];
+            for(let i = 0; i < 2; i++) {
+                let currentMap = i == 0 ? map1 : map2;
+                currentMap.predicates.forEach(function(p) {
+                    if(map.predicates.indexOf(p) < 0) map.predicates.push(p);
+                });
+            }
             map.children = [];
 
             return map;
@@ -298,6 +328,9 @@
                    console.err("couldn't append deep node " + nodeId + ' [' + self.nodes[nodeId].getConcept().name + ']');
                }
             });
+
+            map.satisfied = true;
+            map.tentative = self.options.evaluate.tentative || false;
         };
 
         Relation.prototype.appendLawHelper = function(map, nodeId) {
@@ -306,22 +339,35 @@
 
             let self = this, node = self.nodes[nodeId], head = node['head'], reference = node['reference'],
                 newHead = null, newReference = null;
+            let tentative = self.options.evaluate.tentative || false;
 
+            //if the head and reference of this node haven't been appended yet, do that first
             newHead = self.appendLawHelper(map, head);
             if(newHead == null) return null;
-            for(let child in self.nodes[newHead].children) {
-                if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newReference) {
-                    return child;
-                }
-            }
-
             if(reference) {
                 newReference = self.appendLawHelper(map, reference);
                 if(newReference == null) return null;
+            }
+
+            //if the head and reference are already related by this concept, don't add the node
+            //...unless we are only appending knowledge tentatively, in which case we need to distinguish
+            //which law each tentative node came from
+            if(!tentative) {
+                for(let child in self.nodes[newHead].children) {
+                    if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newReference) {
+                        return child;
+                    }
+                }
+            }
+
+            //same process for the reference node
+            if(reference) {
                 if(self.concepts[node.concept].symmetric) {
-                    for(let child in self.nodes[newReference].children) {
-                        if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newHead) {
-                            return child;
+                    if(!tentative) {
+                        for(let child in self.nodes[newReference].children) {
+                            if(self.nodes[child].concept == node.concept && self.nodes[child].reference == newHead) {
+                                return child;
+                            }
                         }
                     }
                 }
@@ -332,15 +378,16 @@
                 'concept': node['concept'],
                 'head': parseInt(newHead),
                 'reference': newReference ? parseInt(newReference) : null,
-                'value': self.nodes[nodeId].value
+                'value': self.nodes[nodeId].value,
+                'tentative': tentative
             });
-            self.myNodes.push(newId);
-            self.newNodes.push(newId);
-            self.nodesToCheck.push(newId);
+            self.law.nodes.push(newId);
+
+            if(!tentative) self.nodesToCheck.push(newId);
             map.idMap[nodeId] = newId;
             map.idMap[newId] = nodeId;
 
-            self.drawNode(newId, {
+            if(!tentative) self.drawNode(newId, {
                 template: 'appended',
                 drawLinks: true
             });

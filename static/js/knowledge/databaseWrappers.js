@@ -110,6 +110,10 @@
             });
         };
 
+        Law.prototype.hasTag = function(tag) {
+            return this.hashtags.hasOwnProperty(tag) && this.hashtags[tag];
+        }
+
         Law.prototype.getNodesByConcept = function(concept) {
             let nodes = [], self = this;
             this.nodes.forEach(function(id) {
@@ -161,6 +165,8 @@
                 'symbol': self.symbol,
                 'value': self.value
             }
+            self.evaluated = {};
+            self.tentative = false;
         }
 
         Node.prototype = Object.create(Entry.prototype);
@@ -244,6 +250,16 @@
         Node.prototype.remove = function() {
             this.setHead(null);
             if(this.relation) this.relation.removeEntry('node', this.id);
+        };
+
+        Node.prototype.isPredicate = function() {
+            let law = this.getEntry('law', this.law);
+            for(let p in law.predicates) {
+                for(let n in law.predicates[p]) {
+                    if(n == this.id) return true;
+                }
+            }
+            return false;
         };
 
         //use string shorthand to find connected nodes, eg. C.C means all my childrens' children
@@ -476,6 +492,7 @@
         };
 
         Value.prototype.readValue = function(str) {
+            str = str || '';
             let self = this, arr = str.split(',');
             self.values = [];
             arr.forEach(function(str) {
@@ -572,7 +589,17 @@
                     let entry = entries[id];
                     switch(table) {
                         case 'framework': break;
-                        case 'law': break;
+                        case 'law':
+                            //remove all existing predicate indexes for this law
+                            entry.nodes.forEach(function(node) {
+                                if(self.predicateNodes.hasOwnProperty(node)) {
+                                    let concept = self.predicateNodes[node];
+                                    if(self.predicateNodes.hasOwnProperty(concept) && self.predicateNodes[concept].hasOwnProperty(node))
+                                        delete self.predicateNodes[concept][node];
+                                    delete self.predicateNodes[node];
+                                }
+                            });
+                            break;
                         case 'concept': break;
                         case 'node':
                             let head = entry.getHead();
@@ -599,21 +626,38 @@
                             }
                             break;
                         case 'law':
-                            entry.predicateSets = [];
-                            if(self.law.id == entry.id || self.law.id == oldId) {
-                                self.setLaw(entry);
-                            }
-                            $.each(entry.predicates, function(id, group) {
-                                let pset = [];
-                                for(let node in group) pset.push(parseInt(node));
-                                entry.predicateSets.push(pset);
+                            //update hash tags
+                            let hashtags = entry.hashtags;
+                            entry.hashtags = {};
+                            if(hashtags) hashtags.split(',').forEach(function(tag) {
+                                entry.hashtags[tag] = true;
                             });
+                            //update which nodes are deep nodes of this law
                             entry.deepNodes = [];
                             entry.nodes.forEach(function(node) {
                                 let n = parseInt(node);
                                 if(!entry.notDeepNode.hasOwnProperty(n)) {
                                     entry.deepNodes.push(n);
                                 }
+                            });
+                            //update predicate groups
+                            entry.predicateSets = [];
+                            if(self.law.id == entry.id || self.law.id == oldId) {
+                                self.setLaw(entry);
+                            }
+                            $.each(entry.predicates, function(id, group) {
+                                let pset = [];
+                                for(let node in group) {
+                                    pset.push(parseInt(node));
+                                    //fill in the predicate indices
+                                    self.predicateNodes[node] = true;
+                                    if(self.nodes[node]) {
+                                        let concept = self.nodes[node].concept;
+                                        self.predicateNodes[node] = concept;
+                                        self.predicates[concept] = node;
+                                    }
+                                }
+                                entry.predicateSets.push(pset);
                             });
                             break;
                         case 'concept':
@@ -639,8 +683,10 @@
                             break;
                         case 'node':
                             entries[entry.head || 0].children[entry.id] = entry;
-                            if(!self.predicates.hasOwnProperty(entry.concept)) self.predicates[entry.concept] = {};
-                            self.predicates[entry.concept][entry.id] = true;
+                            if(self.predicateNodes.hasOwnProperty(entry.id)) {
+                                self.predicateNodes[entry.id] = entry.concept;
+                                self.predicates[entry.concept][entry.id] = true;
+                            }
                             let nodeData = self.diagram.model.findNodeDataForKey(id);
                             if(!nodeData && oldId) nodeData = self.diagram.model.findNodeDataForKey(oldId);
                             if(nodeData) {
@@ -661,10 +707,10 @@
         Relation.prototype.createEntry = function(table, data) {
             let self = this, entry = null;
             switch(table) {
-                case 'framework': entry = new Framework(data); break;
-                case 'law': entry = new Law(data); break;
-                case 'concept': entry = new Concept(data); break;
-                case 'node': entry = new Node(data); break;
+                case 'framework': entry = new Framework(); break;
+                case 'law': entry = new Law(); break;
+                case 'concept': entry = new Concept(); break;
+                case 'node': entry = new Node(); break;
                 default: break;
             }
             if(entry) {

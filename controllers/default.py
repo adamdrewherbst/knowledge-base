@@ -89,7 +89,7 @@ def getEntry(table, data):
             ret['dependencies'][dep.dependency] = True
     elif table == 'law':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
-            'nodes': [], 'predicates': {}, 'notDeepNode': {}};
+            'hashtags': entry.hashtags, 'nodes': [], 'predicates': {}, 'notDeepNode': {}};
         for node in db(db.node.law == entry.id).iterselect():
             ret['nodes'].append(node.id)
             for predicate in db(db.predicate.node == node.id).iterselect():

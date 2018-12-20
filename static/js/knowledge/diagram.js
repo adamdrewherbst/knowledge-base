@@ -347,10 +347,10 @@
             //=> first we need to identify the children of each node
             let rootNodes = [];
             let nodeMeta = {'-1': {children: []}};
-            self.myNodes.forEach(function(node) {
+            self.law.nodes.forEach(function(node) {
                 nodeMeta[node] = {children: []};
             });
-            self.myNodes.forEach(function(node) {
+            self.law.nodes.forEach(function(node) {
                 if(node < 0) return;
                 let head = self.nodes[node].head, root = !head;;
                 nodeMeta[root ? -1 : head].children.push(node);
@@ -463,4 +463,119 @@
             for(let property in nodeTemplate) {
                 self.diagram.model.setDataProperty(node, property, nodeTemplate[property]);
             }
+        };
+
+
+        Relation.prototype.setNodeData = function(nodeId, attr, value) {
+            console.log('setting node ' + nodeId + ' ' + attr + ' to ' + value);
+            let self = this, node = self.nodes[nodeId];
+            if(node) node[attr] = value;
+            let data = self.diagram.model.findNodeDataForKey(nodeId);
+            if(data) self.diagram.model.set(data, attr, value);
+        };
+
+
+        Relation.prototype.getNodeString = function(id) {
+
+            let self = this, node = self.nodes[id], law = self.law;
+            if(!node) return '';
+
+            let lawStr = '';
+            if(law) lawStr = law.name + ' [' + law.id + ']';
+            else lawStr = 'none';
+
+            let predicates = '';
+            for(let group in self.predicateSets) {
+                if(self.predicateSets[group].hasOwnProperty(id)) {
+                    let groupStr = '';
+                    for(let n in self.predicateSets[group]) groupStr += '' + n + ',';
+                    predicates += groupStr.substring(0, groupStr.length-1) + '; ';
+                }
+            }
+            if(predicates == '') predicates = 'none';
+            else predicates = predicates.substring(0, predicates.length-2);
+
+            let mappings = '';
+            if(self.nodeMap.hasOwnProperty(id)) {
+                for(let p in self.nodeMap[id]) {
+                    for(let m in self.nodeMap[id][p]) {
+                        let map = self.map[m], law = self.laws[map.lawId];
+                        let mapStr = '';
+                        for(let n in map.idMap) if(self.nodes[n].law == law.id) mapStr += '' + n + ',';
+                        mapStr = mapStr.substring(0, mapStr.length-1);
+                        mappings += '' + p + ' [' + self.concepts[self.nodes[p].concept].name + ']' + "\n"
+                            + '.  in ' + law.name + ' [' + law.id + ']' + "\n"
+                            + '.  ' + mapStr + ' (map ' + m + ')' + "\n";
+                    }
+                }
+            }
+            if(mappings == '') mappings = 'none';
+            else mappings = "\n" + mappings;
+
+            msg = 'ID: ' + node.id + "\n"
+                + 'Law: ' + lawStr + "\n"
+                + 'Predicates: ' + predicates + "\n"
+                + 'Values: ' + node.value.toString() + "\n"
+                + 'Mappings: ' + mappings;
+            return msg;
+        };
+
+
+        Relation.prototype.syncGraph = function() {
+            let self = this, graphNodes = [];
+            self.diagram.nodes.each(function(node) {
+                let id = parseInt(node.data['id']);
+                let entries = self.getTable('node');
+                if(!entries.hasOwnProperty(id)) entries[id] = self.createEntry('node');
+                let entry = entries[id];
+                entry.id = id;
+                entry.concept = node.data['concept'];
+                entry.name = node.data['name'] || null;
+                entry.value.readValue(node.data['value']);
+                let head = node.findNodesInto('T'),
+                    reference = node.findNodesOutOf('T');
+                head = head.count > 0 ? head.first().data['id'] : null;
+                reference = reference.count > 0 ? reference.first().data['id'] : null;
+                entry.setHead(head);
+                entry.setReference(reference);
+                if(graphNodes.indexOf(id) < 0) graphNodes.push(id);
+            });
+
+            self.law.nodes.forEach(function(id) {
+                let node = self.findEntry('node', id);
+                if(node && graphNodes.indexOf(id) < 0) {
+                    node.remove();
+                }
+            });
+            self.law.nodes = graphNodes;
+            self.myNodes = self.law.nodes;
+        };
+
+
+        Relation.prototype.selectEntry = function(table, callback, opts) {
+            let self = this;
+            let options = Object.assign({
+                tab: 'search',
+                framework: self.framework.id,
+                fields: {}
+            }, opts);
+            let $modal = $('#' + table + '-select'), $form = $modal.find('#' + table + '-create-form');
+            $modal.find('#' + table + '-' + options.tab + '-tab').show().tab('show');
+            $modal.find('.framework-filter').val(options.framework);
+            self.showSearchResults(table, '');
+            $modal.data('callback', callback);
+            $form.find('input,select').each(function(i, el) {
+                let $el = $(el), name = $el.attr('name');
+                if(name == 'table') return;
+                let value = options.fields[name] || (name == 'framework' ? '-1' : '');
+                let $multiple = $el.parents('.multiple-wrapper');
+                if($el.is('input[type=checkbox]')) $el.attr('checked', value ? true : false);
+                else if($multiple.length > 0) {
+                    $multiple.find('.multiple-item').first().nextAll('.multiple-item').remove();
+                    if(typeof value == 'object') value.forEach(function(row) {
+                        self.addMultipleField($multiple, row);
+                    });
+                } else $el.val(value);
+            });
+            $modal.modal('show');
         };

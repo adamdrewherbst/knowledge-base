@@ -334,3 +334,7 @@ timestamp: 2018-11-09T01:40:54.226910
 ALTER TABLE concept ADD value VARCHAR(512);
 success!
 success!
+timestamp: 2018-12-19T19:25:31.031236
+ALTER TABLE law ADD hashtags VARCHAR(512);
+success!
+success!
