@@ -27,6 +27,13 @@
 
         */
 
+
+        /*
+        assumes that matchId is a deep node of its description
+        */
+        Relation.prototype.fullMatch = function(nodeId, matchId) {
+        };
+
         Relation.prototype.evaluate = function(opts) {
 
             let self = this;
@@ -102,69 +109,64 @@
         };
 
 
-        //see if the relation matches the predicate by recursively tracing the law up to its wildcards
-        Relation.prototype.checkPredicate = function(nodeID, predicateID, map) {
+        function Map() {
+            this.relation = null;
 
-            let self = this, nodeId = parseInt(nodeID), predicateId = parseInt(predicateID),
-                node = this.nodes[nodeId], predicate = this.nodes[predicateId];
+            this.type = null;
+            this.lawId = null;
+            this.setId = null;
+            this.idMap = {};
+            this.deepNodes = [];
+            this.valueMap = {};
+            this.intersects = {};
+            this.children = [];
 
-            //if this is the first recursion step, initialize aggregators
-            let firstLevel = !map;
-            if(firstLevel) {
-                map = {lawId: predicate['law'], predicates: [predicateId], idMap: {}, value: {}, intersects: {}, children: []};
-            }
+            this.nodeId = null;
+            this.matchId = null;
+        }
 
-            //make sure at least one of this node's associated concepts matches the predicate's concept
-            let match = predicate.concept == self.wildcardConcept
-                || node.concept == predicate.concept
-                || self.concepts[node.concept].dependencies[predicate.concept]
-            if(!match && self.concepts[node.concept].inherits && node.head > 0 && self.nodes.hasOwnProperty(node.head)) {
-                let headConcept = self.nodes[node.head].concept;
-                if(headConcept > 0){
-                    match = headConcept == predicate.concept
-                            || self.concepts[headConcept].dependencies[predicate.concept];
-                }
-            }
-            //and find the intersection of any values on the two nodes
-            let value = null;
-            if(match) value = node.value; //.intersect(predicate.values);
-            if(!match) return false; // || (value && value.length == 0)) return false;
+        Map.prototype.checkMatch = function() {
+            let self = this, relation = self.relation;
+            let nodeId = self.nodeId, matchId = self.matchId;
+            let node = relation.findEntry('node', nodeId),
+                matchNode = relation.findEntry('node', matchId);
 
-            map.idMap[nodeId] = predicateId;
-            map.idMap[predicateId] = nodeId;
-            map.value[nodeId] = value;
+            //make sure the test node's concept is an instance of the match's concept
+            if(!node.getConcept().instanceOf(matchNode.getConcept())) return false;
+
+            self.idMap[nodeId] = matchId;
+            self.idMap[matchId] = nodeId;
 
             //note any prior mappings between this node and predicate node - used later to test for intersections
-            if(self.nodeMap.hasOwnProperty(nodeId) && self.nodeMap[nodeId].hasOwnProperty(predicateId)) {
-                for(let mapId in self.nodeMap[nodeId][predicateId]) {
-                    map.intersects[mapId] = true;
-                }
+            if(Map.nodeMap[nodeId] && Map.nodeMap[nodeId][matchId]) {
+                for(let mapId in Map.nodeMap[nodeId][matchId])
+                    self.intersects[mapId] = true;
             }
 
             //for symmetric nodes, make 2 submaps, one for each orientation
-            let symmetric = self.concepts[node.concept].symmetric, fwdMap = map, revMap = map, fwd = true, rev = true;
-            let nh = node.head, nr = node.reference, ph = predicate.head, pr = predicate.reference, twoMaps = false;
+            let symmetric = node.getConcept().symmetric, fwdMap = map, revMap = map, fwd = true, rev = true;
+            let nh = node.head, nr = node.reference, ph = match.head, pr = match.reference, twoMaps = false;
             if(symmetric && ((ph && nh) || (pr && nr))) {
                 twoMaps = true;
-                fwdMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, value: {}, intersects: {}, children: [], parent: map};
-                revMap = {lawId: predicate.law, predicates: [predicateId], idMap: {}, value: {}, intersects: {}, children: [], parent: map};
+                fwdMap = self.initChild();
+                revMap = self.initChild();
             }
 
             //check recursively on this node's head and reference
-            if(ph) fwd = fwd && nh && self.checkPredicate(nh, ph, fwdMap);
-            if(pr) fwd = fwd && nr && self.checkPredicate(nr, pr, fwdMap);
+            if(ph) fwd = fwd && nh && self.checkMatch(nh, ph, fwdMap);
+            if(pr) fwd = fwd && nr && self.checkMatch(nr, pr, fwdMap);
             //for symmetric nodes, check the other orientation
             if(symmetric) {
-                if(ph) rev = rev && nr && self.checkPredicate(nr, ph, revMap);
-                if(pr) rev = rev && nh && self.checkPredicate(nh, pr, revMap);
+                if(ph) rev = rev && nr && self.checkMatch(nr, ph, revMap);
+                if(pr) rev = rev && nh && self.checkMatch(nh, pr, revMap);
                 //if both succeed, keep the two alternatives as a pair of submaps
                 if(fwd && rev) {
-                    if(twoMaps) map.children.push([fwdMap, revMap]);
+                    if(twoMaps) self.children.push([fwdMap, revMap]);
                 }
                 //if only one, absorb the corresponding submap into this map
                 else if(fwd || rev) {
                     let keepMap = fwd ? fwdMap : revMap;
-                    if(!self.absorbMap(map, keepMap)) return false;
+                    if(!self.absorb(keepMap)) return false;
                 }
             } else rev = false;
             //and if neither direction worked, the predicate fails
@@ -173,20 +175,29 @@
             if(firstLevel) {
                 //at this point we have a complete match to the predicate
                 //separate all the forks on symmetric nodes into full maps
-                let maps = self.splitMaps(map), newMaps = 0, law = self.laws[predicate.law];
-                console.log('node ' + nodeId + ' matches ' + law.name + ' on ' + predicateId);
+                let maps = self.split(), newMaps = 0, relation.findEntry('law', matchNode.law);
+                console.log('node ' + nodeId + ' matches ' + law.name + ' on ' + matchId);
                 console.log('   ' + maps.length + ' map versions');
-                let satisfied = !law.predicateSets.every(function(pset) {
-                    return !(pset.length == 1 && pset[0] == predicateId);
-                });
+                let satisfied = false;
+                switch(self.type) {
+                    case 'predicate':
+                        satisfied = !law.predicateSets.every(function(pset) {
+                            return !(pset.length == 1 && pset[0] == matchId);
+                        });
+                        break;
+                    case 'set':
+                        let rset = law.sets[self.setId];
+                        satisfied = rset.length == 1 && rset[0] == matchId;
+                        break;
+                }
                 if(satisfied) console.log('   satisfied');
                 maps.forEach(function(map) {
-                    if(!self.includeMap(map)) return;
+                    if(!relation.includeMap(self)) return;
                     if(satisfied) {
-                        self.appendLaw(map);
+                        relation.doSatisfied(self);
                     } else {
                         for(let other in map.intersects) {
-                            self.checkIntersection(map.id, other);
+                            self.checkIntersection(other);
                         }
                     }
                 });
@@ -194,73 +205,81 @@
             return true;
         };
 
+        Map.prototype.initChild = function() {
+            let child = new Map();
+            child.type = this.type;
+            child.setId = this.setId;
+            child.deepNodes = this.deepNodes;
+            return child;
+        };
 
-        Relation.prototype.includeMap = function(map) {
-            let self = this, count = 0, id = self.nextMapId;
-            for(let n in map.idMap) {
-                let p = map.idMap[n];
-                if(!self.nodeMap.hasOwnProperty(n)) self.nodeMap[n] = {};
-                if(!self.nodeMap[n].hasOwnProperty(p)) self.nodeMap[n][p] = {};
-                if(!self.nodeMap.hasOwnProperty(p)) self.nodeMap[p] = {};
-                if(!self.nodeMap[p].hasOwnProperty(n)) self.nodeMap[p][n] = {};
-                self.nodeMap[n][p][id] = true;
+
+        Map.prototype.include = function() {
+            let self = this, count = 0, id = Map.nextMapId;
+            for(let n in self.idMap) {
+                let p = self.idMap[n];
+                if(!Map.nodeMap[n]) Map.nodeMap[n] = {};
+                if(!Map.nodeMap[n][p]) Map.nodeMap[n][p] = {};
+                if(!Map.nodeMap[p]) Map.nodeMap[p] = {};
+                if(!Map.nodeMap[p][n]) Map.nodeMap[p][n] = {};
+                Map.nodeMap[n][p][id] = true;
                 count++;
             }
             if(count > 0) {
-                map.id = id;
-                self.map[self.nextMapId++] = map;
+                self.id = id;
+                Map.map[Map.nextMapId++] = self;
                 return true;
             }
             return false;
         };
 
 
-        Relation.prototype.absorbMap = function(map, submap) {
+        Map.prototype.absorb = function(submap) {
             let self = this;
             for(let n in submap.idMap) {
-                if(map.idMap.hasOwnProperty(n) && map.idMap[n] != submap.idMap[n]) return false;
-                map.idMap[n] = submap.idMap[n];
+                if(self.idMap.hasOwnProperty(n) && self.idMap[n] != submap.idMap[n]) return false;
+                self.idMap[n] = submap.idMap[n];
             }
-            for(let n in submap.value) map.value[n] = submap.value[n];
-            for(let m in submap.intersects) map.intersects[m] = submap.intersects[m];
-            map.children = map.children.concat(submap.children);
+            for(let n in submap.value) self.value[n] = submap.value[n];
+            for(let m in submap.intersects) self.intersects[m] = submap.intersects[m];
+            self.children = self.children.concat(submap.children);
         };
 
         /*
         From every symmetric node, there are two possible maps.
         */
-        Relation.prototype.splitMaps = function(map) {
+        Map.prototype.split = function() {
             let self = this, maps = [];
 
             map.children.forEach(function(pair) {
-                let submaps = self.splitMaps(pair[0]).concat(self.splitMaps(pair[1]));
+                let submaps = pair[0].split().concat(pair[1].split());
                 submaps.forEach(function(submap) {
-                    let merge = self.mergeMaps(map, submap);
+                    let merge = self.merge(submap);
                     if(merge) maps.push(merge);
                 });
             });
 
-            if(maps.length == 0) maps.push(map);
+            if(maps.length == 0) maps.push(self);
 
             return maps;
         }
 
 
-        Relation.prototype.mergeMaps = function(map1, map2) {
-            let self = this, map = {};
+        Relation.prototype.merge = function(other) {
+            let self = this, map = new Map();
 
-            map.lawId = map1.lawId;
-            for(let n in map1.idMap) {
-                if(map2.idMap.hasOwnProperty(n) && map2.idMap[n] != map1.idMap[n]) return false;
+            map.lawId = self.lawId;
+            for(let n in self.idMap) {
+                if(other.idMap.hasOwnProperty(n) && self.idMap[n] != other.idMap[n]) return false;
             }
-            map.idMap = Object.assign({}, map1.idMap, map2.idMap);
-            map.value = Object.assign({}, map1.value, map2.value);
-            map.intersects = Object.assign({}, map1.intersects, map2.intersects);
-            map.predicates = [];
+            map.idMap = Object.assign({}, self.idMap, other.idMap);
+            map.valueMap = Object.assign({}, self.valueMap, other.valueMap);
+            map.intersects = Object.assign({}, self.intersects, other.intersects);
+            map.deepNodes = [];
             for(let i = 0; i < 2; i++) {
-                let currentMap = i == 0 ? map1 : map2;
-                currentMap.predicates.forEach(function(p) {
-                    if(map.predicates.indexOf(p) < 0) map.predicates.push(p);
+                let currentMap = i == 0 ? self : other;
+                currentMap.deepNodes.forEach(function(n) {
+                    if(map.deepNodes.indexOf(n) < 0) map.deepNodes.push(n);
                 });
             }
             map.children = [];
@@ -269,64 +288,94 @@
         };
 
 
-        Relation.prototype.checkIntersection = function(mapId1, mapId2) {
+        Map.prototype.checkIntersection = function(other) {
 
-            let self = this, map1 = self.map[mapId1], map2 = self.map[mapId2];
-            console.log('intersecting map ' + mapId1 + ' with ' + mapId2);
+            let self = this, relation = self.relation;
+            console.log('intersecting map ' + self.id + ' with ' + other.id);
 
-            //make sure the two maps are for the same law, but their predicate sets are disjoint
-            if(map1.lawId != map2.lawId) return false;
-            let disjoint = map1.predicates.every(function(predicate) {
-                    return map2.predicates.indexOf(predicate) < 0;
+            //make sure the two maps are for the same law, but their deep node sets are disjoint
+            if(self.type != other.type || self.lawId != other.lawId) return false;
+            if(self.type == 'set' && self.setId != other.setId) return false;
+            let disjoint = self.deepNodes.every(function(n) {
+                    return other.deepNodes.indexOf(n) < 0;
                 });
             if(!disjoint) return false;
 
-            //and that the joint predicate set is part of a set that satisfies the law
-            let law = self.laws[map1.lawId], predicateSet = map1.predicates.concat(map2.predicates), match = null;
-            let predicates1 = map1.predicates.join(','), predicates2 = map2.predicates.join(',');
-            console.log('intersecting ' + predicates1 + ' with ' + predicates2 + ' for ' + law.name);
-            console.log('   requires: ' + JSON.stringify(law.predicateSets));
-            let cannotCombine = law.predicateSets.every(function(pset) {
-                let isSubset = predicateSet.every(function(predicate) {
-                    return pset.indexOf(predicate) >= 0;
+            //and that the joint deep node set is part of a set that satisfies the law
+            let deepNodes = self.deepNodes.concat(other.deepNodes), match = null;
+            let str1 = self.deepNodes.join(','), str2 = other.deepNodes.join(',');
+            console.log('intersecting ' + str1 + ' with ' + str2);
+
+            let law = relation.findEntry('law', self.lawId), matchingSets = [];
+            switch(self.type) {
+                case 'predicate':
+                    matchingSets = law.predicateSets;
+                    break;
+                case 'set':
+                    matchingSets = law.sets[self.setId];
+                    break;
+                default: return false;
+            }
+
+            let cannotCombine = matchingSets.every(function(mset) {
+                let isSubset = deepNodes.every(function(n) {
+                    return mset.indexOf(n) >= 0;
                 }), isMatch = false;
                 if(isSubset) {
                     console.log('   subset');
-                    //meanwhile, check if the predicates in the two maps in fact satisfy the law
-                    isMatch = pset.every(function(predicate) {
-                        return predicateSet.indexOf(predicate) >= 0;
+                    //meanwhile, check if the deep nodes in the two maps in fact satisfy the law/set
+                    isMatch = mset.every(function(m) {
+                        return deepNodes.indexOf(m) >= 0;
                     });
                     if(isMatch) {
-                        match = pset;
+                        match = mset;
                         console.log('   match');
                     }
                 }
                 return !isSubset && !isMatch;
             });
+
             if(match == null && cannotCombine) {
-                console.log('   predicate failure');
+                console.log('   match failure');
                 return false;
             }
 
-            //whichever relation nodes are shared by the two maps must be mapped to the same predicate node
-            for(let node in map1.idMap) {
-                if(!map2.idMap.hasOwnProperty(node)) continue;
-                if(map2.idMap[node] != map1.idMap[node]) return false;
+            //whichever relation nodes are shared by the two maps must be mapped to the same match node
+            for(let node in self.idMap) {
+                if(!other.idMap.hasOwnProperty(node)) continue;
+                if(other.idMap[node] != self.idMap[node]) return false;
             }
             console.log('   success');
 
             //at this point they do intersect, so create a new map by merging these two
-            let map = self.mergeMaps(map1, map2);
-            if(!self.includeMap(map)) return false;
+            let map = self.merge(other);
+            if(!map.include()) return false;
 
             //if the law has been satisfied, use the map to append the knowledge of the law to our relation
             if(match) {
-                self.appendLaw(map);
+                relation.doSatisfied(self);
             }
 
             return true;
         };
 
+        Relation.prototype.doSatisfied = function(map) {
+            let self = this;
+            switch(map.type) {
+                case 'predicate':
+                    self.appendLaw(map);
+                    break;
+                case 'set':
+                    self.addToSet(map);
+                    break;
+                default: break;
+            }
+        };
+
+        Relation.prototype.addToSet = function(map) {
+            let self = this;
+
+        };
 
         //given a correspondence between nodes in the relation and predicate, fill in the rest of the law
         Relation.prototype.appendLaw = function(map) {
@@ -423,6 +472,7 @@
             node.id = newId;
             node.setHead(node.head);
             node.setReference(node.reference);
+            if(!node.tentative) node.updateMatches();
             return newId;
         };
 

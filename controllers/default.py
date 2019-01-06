@@ -96,6 +96,10 @@ def getEntry(table, data):
                 if predicate.predicate_group not in ret['predicates']:
                     ret['predicates'][predicate.predicate_group] = {}
                 ret['predicates'][predicate.predicate_group][node.id] = True
+            for set in db(db.set.node == node.id).iterselect():
+                if set.set_id not in ret['sets']:
+                    ret['sets'][set.set_id] = {}
+                ret['sets'][set.set_id][node.id] = True
             if node.head:
                 ret['notDeepNode'][node.head] = True
             if node.reference:

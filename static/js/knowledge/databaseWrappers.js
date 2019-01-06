@@ -95,6 +95,7 @@
 
         function Law() {
             this.nodes = [];
+            this.sets = {};
         }
 
         Law.prototype = Object.create(Entry.prototype);
@@ -163,7 +164,7 @@
 
         function Node() {
             let self = this;
-            self.children = {};
+            self.children = {0: {}, 1: {}};
             self.symbol = new Symbol();
             self.value = new Value();
             self.data = {
@@ -182,6 +183,12 @@
             switch(key) {
                 case 'value':
                     this.setValue(value);
+                    break;
+                case 'head':
+                    this.setHead(value);
+                    break;
+                case 'reference':
+                    this.setReference(value);
                     break;
                 default: this[key] = value; break;
             }
@@ -215,41 +222,50 @@
             return this.findEntry(this.table, this.reference);
         };
 
+        Node.prototype.getParents = function() {
+            return [this.getHead(), this.getReference()];
+        };
+
         Node.prototype.setHead = function(id) {
             let currentHead = this.findEntry('node', this.head);
-            if(currentHead) currentHead.removeChild(this.id);
+            if(currentHead) currentHead.removeChild(0, this.id);
             this.head = id;
             let newHead = this.findEntry('node', this.head);
-            if(newHead) newHead.addChild(this);
+            if(newHead) newHead.addChild(0, this);
         };
 
         Node.prototype.setReference = function(id) {
+            let currentReference = this.findEntry('node', this.reference);
+            if(currentReference) currentReference.removeChild(1, this.id);
             this.reference = id;
+            let newReference = this.findEntry('node', this.reference);
+            if(newReference) newReference.addChild(1, this);
         };
 
-        Node.prototype.addChild = function(node) {
-            this.children[node.getId()] = node;
+        //type == 0 for children whose head is me, 1 for children whose reference is me
+        Node.prototype.addChild = function(type, node) {
+            this.children[type][node.getId()] = node;
         };
 
-        Node.prototype.getChildren = function() {
+        Node.prototype.getChildren = function(type) {
             let children = [];
-            for(let id in this.children) {
-                children.push(this.children[id]);
+            for(let id in this.children[type]) {
+                children.push(this.children[type][id]);
             }
             return children;
         };
 
-        Node.prototype.getChildrenByConcept = function(concept) {
+        Node.prototype.getChildrenByConcept = function(type, concept) {
             let children = [];
-            for(let id in this.children) {
-                let child = this.children[id];
+            for(let id in this.children[type]) {
+                let child = this.children[type][id];
                 if(child.instanceOf(concept)) children.push(child);
             }
             return children;
         };
 
-        Node.prototype.removeChild = function(id) {
-            delete this.children[id];
+        Node.prototype.removeChild = function(type, id) {
+            delete this.children[type][id];
         };
 
         Node.prototype.remove = function() {
@@ -389,6 +405,46 @@
             }
             delete data.waiting[node.id];
             delete node.data[type].trigger[self.id];
+        };
+
+        /*
+        Determine what partial set or predicate matches my head and reference are part of.
+
+        If my head is part of a match,
+        */
+        Node.prototype.updateMatches = function() {
+            let self = this;
+            //first check if I match a top-level node from any set or predicate description
+
+            //then check existing partial matches on my parents, and add me to them if appropriate
+            let candidates = {};
+            for(let i = 0; i < 2; i++) {
+                let parent = self.getParent(i);
+                if(!parent) continue;
+                for(let nodeId in parent.matches) {
+                    let node = self.findEntry('node', nodeId);
+                    for(let descriptionId in parent.matches[nodeId]) {
+                        node.getChildren(i).forEach(function(child) {
+                            if(child.descriptions[descriptionId] && self.conceptMatches(child)) {
+                                if(child.getParent((i+1)%2) == null) {
+                                    self.setMatch(child.id, descriptionId);
+                                } else {
+                                    if(i == 0) {
+                                        if(!candidates[child.id]) candidates[child.id] = {};
+                                        candidates[child.id][descriptionId] = true;
+                                    } else if(candidates[child.id] && candidates[child.id][descriptionId]) {
+                                        self.setMatch(child.id, descriptionId);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        };
+
+        Node.prototype.setMatch = function(nodeId) {
+            self.matches[nodeId] = true;
         };
 
 
@@ -610,8 +666,6 @@
                             break;
                         case 'concept': break;
                         case 'node':
-                            let head = entry.getHead();
-                            if(head && data[id].head != head.id) head.removeChild(id);
                             break;
                         default: break;
                     }
@@ -691,7 +745,6 @@
                             }
                             break;
                         case 'node':
-                            entries[entry.head || 0].children[entry.id] = entry;
                             if(self.predicateNodes.hasOwnProperty(entry.id)) {
                                 self.predicateNodes[entry.id] = entry.concept;
                                 self.predicates[entry.concept][entry.id] = true;
