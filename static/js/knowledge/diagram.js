@@ -523,32 +523,40 @@
 
         Relation.prototype.syncGraph = function() {
             let self = this, graphNodes = [];
+
+            self.law.eachNode(function(node) {
+                node.preprocess();
+            });
+
             self.diagram.nodes.each(function(node) {
                 let id = parseInt(node.data['id']);
-                let entries = self.getTable('node');
-                if(!entries.hasOwnProperty(id)) entries[id] = self.createEntry('node');
-                let entry = entries[id];
-                entry.id = id;
-                entry.concept = node.data['concept'];
-                entry.name = node.data['name'] || null;
-                entry.value.readValue(node.data['value']);
+                self.findOrCreateEntry('node', id);
+                if(graphNodes.indexOf(id) < 0) graphNodes.push(id);
+            });
+            self.diagram.nodes.each(function(node) {
+                let id = parseInt(node.data['id']);
+                let entry = self.findEntry('node', id);
                 let head = node.findNodesInto('T'),
                     reference = node.findNodesOutOf('T');
                 head = head.count > 0 ? head.first().data['id'] : null;
                 reference = reference.count > 0 ? reference.first().data['id'] : null;
-                entry.setHead(head);
-                entry.setReference(reference);
-                if(graphNodes.indexOf(id) < 0) graphNodes.push(id);
+                entry.store({
+                    concept: node.data['concept'],
+                    name: node.data['name'] || null,
+                    value: node.data['value'],
+                    head: head,
+                    reference: reference
+                });
             });
 
-            self.law.nodes.forEach(function(id) {
-                let node = self.findEntry('node', id);
-                if(node && graphNodes.indexOf(id) < 0) {
-                    node.remove();
-                }
+            self.law.eachNode(function(node) {
+                if(graphNodes.indexOf(node.id) < 0) node.remove();
             });
             self.law.nodes = graphNodes;
-            self.myNodes = self.law.nodes;
+
+            self.law.eachNode(function(node) {
+                node.postprocess();
+            });
         };
 
 

@@ -56,49 +56,9 @@
 
             $('#evaluate-msg').text('Evaluating...');
             self.syncGraph();
-            self.nodesToCheck = [];
-            self.law.nodes.forEach(function(nodeId) {
-                let node = self.nodes[nodeId];
-                if(node && !node.evaluated[opts.tag || 'all']) self.nodesToCheck.push(nodeId);
-            });
-
-            self.stats.evaluate.nodesChecked = 0;
-            self.stats.evaluate.nodesAppended = 0;
-
-            while(self.nodesToCheck.length > 0) {
-               //find any deep predicate nodes in included frameworks that have the same concept as this node
-               let nodeId = self.nodesToCheck.shift(), node = self.nodes[nodeId], concepts = node.getConcept().getAllConcepts();
-               if(node.tentative) continue;
-               console.log('checking node ' + nodeId);
-               for(let concept in concepts) {
-                   if(!self.predicates.hasOwnProperty(concept)) continue;
-                   for(let predicateId in self.predicates[concept]) {
-                       let predicateNode = self.nodes[predicateId];
-                       if(node.law == predicateNode.law) continue;
-                       let law = self.findEntry('law', predicateNode.law);
-                       if(law.hasTag('inactive')) continue;
-                       if(opts.frameworks && opts.frameworks.indexOf(law.framework) < 0) continue;
-                       if(opts.useLaw && !opts.useLaw.call(self, law)) continue;
-                       if(opts.tag && !law.hasTag(opts.tag)) continue;
-                       else if(!opts.tag && (law.hasTag('visualization'))) continue;
-                       console.log('node ' + nodeId + ' matches ' + predicateId + ' in ' + law.name + ' [' + law.id + ']');
-                       self.checkPredicate(nodeId, predicateId);
-                   }
-               }
-               node.evaluated[opts.tag || 'all'] = true;
-
-               self.stats.evaluate.nodesChecked++;
-
-               if(self.nextMapId > 100) {
-                   console.log('');
-                   console.error('TOO MANY MAPS - ABORTING');
-                   break;
-               }
-            }
-            if(opts.propagate) {
-                for(let type in opts.propagate) self.law.propagateData(type);
-            }
+            self.law.evaluate();
             $('#evaluate-msg').text('Done evaluating');
+
             console.log('');
             console.log('Checked ' + self.stats.evaluate.nodesChecked + ' nodes');
             console.log('Created ' + self.nextMapId + ' maps');
