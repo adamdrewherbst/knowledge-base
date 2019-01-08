@@ -80,7 +80,7 @@
             let self = this, val = node.value.toString();
             if(!isNaN(val)) val = parseFloat(val);
             let opts = {_value: val};
-            let children = node.getChildren();
+            let children = node.getChildren(0);
             children.forEach(function(child) {
                 let concept = child.getConcept();
                 opts[concept.name] = self.getChildTree(child);

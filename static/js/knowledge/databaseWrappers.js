@@ -1,3 +1,28 @@
+        Object.prototype.setIndex = function() {
+            let ref = this, n = arguments.length;
+            for(let i = 0; i < n-2; i++) {
+                let index = arguments[i];
+                if(!ref[index]) ref[index] = {};
+                ref = ref[index];
+            }
+            ref[arguments[n-2]] = arguments[n-1];
+        };
+
+        Object.prototype.deleteIndex = function() {
+            let ref = this, refs = [], n = arguments.length;
+            for(let i = 0; i < n-1; i++) {
+                let index = arguments[i];
+                if(!ref[index]) return;
+                refs.push(ref);
+                ref = ref[index];
+            }
+            delete ref[arguments[n-1]];
+            while(Object.keys(ref).length === 0) {
+                ref = refs.pop();
+                delete ref[arguments[--i]];
+            }
+        };
+
         function Entry() {
         }
 
@@ -31,6 +56,15 @@
                 if(match) return id;
             }
             return null;
+        };
+
+        Entry.prototype.store = function(data) {
+            for(let key in data) {
+                this.set(key, data[id][key]);
+            }
+        };
+
+        Entry.prototype.clearIndices = function() {
         };
 
 
@@ -101,6 +135,11 @@
         Law.prototype = Object.create(Entry.prototype);
         Law.prototype.constructor = Law;
         Law.prototype.table = 'law';
+
+        Law.prototype.store = function(data) {
+            let self = this;
+            super.store(data);
+        };
 
         Law.prototype.eachNode = function(callback) {
             let self = this;
@@ -190,7 +229,40 @@
                 case 'reference':
                     this.setReference(value);
                     break;
-                default: this[key] = value; break;
+                default:
+                    super.set(key, value);
+                    break;
+            }
+        };
+
+        Node.prototype.clearIndices = function() {
+            Law.predicateTop.deleteIndex(this.concept, this.id);
+            Law.setTop.deleteIndex(this.head, this.reference, this.concept, this.id);
+        };
+
+        Node.prototype.updateIndices = function() {
+            let self = this;
+            //if I have no parents I am a top predicate node
+            if(self.isPredicate && self.head == null && self.reference == null) {
+                Law.predicateTop.setIndex(self.concept, self.id, true);
+            }
+            //if I am in a set and my parents aren't in it, I am a top set node
+            if(self.isSet) {
+                let head = self.getHead(), ref = self.getReference();
+                if((!head || !head.isSet || head.setId != self.setId) &&
+                   (!ref || !ref.isSet || ref.setId != self.setId))
+                   Law.setTop.setIndex(self.head, self.reference, self.concept, self.id, true);
+            }
+            //if any of my children is in the same predicate/set as me,
+            //then I am not a deep node of that predicate/set
+            self.predicateDeep = self.isPredicate;
+            self.setDeep = self.isSet;
+            if(self.predicateDeep || self.setDeep) {
+                self.getChildren().every(function(child) {
+                    if(predicateDeep && child.isPredicate) predicateDeep = false;
+                    if(setDeep && child.isSet && child.setId == self.setId) setDeep = false;
+                    return self.predicateDeep || self.setDeep;
+                });
             }
         };
 
@@ -248,19 +320,27 @@
         };
 
         Node.prototype.getChildren = function(type) {
-            let children = [];
-            for(let id in this.children[type]) {
-                children.push(this.children[type][id]);
-            }
+            let children = [], types = null;
+            if(type === undefined) types = [0, 1];
+            else types = [type];
+            types.forEach(function(t) {
+                for(let id in this.children[t]) {
+                    children.push(this.children[t][id]);
+                }
+            });
             return children;
         };
 
-        Node.prototype.getChildrenByConcept = function(type, concept) {
-            let children = [];
-            for(let id in this.children[type]) {
-                let child = this.children[type][id];
-                if(child.instanceOf(concept)) children.push(child);
-            }
+        Node.prototype.getChildrenByConcept = function(concept, type) {
+            let children = [], types = null;
+            if(type === undefined) types = [0];
+            else types = [type];
+            types.forEach(function(t) {
+                for(let id in this.children[t]) {
+                    let child = this.children[t][id];
+                    if(child.instanceOf(concept)) children.push(child);
+                }
+            });
             return children;
         };
 
@@ -299,7 +379,7 @@
                             //if(symmetric) arr.push(node.getReference()); break;
                         case 'B': arr.push(node.getReference()); break;
                             //if(symmetric) arr.push(node.getHead()); break;
-                        case 'C': arr = arr.concat(node.getChildren()); break;
+                        case 'C': arr = arr.concat(node.getChildren(0)); break;
                         default: break;
                     }
                 });
@@ -408,34 +488,64 @@
         };
 
         /*
-        Determine what partial set or predicate matches my head and reference are part of.
-
-        If my head is part of a match,
+        Determine what nodes in any predicate or set description I match,
+        based on my concept and what my parents have already matched
         */
         Node.prototype.updateMatches = function() {
-            let self = this;
+            let self = this, symmetric = self.getConcept().symmetric;
             //first check if I match a top-level node from any set or predicate description
+            let concepts = self.getConcept().getAllConcepts();
+            let predicates = Law.getIndex('predicate.top'), sets = Law.getIndex('set.top');
+            for(let concept in concepts) {
+                //for a predicate, matching the concept of a top-level node is enough
+                for(let nodeId in predicates[concept]) {
+                    self.setMatch(nodeId);
+                }
+                //for a set, if its top-level node has parents in our relation,
+                //my parents must be the same as its parents - if either parent is null, we ignore it
+                for(let i = 0; i < 2; i++) for(let j = 0; j < 2; j++) {
+                    let h = i == 0 ? null : self.head, r = j == 0 ? null : self.reference;
+                    for(let nodeId in sets[h][r][concept]) self.setMatch(nodeId);
+                    if(symmetric) for(let nodeId in sets[r][h][concept]) self.setMatch(nodeId);
+                }
+            }
 
             //then check existing partial matches on my parents, and add me to them if appropriate
             let candidates = {};
             for(let i = 0; i < 2; i++) {
                 let parent = self.getParent(i);
                 if(!parent) continue;
-                for(let nodeId in parent.matches) {
-                    let node = self.findEntry('node', nodeId);
-                    for(let descriptionId in parent.matches[nodeId]) {
-                        node.getChildren(i).forEach(function(child) {
-                            if(child.descriptions[descriptionId] && self.conceptMatches(child)) {
-                                if(child.getParent((i+1)%2) == null) {
-                                    self.setMatch(child.id, descriptionId);
-                                } else {
-                                    if(i == 0) {
-                                        if(!candidates[child.id]) candidates[child.id] = {};
-                                        candidates[child.id][descriptionId] = true;
-                                    } else if(candidates[child.id] && candidates[child.id][descriptionId]) {
-                                        self.setMatch(child.id, descriptionId);
-                                    }
-                                }
+                for(let matchId in parent.matches) {
+                    let parentMatch = self.findEntry('node', matchId);
+
+                    //if the node my parent matched was already deep, we can't go any deeper
+                    if(parentMatch.isDeepPredicate || parentMatch.isDeepSet) continue;
+
+                    //consider both of my orientations if I am symmetric
+                    for(let j = 0; j < 2; j++) {
+                        if(j == 1 && !symmetric) continue;
+                        parentMatch.getChildren((i+j)%2).forEach(function(childMatch) {
+
+                            //first, this node's concept must match that of the child node's concept
+                            if(!self.getConcept().instanceOf(childMatch.getConcept())) return;
+                            let childId = childMatch.id;
+                            if(candidates[childId][j]) return self.setMatch(childId, j);
+
+                            //if the matching node has no other parent anyway, the match is complete
+                            let childMatchOtherParent = childMatch.getParent((i+j+1)%2);
+                            if(childMatchOtherParent == null) return self.setMatch(childId, j);
+
+                            //to match a set node whose other parent is a normal relation node,
+                            //my other parent must be the same relation node
+                            if(parentMatch.setId !== null && childMatchOtherParent.setId === null) {
+                                let otherParent = self.getParent((i+1)%2);
+                                if(otherParent !== childMatchOtherParent) return;
+                            }
+
+                            //otherwise, we mark this child as matched pending a match with the other parent
+                            if(i == 0) {
+                                if(!candidates[child.id]) candidates[child.id] = {};
+                                candidates[child.id][j] = true;
                             }
                         });
                     }
@@ -443,7 +553,7 @@
             }
         };
 
-        Node.prototype.setMatch = function(nodeId) {
+        Node.prototype.setMatch = function(nodeId, direction) {
             self.matches[nodeId] = true;
         };
 
@@ -628,58 +738,48 @@
         };
 
 
-
         Relation.prototype.storeEntries = function(ajaxData) {
             let self = this;
             if(!ajaxData || typeof ajaxData.entries != 'object') return;
             console.log('storing entries');
             console.info(ajaxData.entries);
-            for(let table in ajaxData.entries) {
-                let data = ajaxData.entries[table], entries = self.getTable(table);
-                if(!entries) return;
+
+            //order in which entries should be stored
+            let tables = ['concept', 'node', 'law', 'framework'];
+            tables.forEach(function(table) {
+                let data = ajaxData.entries[table];
+                if(!data) continue;
+                let entries = self.getTable(table);
                 let saved = {};
 
-                //pre-processing
+                //make sure all records are created with the proper IDs
                 for(let id in data) {
                     if(isNaN(id)) continue;
                     id = parseInt(id);
                     let oldId = data[id].oldId;
-                    if(!entries.hasOwnProperty(id)) {
-                        if(oldId && entries.hasOwnProperty(oldId)) {
+                    if(!entries[id]) {
+                        if(oldId && entries[oldId]) {
                             entries[id] = entries[oldId];
                             delete entries[oldId];
                         } else entries[id] = self.createEntry(table);
                     }
+                }
+                //clear any indices on these records - to be recalculated after
+                for(let id in data) {
+                    entry.clearIndices();
+                }
+                //update the data in each record
+                for(let id in data) {
                     let entry = entries[id];
-                    switch(table) {
-                        case 'framework': break;
-                        case 'law':
-                            //remove all existing predicate indexes for this law
-                            entry.nodes.forEach(function(node) {
-                                if(self.predicateNodes.hasOwnProperty(node)) {
-                                    let concept = self.predicateNodes[node];
-                                    if(self.predicateNodes.hasOwnProperty(concept) && self.predicateNodes[concept].hasOwnProperty(node))
-                                        delete self.predicateNodes[concept][node];
-                                    delete self.predicateNodes[node];
-                                }
-                            });
-                            break;
-                        case 'concept': break;
-                        case 'node':
-                            break;
-                        default: break;
-                    }
-                    //overwriting
-                    for(let key in data[id]) {
-                        entry.set(key, data[id][key]);
-                    }
+                    entry.store(data[id]);
                     saved[id] = true;
                 }
 
-                //post-processing
+                //post-process each record as needed
                 let frameworkReset = false;
                 for(let id in saved) {
                     let entry = entries[id], oldId = data[id].oldId;
+                    entry.updateIndices();
                     switch(table) {
                         case 'framework':
                             if(self.framework.id == id || self.framework.id == oldId) {
@@ -696,11 +796,8 @@
                             });
                             //update which nodes are deep nodes of this law
                             entry.deepNodes = [];
-                            entry.nodes.forEach(function(node) {
-                                let n = parseInt(node);
-                                if(!entry.notDeepNode.hasOwnProperty(n)) {
-                                    entry.deepNodes.push(n);
-                                }
+                            entry.eachNode(function(node) {
+                                if(node.isDeep) entry.deepNodes.push(node.id);
                             });
                             //update predicate groups
                             entry.predicateSets = [];
@@ -711,14 +808,6 @@
                                 let pset = [];
                                 for(let node in group) {
                                     pset.push(parseInt(node));
-                                    //fill in the predicate indices
-                                    self.predicateNodes[node] = true;
-                                    if(self.nodes[node]) {
-                                        let concept = self.nodes[node].concept;
-                                        self.predicateNodes[node] = concept;
-                                        if(!self.predicates.hasOwnProperty(concept)) self.predicates[concept] = {};
-                                        self.predicates[concept][node] = true;
-                                    }
                                 }
                                 entry.predicateSets.push(pset);
                             });
@@ -745,10 +834,6 @@
                             }
                             break;
                         case 'node':
-                            if(self.predicateNodes.hasOwnProperty(entry.id)) {
-                                self.predicateNodes[entry.id] = entry.concept;
-                                self.predicates[entry.concept][entry.id] = true;
-                            }
                             let nodeData = self.diagram.model.findNodeDataForKey(id);
                             if(!nodeData && oldId) nodeData = self.diagram.model.findNodeDataForKey(oldId);
                             if(nodeData) {
@@ -761,9 +846,9 @@
                         default: break;
                     }
                 }
-                if(frameworkReset) self.filterPalette();
-            }
-        }
+            });
+            if(frameworkReset) self.filterPalette();
+        };
 
 
         Relation.prototype.createEntry = function(table, data) {

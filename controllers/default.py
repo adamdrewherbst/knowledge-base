@@ -89,7 +89,7 @@ def getEntry(table, data):
             ret['dependencies'][dep.dependency] = True
     elif table == 'law':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
-            'hashtags': entry.hashtags, 'nodes': [], 'predicates': {}, 'notDeepNode': {}};
+            'hashtags': entry.hashtags, 'nodes': [], 'predicates': {}, 'sets': {}};
         for node in db(db.node.law == entry.id).iterselect():
             ret['nodes'].append(node.id)
             for predicate in db(db.predicate.node == node.id).iterselect():
@@ -100,10 +100,6 @@ def getEntry(table, data):
                 if set.set_id not in ret['sets']:
                     ret['sets'][set.set_id] = {}
                 ret['sets'][set.set_id][node.id] = True
-            if node.head:
-                ret['notDeepNode'][node.head] = True
-            if node.reference:
-                ret['notDeepNode'][node.reference] = True
     elif table == 'node':
         ret = {'id': entry.id, 'law': entry.law, 'concept': entry.concept, 'head': entry.head, \
             'reference': entry.reference, 'name': entry.name, 'value': entry.node_values};

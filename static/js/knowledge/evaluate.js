@@ -30,8 +30,22 @@
 
         /*
         assumes that matchId is a deep node of its description
+
+        How do we determine if we have a full match, starting from a single deep node match?
+
+        We have to trace the deep node back to its root matches, all the while checking if any
+        ancestor node's other child gives us another node we need for a match.  If so, we add
+        that child to the map we are building, and keep traversing down from that child.
+
+        If an ancestor has no matching child, we are out of luck.  If it has multiple candidates,
+        we can try each one in sequence.
+
+        Before a child is added, its other parent must match, if necessary, and all of its children.
+        We are only looking at children that have already been marked as matching the requisite node,
+        so we don't have to check the other parent, just its children in turn.
         */
         Relation.prototype.fullMatch = function(nodeId, matchId) {
+
         };
 
         Relation.prototype.evaluate = function(opts) {
@@ -52,8 +66,7 @@
             self.stats.evaluate.nodesAppended = 0;
 
             while(self.nodesToCheck.length > 0) {
-               //find any deep predicate nodes in included frameworks
-               //that have the same concept as this node
+               //find any deep predicate nodes in included frameworks that have the same concept as this node
                let nodeId = self.nodesToCheck.shift(), node = self.nodes[nodeId], concepts = node.getConcept().getAllConcepts();
                if(node.tentative) continue;
                console.log('checking node ' + nodeId);
