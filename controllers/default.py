@@ -89,17 +89,13 @@ def getEntry(table, data):
             ret['dependencies'][dep.dependency] = True
     elif table == 'law':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
-            'hashtags': entry.hashtags, 'nodes': [], 'predicates': {}, 'sets': {}};
+            'hashtags': entry.hashtags, 'nodes': [], 'predicates': {}};
         for node in db(db.node.law == entry.id).iterselect():
             ret['nodes'].append(node.id)
             for predicate in db(db.predicate.node == node.id).iterselect():
                 if predicate.predicate_group not in ret['predicates']:
                     ret['predicates'][predicate.predicate_group] = {}
                 ret['predicates'][predicate.predicate_group][node.id] = True
-            for set in db(db.set.node == node.id).iterselect():
-                if set.set_id not in ret['sets']:
-                    ret['sets'][set.set_id] = {}
-                ret['sets'][set.set_id][node.id] = True
     elif table == 'node':
         ret = {'id': entry.id, 'law': entry.law, 'concept': entry.concept, 'head': entry.head, \
             'reference': entry.reference, 'name': entry.name, 'value': entry.node_values};
@@ -197,10 +193,11 @@ def saveEntry():
         if 'id' in request_vars:
             db(db[depTable][table] == request_vars['id']).delete()
         for dep,load in deps.items():
+            if not dep:
+                break;
             db[depTable].insert(**{table: entryId, 'dependency': dep})
-            if load:
-                if table == 'framework':
-                    ret['entries'].update(getFramework(dep))
+            if load and table == 'framework':
+                ret['entries'].update(getFramework(dep))
 
     ret['id'] = entryId
     ret['entries'].update({table: {entryId: getEntry(table, entryId)}})

@@ -338,3 +338,10 @@ timestamp: 2018-12-19T19:25:31.031236
 ALTER TABLE law ADD hashtags VARCHAR(512);
 success!
 success!
+timestamp: 2019-01-14T20:06:02.046695
+CREATE TABLE set(
+    id INT AUTO_INCREMENT NOT NULL,
+    node INT  , INDEX node__idx (node), FOREIGN KEY (node) REFERENCES node (id) ON DELETE CASCADE,
+    set_id INT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;

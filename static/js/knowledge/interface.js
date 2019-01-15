@@ -146,7 +146,7 @@
         Relation.prototype.useLaw = function(id) {
             let self = this;
             if(self.law.id == id) return;
-            self.clearMaps();
+            self.reset();
             self.setLaw(id);
             if(self.law.framework != self.framework.id)
                 self.useFramework(self.law.framework);

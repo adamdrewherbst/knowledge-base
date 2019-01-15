@@ -31,7 +31,7 @@ Relation.prototype.suggest = function() {
         let law = self.laws[map.lawId], symbols = [];
         for(let i = 0; i < law.deepNodes.length; i++) {
             let n = law.deepNodes[i], lawNode = self.nodes[n];
-            if(!lawNode || lawNode.isPredicate()) continue;
+            if(!lawNode || lawNode.isPredicate) continue;
             let node = self.nodes[map.idMap[n]];
             if(!node) continue;
             console.log('adding symbol for node ' + n);
