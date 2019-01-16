@@ -24,15 +24,15 @@ Relation.prototype.suggest = function() {
     self.symbolize();
 
     $('#suggestion-wrapper').empty();
-    for(let mapId in self.map) {
-        let map = self.map[mapId];
+    for(let mapId in self.law.maps) {
+        let map = self.law.maps[mapId];
         if(!map.tentative || !map.satisfied) continue;
 
-        let law = self.laws[map.lawId], symbols = [];
+        let law = map.predicateLaw, symbols = [];
         for(let i = 0; i < law.deepNodes.length; i++) {
-            let n = law.deepNodes[i], lawNode = self.nodes[n];
+            let n = law.deepNodes[i], lawNode = self.findEntry('node', n);
             if(!lawNode || lawNode.isPredicate) continue;
-            let node = self.nodes[map.idMap[n]];
+            let node = self.findEntry('node', map.idMap[n]);
             if(!node) continue;
             console.log('adding symbol for node ' + n);
             symbols.push('<math scriptlevel="-1">' + node.symbol.toString() + '</math>');
@@ -41,8 +41,22 @@ Relation.prototype.suggest = function() {
         let $entry = $('<div class="suggestion"></div>');
         $entry.append('<span class="suggestion-name">' + law.name + '</span>');
         $entry.append('<span class="suggestion-symbol">' + symbols.join(',  ') + '</span>')
-        $entry.append('<button class="suggestion-accept btn btn-primary" type="button">Accept</button>');
+
+        let $acceptButton = $('<button class="suggestion-accept btn btn-primary" type="button">Accept</button>');
+        $acceptButton.click(function(e) {
+            self.acceptSuggestion(map);
+        });
+        $entry.append($acceptButton);
+
         $('#suggestion-wrapper').append('<hr>').append($entry);
     }
 };
+
+Relation.prototype.acceptSuggestion = function(map) {
+    let self = this;
+    map.setTentative(false);
+    self.symbolize();
+};
+
+
 

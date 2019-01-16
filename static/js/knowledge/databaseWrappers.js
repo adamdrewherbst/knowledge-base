@@ -97,10 +97,12 @@
         Concept.prototype = Object.create(Entry.prototype);
         Concept.prototype.constructor = Concept;
         Concept.prototype.table = 'concept';
+        Concept.prototype.wildcardConcept = 2;
 
         Concept.prototype.instanceOf = function(parent) {
             let self = this;
             if(typeof parent == 'string') parent = self.findId(self.table, {name: parent});
+            if(parent === self.wildcardConcept) return true;
             if(self.id == parent) return true;
             if(self.dependencies[parent]) return true;
             for(let dep in self.dependencies) {
@@ -145,7 +147,8 @@
 
         function Law() {
             this.nodes = [];
-            this.sets = {};
+            this.maps = {};
+            this.nextMapId = 0;
         }
 
         Law.prototype = Object.create(Entry.prototype);
@@ -163,10 +166,7 @@
                 self.hashtags[tag] = true;
             });
             //update which nodes are deep nodes of this law
-            self.deepNodes = [];
-            self.eachNode(function(node) {
-                if(node.isDeep) self.deepNodes.push(node.id);
-            });
+            self.calculateDeepNodes();
             //update predicate groups
             self.predicateSets = [];
             self.deepPredicates = {};
@@ -182,6 +182,32 @@
                 let node = self.findEntry('node', id);
                 if(node) node.setDeepPredicate();
             }
+        };
+
+        Law.prototype.calculateDeepNodes = function() {
+            let self = this;
+            self.deepNodes = [];
+            self.nodes.forEach(function(id) {
+                let node = self.findEntry('node', id);
+                let children = node.getChildren();
+                node.isDeep = !node.tentative;
+                if(node.isDeep) children.every(function(child) {
+                    if(!child.tentative) {
+                        node.isDeep = false;
+                        return false;
+                    }
+                    return true;
+                })
+                if(node.isDeep) self.deepNodes.push(id);
+            });
+        };
+
+        Law.prototype.addNode = function(data) {
+            let self = this, relation = self.relation;
+            let node = relation.createEntry('node', data, true);
+            self.nodes.push(node.getId());
+            if(!node.tentative) node.addToEvaluateQueue();
+            return node;
         };
 
         Law.prototype.eachNode = function(callback) {
@@ -240,11 +266,22 @@
             this.evaluateQueue.push(node);
         };
 
-        Law.prototype.addMap = function(node, predicate) {
-            let map = new Map(self.nextMapId);
+        Law.prototype.addMap = function(map) {
+            map.id = this.nextMapId;
+            this.maps[this.nextMapId++] = map;
+        };
+
+        Law.prototype.addMapFromNodes = function(node, predicate) {
+            let map = new Map(this);
+            map.predicateLaw = this.findEntry('law', predicate.law);
             if(!map.addNode(node, predicate)) return false;
-            self.maps[self.nextMapId++] = map;
-            map.checkIntersections();
+            map.deepPredicates = [predicate.id];
+            this.addMap(map);
+            map.satisfied = !map.predicateLaw.predicateSets.every(function(pset) {
+                return !(pset.length === 1 && pset[0] == map.deepPredicates[0]);
+            });
+            if(map.satisfied) map.append();
+            else map.checkIntersections();
             return true;
         };
 
@@ -303,6 +340,7 @@
                 'value': self.value
             }
             self.tentative = false;
+            self.fromMap = {};
             self.reset();
         }
 
@@ -330,12 +368,6 @@
         Node.prototype.preprocess = function() {
             this.removeChildren();
             Misc.deleteIndex(Law.predicateTop, this.concept, this.id);
-        };
-
-        Node.prototype.postprocess = function() {
-            let self = this, children = self.getChildren();
-            //if I have no children, I am a deep node of this relation
-            self.isDeep = children.length === 0;
         };
 
         Node.prototype.getLaw = function() {
@@ -458,6 +490,26 @@
             if(!head && !ref) {
                 if(!Law.predicateTop[self.concept]) Law.predicateTop[self.concept] = {};
                 Law.predicateTop[self.concept][self.id] = true;
+            }
+        };
+
+        Node.prototype.addFromMap = function(map) {
+            let self = this;
+            self.fromMap[map.id] = map;
+            if(!map.tentative) self.tentative = false;
+        };
+
+        Node.prototype.setTentative = function(map) {
+            let self = this;
+            self.tentative = map.tentative;
+            if(self.tentative) {
+                for(let mapId in self.fromMap)
+                    if(!self.fromMap[mapId].tentative) self.tentative = false;
+            }
+            for(let i = 0; i < 2; i++) {
+                let parent = self.getParent(i);
+                if(parent && parent.fromMap[map.id] === map)
+                    parent.setTentative(map);
             }
         };
 
@@ -603,7 +655,8 @@
             let self = this, opts = self.relation.options.evaluate;
 
             //first check if I match a top-level node from any predicate description
-            let concepts = self.getConcept().getAllConcepts();
+            let concepts = self.getConcept().getAllConcepts(), wildcard = Concept.prototype.wildcardConcept;
+            concepts[wildcard] = self.relation.findEntry('concept', wildcard);
             for(let concept in concepts) {
                 //for a predicate, matching the concept of a top-level node is enough
                 for(let nodeId in Law.predicateTop[concept]) {
@@ -655,7 +708,7 @@
             self.matches[nodeId] = true;
 
             if(node.isDeepPredicate) {
-                if(!self.getLaw().addMap(self, node)) {
+                if(!self.getLaw().addMapFromNodes(self, node)) {
                     console.err("Couldn't create map for node " + self.id + ' [' + self.getConcept().name + ']');
                     console.err('  mapped to ' + node.toString());
                 }
@@ -952,7 +1005,7 @@
         };
 
 
-        Relation.prototype.createEntry = function(table, data) {
+        Relation.prototype.createEntry = function(table, data, add) {
             let self = this, entry = null;
             switch(table) {
                 case 'framework': entry = new Framework(); break;
@@ -963,11 +1016,22 @@
             }
             if(entry) {
                 entry.relation = self;
-                if(typeof data == 'object') {
-                    for(let key in data) entry.set(key, data[key]);
+                if(add) {
+                    if(data.hasOwnProperty('id') && !isNaN(data.id)) entry.id = parseInt(data.id);
+                    else entry.id = self.nextId[table]--;
+                    let entries = self.getTable(table);
+                    if(entries) entries[entry.id] = entry;
                 }
+                if(typeof data == 'object') entry.store(data);
             }
             return entry;
+        };
+
+
+        Relation.prototype.addEntry = function(table, entry) {
+            if(!entry.hasOwnProperty('id')) return false;
+            let self = this, entries = self.getTable(table);
+            entries[entry.id] = entry;
         };
 
 

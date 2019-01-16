@@ -282,7 +282,7 @@
             width: 100%;
         }
         .suggestion {
-            display: table-cell;
+            display: table-row;
         }
         .suggestion-name {
             font-size: 28px;
@@ -385,6 +385,8 @@
 
             this.concepts = {};
             this.wildcardConcept = 2;
+
+            this.nextId = {'concept': -1, 'node': -1, 'law': -1, 'framework': -1};
 
             this.predicateSets = [];
             this.currentPredicate = -1;
@@ -546,10 +548,10 @@
                 relation.save();
             });
             $('#evaluate-relation').click(function(e) {
-                relation.evaluate({});
+                relation.evaluate({ reset: true });
             });
             $('#reset-relation').click(function(e) {
-                relation.clearMaps();
+                relation.reset();
             });
             $('#visualize-relation').click(function(e) {
                 relation.visualize();

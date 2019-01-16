@@ -101,11 +101,7 @@
                         framework: self.framework.id
                     },
                     success: function(data) {
-                        self.predicates = {};
                         self.storeEntries(data);
-
-                        if(data.hasOwnProperty('nextNodeId')) self.nextNodeId = parseInt(data.nextNodeId);
-
                         self.setPaletteModel();
                         self.filterPalette();
                         self.updateFields();
@@ -146,7 +142,6 @@
         Relation.prototype.useLaw = function(id) {
             let self = this;
             if(self.law.id == id) return;
-            self.reset();
             self.setLaw(id);
             if(self.law.framework != self.framework.id)
                 self.useFramework(self.law.framework);
