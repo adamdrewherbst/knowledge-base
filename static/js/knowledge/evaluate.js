@@ -15,34 +15,6 @@
         from L.  As we keep merging maps, eventually we may have a map whose predicate nodes completely satisfy L.
         At that point, we can append to our relation R the additional knowledge (relations) that L provides us.
 
-        *Symmetry*:
-
-        Certain concepts, eg. sum, product, equality, are symmetric.  Within the tree rooted at a predicate node, if there
-        is a symmetric node, we can flip its subtree relative to our relation, and if both orientations match, they give
-        us two alternative submaps within the full map for that predicate node.
-
-        So a given predicate map has 2^n alternative configurations where n is the number of symmetric nodes that matched
-        in both orientations.  We make a separate map for each configuration.  Then we check all intersections with any of
-        those 2^n maps.
-
-        */
-
-
-        /*
-        assumes that matchId is a deep node of its description
-
-        How do we determine if we have a full match, starting from a single deep node match?
-
-        We have to trace the deep node back to its root matches, all the while checking if any
-        ancestor node's other child gives us another node we need for a match.  If so, we add
-        that child to the map we are building, and keep traversing down from that child.
-
-        If an ancestor has no matching child, we are out of luck.  If it has multiple candidates,
-        we can try each one in sequence.
-
-        Before a child is added, its other parent must match, if necessary, and all of its children.
-        We are only looking at children that have already been marked as matching the requisite node,
-        so we don't have to check the other parent, just its children in turn.
         */
 
         Relation.prototype.evaluate = function(opts) {
