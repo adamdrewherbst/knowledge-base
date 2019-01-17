@@ -82,7 +82,7 @@ reference body.  But we can declare that any 'absolute' concept is in fact
 relative to the ROOT node, that is, the universe.  The meaning in this rule is 
 debatable, but take for example the shape of a body, which seems to be an 
 absolute property.  An object that is a sphere in one universe would no longer 
-be a sphere if we deformed the space the body resides in.  In any case, the 
+be a sphere if we deformed the universe the body resides in.  In any case, the 
 utility of this rule will become apparent in the next section.
 
 Once we add this requirement, the structure becomes simpler.  Thinking about a 
@@ -95,6 +95,10 @@ which is the second.  So we call the first parent the 'head', and the second
 parent the 'reference'.  Following the above language, if H and R are the head 
 and reference nodes of node A, then A is a property of H relative to R.  But 
 again, the meaning varies according to the node's concept.
+
+Notice that immediate children of ROOT, such as 'bodies' or 'fields' in a 
+typical problem, must therefore have ROOT as both their head and reference node.  
+That is, they are properties of ROOT relative to itself.
 
 In general a single problem description may consist of more than one of these 
 tree-graphs.  Each graph in some sense represents a distinct statement or set 
@@ -156,9 +160,44 @@ Then the specific problem must be formulated as a tree-graph.  Approaches to
 help the user do this are discussed in the next section.
 
 The challenge is then to find the general knowledge we can append to the graph. 
- The approach is the following:
+ The approach is based on the connected nature of a law's predicate.  The 
+predicate will contain 'top-level' nodes with no parents, and 'deep' nodes with 
+no children.  For example, addition of velocities is predicated on 3 bodies 
+(top-level nodes) connected by 2 velocities (deep nodes) - this simple predicate 
+has no nodes between top and deep, though some will.
 
-TODO
+Starting from the specific problem tree-graph, we pass over the nodes in a 
+breadth-first manner.  (To make sure of this, we add each node to the queue to 
+be evaluated, but recursively add its parents to the queue first.)
+
+At each node, we check whether its concept is an instance of a concept that is a 
+top-level node of a general law, and store that match within the node.  In the 
+velocity example, if our node is an instance of 'body', then it will match all 3 
+of the body nodes in the velocity addition law.
+
+Then, if our node has parents (ie. it is not ROOT), we look at them.  Since we 
+are traversing breadth-first, their matches will already have been checked.  If 
+we're lucky, our head and reference will have matched a pair of nodes in a law 
+that share a child who our node matches.  Again, we mark the match in our node.  
+Per the example, if both parents are bodies, and our node is a velocity, we 
+match both of the 2 velocities in the predicate.
+
+In this recursive manner we may eventually match a deep predicate node of a 
+law.  At that point, we take the matching node and all its matching ancestors, 
+and make a map that says which node of our problem description matched to which 
+node of the law.  If there is only one deep node in the predicate, the law is 
+now satisfied, and we can append its deeper (non-predicate) nodes to our problem 
+description - in the example, these are the third velocity node and the sum and 
+equal nodes relating them.
+
+If there are multiple deep predicate nodes, we have to look for intersections 
+between maps.  Since the predicate is connected, our problem must contain 
+multiple maps that intersect (ie. they share a node match).  We make sure the 
+two maps intersect in our problem in the same way they do in the predicate, and 
+if so we make a combined map.  This combined map may intersect with other maps, 
+and by building these compound maps we may eventually get one that contains all 
+deep predicate nodes of the law.  As above, we then append the non-predicate 
+nodes of the law to our specific problem graph.
 
 
 THE INTERFACE
@@ -167,7 +206,7 @@ In order to use this tool, a user must first re-formulate the problem as a
 tree-graph described above.  To do this by hand would be too tedious, so we 
 need a visual interface to speed up the process.  I envision a canvas, 
 
-TODO
+MORE TO ADD
 
 
 Developed with web2py.
