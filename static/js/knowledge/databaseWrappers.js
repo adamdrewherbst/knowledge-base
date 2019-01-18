@@ -335,10 +335,8 @@
             self.children = {0: {}, 1: {}};
             self.symbol = new Symbol();
             self.value = new Value();
-            self.data = {
-                'symbol': self.symbol,
-                'value': self.value
-            }
+            self.data = {};
+            self.dataTriggers = {};
             self.tentative = false;
             self.fromMap = {};
             self.reset();
