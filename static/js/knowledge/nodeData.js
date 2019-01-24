@@ -67,7 +67,23 @@ And the key being edited will receive any keys it doesn't yet have.
 
 
 Node.prototype.initData = function(type) {
-
+    let self = this, data = self.data;
+    data[type] = {};
+    switch(type) {
+        case 'concept':
+            data.concept[self.concept] = true;
+            break;
+        case 'symbol':
+            if(self.name) {
+                data.symbol.text = self.name;
+            }
+            break;
+        case 'value':
+            if(self.getValue() !== null) {
+                self.data.value = self.getValue();
+            }
+            break;
+    }
 };
 
 Node.prototype.setupDataDependencies = function(type) {
@@ -83,7 +99,7 @@ Node.prototype.setupDataDependencies = function(type) {
         command = command.replace(targetStr, targetKey);
 
         targets.forEach(function(target) {
-            target.createDataDependency(command);
+            target.addDataCommand(command);
         });
     });
 };
@@ -109,33 +125,108 @@ Node.prototype.splitDataCommand = function(command) {
     /* TODO */
 };
 
-Node.prototype.createDataDependency = function(command) {
-    let dep = new NodeDataDependency(this, command);
+Node.prototype.addDataCommand = function(command) {
+    let dep = new NodeDataCommand(this, command);
     dep.init();
 };
 
-Node.prototype.addTrigger = function(node, key) {
-    Misc.setIndex(this.dataTriggers, key, node.getId(), node);
+Node.prototype.getDataKey = function(key, create) {
+    return this.data.getKey(key, create);
+};
+
+Node.prototype.addDataKey = function(key, value) {
+    this.data.insert(key, value);
 };
 
 
-function NodeDataDependency(node, command) {
+function NodeData(node) {
     this.id = null;
+    this.node = node;
+    this.key = key;
+    this.parent = null;
+    this.children = {};
+    this.value = null;
+    this.waiting = {};
+    this.triggers = {};
+}
+
+NodeData.prototype.insert = function(key, value) {
+    self.getKey(key, true).setValue(value);
+};
+
+NodeData.prototype.getKey = function(key, create) {
+    let self = this;
+    if(typeof key !== 'object') key = key.split('.');
+
+    if(key.length === 0) return self;
+
+    let firstKey = key.shift();
+    let child = self.getChild(firstKey, create);
+    if(!child) return null;
+    return child.getKey(key, create);
+};
+
+NodeData.prototype.getChild = function(key, create) {
+    let self = this;
+    if(!self.children.hasOwnProperty(key)) {
+        if(!create) return null;
+        self.children[key] = new NodeData(self.node);
+    }
+    return self.children[key];
+};
+
+NodeData.prototype.getValue = function() {
+    return this.value;
+};
+
+NodeData.prototype.setValue = function(value) {
+    this.value = value === undefined ? null : value;
+};
+
+NodeData.prototype.wait = function(command) {
+    this.waiting[command.id] = command;
+};
+
+NodeData.prototype.addTrigger = function(node) {
+    Misc.setIndex(this.triggers, node.getId(), node);
+};
+
+NodeData.prototype.resolve = function(command) {
+    let self = this;
+    delete self.waiting[command.id];
+    if(Object.keys(self.waiting).length === 0) {
+        for(let id in triggers) {
+            self.triggers[id].resolve(self);
+        }
+    }
+};
+
+
+function NodeDataCommand(node, command) {
+    this.id = NodeDataCommand.id++;
     this.node = node;
     this.command = command;
     this.originalCommand = command;
+    this.editKey = null;
+    this.operation = null;
     this.waiting = {};
     this.values = {'sub': {}, 'all': {}};
-    this.tree = {};
+    this.expressionTree = null;
 }
+NodeDataCommand.id = 0;
 
-NodeDataDependency.prototype.init = function() {
-    let self = this, tokens = this.command.split(' '), key = tokens.shift(), op = tokens.shift(), sources = [];
+NodeDataCommand.prototype.init = function() {
+    let self = this, tokens = this.command.split(/\s+/), sources = [];
+    self.editKey = tokens.shift();
+    self.operation = tokens.shift();
 
-    let specialOps = ['add', 'clear'];
-    if(specialOps.indexOf(op) >= 0) this.tree[op] = [key, tokens.join(' ')];
-    else this.tree = this.command;
+    //the data key being edited by this command can't be resolved until the command completes
+    self.data = self.node.getDataKey(self.editKey, true);
+    self.data.wait(self);
 
+    self.expressionTree = tokens.join(' ');
+
+    //and in turn, this command has to wait for all dependent keys to be resolved
     for(let i = 2; i < tokens.length; i++) {
         if(self.node.isDataKey(tokens[i])) sources.push(self.node.parseDataKey(tokens[i]));
     }
@@ -144,12 +235,14 @@ NodeDataDependency.prototype.init = function() {
     });
 };
 
-NodeDataDependency.prototype.wait = function(node, key) {
+//
+NodeDataCommand.prototype.wait = function(node, key) {
+    let data = node.getDataKey(key, true);
     Misc.setIndex(this.waiting, node.getId(), key, true);
-    node.addTrigger(this, key);
+    data.addTrigger(this);
 };
 
-NodeDataDependency.prototype.resolve = function(node, key, value) {
+NodeDataCommand.prototype.resolve = function(node, key, value) {
     let nodeId = node.getId(), keyStr = '' + nodeId + key;
 
     if(typeof value === 'object') {
@@ -163,16 +256,36 @@ NodeDataDependency.prototype.resolve = function(node, key, value) {
     Misc.deleteIndex(this.waiting, nodeId, key);
     if(Object.keys(this.waiting).length === 0) {
         this.resolveCommand();
+        this.node.resolve()
     }
 };
 
-NodeDataDependency.prototype.resolveCommand = function() {
-    for(let k in this.values.sub) this.resolveTree(this.tree, k);
-    this.resolveTree(null);
+NodeDataCommand.prototype.resolveCommand = function() {
+    for(let k in this.values.sub) this.resolveTree(this.expressionTree, k);
+    this.resolveTree(this.expressionTree, null);
 };
 
-NodeDataDependency.prototype.resolveTree = function(tree, index) {
+NodeDataCommand.prototype.resolveCommandHelper = function(index) {
 
+    let self = this, key = self.editKey;
+    if(index) key += '.' + index;
+    let editKey = Misc.getOrCreateIndex.apply(self.node.data, key.split('.'));
+
+    let expression = self.resolveTree(self.tree, index);
+    switch(self.operation) {
+        case 'add': //specify an index to add to a data key
+            editKey[expression] = {};
+            break;
+        case 'clear': //empty out the given data key
+            for(let k in editKey) delete editKey[k];
+            break;
+        default:
+            eval('self.data.' + key + ' ' + self.operation + ' ' + expression);
+            break;
+    }
+};
+
+NodeDataCommand.prototype.resolveTree = function(tree, index) {
     if(typeof tree !== 'object') {
         tree = '' + tree;
         let values = index === null ? this.values.all : this.values.sub[index];
@@ -182,15 +295,12 @@ NodeDataDependency.prototype.resolveTree = function(tree, index) {
 
     let op = Object.keys(tree)[0], args = tree[op], resolvedArgs = [];
     args.forEach(function(arg) {
-        resolvedArgs.push(self.resolveTree(arg, index));
+        resolvedArgs.push(self.resolveTree(arg));
     });
     switch(op) {
-        case 'add':
-            break;
-        case 'clear':
-            break;
-        default:
+        default: return eval(resolvedArgs[0] + ' ' + op + ' ' + resolvedArgs[1]);
             break;
     }
+    return null;
 };
 

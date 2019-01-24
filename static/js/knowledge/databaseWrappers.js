@@ -10,6 +10,16 @@
             return ref;
         };
 
+        Misc.getOrCreateIndex = function(obj) {
+            let ref = obj, n = arguments.length;
+            for(let i = 1; i < n; i++) {
+                let index = arguments[i];
+                if(!ref[index]) ref[index] = {};
+                ref = ref[index];
+            }
+            return ref;
+        };
+
         Misc.setIndex = function(obj) {
             let ref = obj, n = arguments.length;
             for(let i = 1; i < n-2; i++) {
@@ -337,6 +347,7 @@
             self.value = new Value();
             self.data = {};
             self.dataTriggers = {};
+            self.dataWaiting = {};
             self.tentative = false;
             self.fromMap = {};
             self.reset();
@@ -544,105 +555,6 @@
             if(opts && self.evaluated[opts.tag || 'all']) return;
             if(opts && opts.includeNode && !opts.includeNode.call(self)) return;
             law.addToEvaluateQueue(self);
-        };
-
-        Node.prototype.initData = function(type) {
-            let self = this, data = self.data[type];
-            data.waiting = {};
-            data.trigger = {};
-            data.blocks = {};
-            data.known = false;
-
-            switch(type) {
-                case 'symbol':
-                    if(self.name) {
-                        data.blocks['text'] = [{text: self.name}];
-                    }
-                    break;
-                case 'value':
-                    if(self.getValue() !== null) {
-                        data.blocks['text'] = [{text: '' + self.getValue()}];
-                    }
-                    break;
-            }
-        };
-
-        Node.prototype.setupData = function(type) {
-            let self = this, input = null;
-            let symmetric = self.getConcept().symmetric;
-            let commands = self.getConcept().getCommands(type);
-            let variable = "\{\{([^}{]+)\}\}", word = "([^}{]+)";
-            commands.forEach(function(command) {
-                for(let i = 0; i < (symmetric ? 2 : 1); i++) {
-                    let str = command;
-                    if(i == 1) {
-                        str = str.replace(/\{\{A\}\}/g, "\{\{a\}\}").replace(/\{\{B\}\}/g, "\{\{A\}\}").replace(/\{\{a\}\}/g, "\{\{B\}\}");
-                    }
-
-                    let match = str.match(new RegExp("^\\s*(?:" + variable + "\\s*:\\s*)*(.*)"));
-                    if(!match || match.length < 3) return;
-                    let targetName = match[1] || 'S';
-
-                    switch(type) {
-                        case 'symbol': args = match[2].split(' '); break;
-                        case 'value': args = [match[2]]; break;
-                    }
-                    let block = args[0], blockType = args[1] || 'text';
-
-                    let targetContext = targetName[targetName.length-1] == ':';
-                    if(targetContext) targetName = targetName.substring(0, targetName.length-1);
-
-                    let targets = self.getConnectedNodes(targetName);
-                    targets.forEach(function(target) {
-                        let regex = new RegExp("\{\{([^}{])\}\}", 'g'), arr = [], sources = [], text = block;
-                        while((arr = regex.exec(block)) !== null) {
-                            let source = (targetContext ? target : self).getConnectedNodes(arr[1])[0];
-                            if(!source) continue;
-                            if(sources.indexOf(source) < 0) sources.push(source);
-                            text = text.replace("\{\{" + arr[1] + "\}\}", "\{\{" + source.id + "\}\}");
-                        }
-                        target.createDataDependency(type, sources, text, blockType);
-                    });
-                }
-            });
-        };
-
-        Node.prototype.createDataDependency = function(type, sources, text, blockType) {
-            let self = this, data = self.data[type];
-            if(!data.blocks.hasOwnProperty(blockType)) data.blocks[blockType] = [];
-            if(blockType == 'text' && data.blocks[blockType].length > 0) return;
-            data.blocks[blockType].push({text: text});
-            let blockId = data.blocks[blockType].length - 1;
-            sources.forEach(function(source) {
-                let sourceId = source.id;
-                if(!data.waiting.hasOwnProperty(sourceId)) data.waiting[sourceId] = {};
-                if(!data.waiting[sourceId].hasOwnProperty(blockType)) data.waiting[sourceId][blockType] = {};
-                data.waiting[sourceId][blockType][blockId] = true;
-                source.data[type].trigger[self.id] = self;
-            })
-        };
-
-        Node.prototype.resolveDataDependency = function(type, node) {
-            let self = this, data = self.data[type];
-            for(let blockType in data.waiting[node.id]) {
-                for(let blockId in data.waiting[node.id][blockType]) {
-                    let block = data.blocks[blockType][blockId], text = node.data[type].toString();
-                    if(!text || text == null || text == undefined) text = '';
-                    else switch(type) {
-                        case 'symbol': {
-                            let op = self.getConcept().getOperationIndex(), nodeOp = node.getConcept().getOperationIndex();
-                            if(op >= 0 && nodeOp >= 0 && op < nodeOp) {
-                                text = '<mfenced>' + text + '</mfenced>';
-                            }
-                        } break;
-                        case 'value':
-                            break;
-                    }
-                    block.text = block.text.replace("\{\{" + node.id + "\}\}", text);
-                }
-            }
-            delete data.waiting[node.id];
-            delete node.data[type].trigger[self.id];
         };
 
         /*
