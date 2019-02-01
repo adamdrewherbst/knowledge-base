@@ -145,13 +145,12 @@
             return commands;
         };
 
-        Concept.prototype.getOperationIndex = function() {
-            let ops = ['power', ['product', 'ratio'], ['sum', 'difference']];
-            for(let i = 0; i < ops.length; i++) {
-                if(typeof ops[i] == 'string' && this.name == ops[i]) return i;
-                if(typeof ops[i] == 'object' && ops[i].indexOf(this.name) >= 0) return i;
-            }
-            return -1;
+        Concept.prototype.isWildcard = function() {
+            return this.framework === null && this.name === 'anything';
+        };
+
+        Concept.prototype.isData = function() {
+            return this.framework === null && this.name === 'data';
         };
 
 
@@ -568,7 +567,6 @@
             let concepts = self.getConcept().getAllConcepts(), wildcard = Concept.prototype.wildcardConcept;
             concepts[wildcard] = self.relation.findEntry('concept', wildcard);
             for(let concept in concepts) {
-                //for a predicate, matching the concept of a top-level node is enough
                 for(let nodeId in Law.predicateTop[concept]) {
                     self.setMatch(nodeId);
                 }
@@ -588,7 +586,10 @@
                     parentMatch.getChildren(i).forEach(function(childMatch) {
 
                         //first, this node's concept must match that of the child node's concept
-                        if(!self.getConcept().instanceOf(childMatch.concept)) return;
+                        let concept = self.getConcept(), matchConcept = childMatch.getConcept();
+                        if(!concept.instanceOf(childMatch.concept)) return;
+                        if(matchConcept.isData() && (!concept.isData() ||
+                            self.getDataKey() !== childMatch.getDataKey())) return;
 
                         let childId = childMatch.id;
                         if(candidates[childId]) return self.setMatch(childId);
@@ -604,6 +605,14 @@
             }
 
             self.evaluated[opts.tag || 'all'] = true;
+        };
+
+        Node.prototype.isData = function() {
+            return this.getConcept().isData();
+        };
+
+        Node.prototype.getDataKey = function() {
+            return this.data_key;
         };
 
         Node.prototype.setMatch = function(nodeId, direction) {

@@ -202,14 +202,14 @@
             console.log('appending ' + self.predicateLaw.name);
             self.deepNodes = [];
             self.predicateLaw.deepNodes.forEach(function(nodeId) {
-               let appendedNode = self.appendHelper(nodeId);
+               let appendedNode = self.appendNode(nodeId);
                if(!appendedNode) {
                    console.err("couldn't append deep node " + nodeId);
                } else self.deepNodes.push(appendedNode.getId());
             });
         };
 
-        Map.prototype.appendHelper = function(nodeId) {
+        Map.prototype.appendNode = function(nodeId) {
 
             let self = this, law = self.law, relation = self.relation;
             if(self.idMap.hasOwnProperty(nodeId)) return relation.findEntry('node', self.idMap[nodeId]);
@@ -225,6 +225,9 @@
                 newReference = self.appendHelper(reference);
                 if(newReference == null) return null;
             }
+
+            //data nodes are treated separately as they are added to the node's data tree/command set
+            if(node.isData()) return self.appendDataNode(node, newHead, newReference);
 
             //if the head and reference are already related by this concept, don't add the node
             let childMatch = null;
@@ -242,7 +245,7 @@
 
             let newNode = law.addNode({
                 'law': law.id,
-                'concept': node['concept'],
+                'concept': node.concept,
                 'head': parseInt(newHead),
                 'reference': newReference ? parseInt(newReference) : null,
                 'value': node.value,
@@ -263,6 +266,56 @@
                 });
             }
             return newNode;
+        };
+
+        Map.prototype.appendDataNode = function(node, headObj, refObj) {
+            let self = this;
+
+            let parents = [];
+            for(let i = 0; i < 2; i++) {
+                let parentObj = i == 0 ? headObj : refObj, parent = {};
+                if(parentObj.prototype.isPrototypeOf(Node) {
+                    parent.type = 'node';
+                    parent.node = parentObj;
+                    parent.data = parentObj.data;
+                } else if(parentObj.prototype.isPrototypeOf(NodeData)) {
+                    parent.type = 'data';
+                    parent.node = parentObj.node;
+                    parent.data = parentObj;
+                } else if(parentObj.prototype.isPrototypeOf(Expression)) {
+                    parentObj.type = 'expression';
+                    parentObj.expression = parent;
+                } else parent = null;
+                parents.push(parent);
+            }
+            let head = parents[0], ref = parents[1];
+
+            if(!head) return false;
+
+            //if this is part of a data tree, just return the key
+            if(!ref) {
+                if(head.type === 'data')
+                    return head.data.getKey(node.getDataKey(), true);
+                else return false;
+            } else if(node.isDeep) {
+                let command = new NodeDataCommand(head.node);
+                //the head is treated as a data key
+                command.editKey = head.data.getKeyString() || 'value';
+                //the reference is treated as an expression
+                if(ref.type === 'expression') command.expressionTree = ref;
+                else command.expression = new Expression(ref.data);
+                //the deep node specifies the editing operation
+                command.operation = node.getDataKey();
+                command.setup();
+                return command;
+            } else {
+                let expression = new Expression(node.getDataKey()),
+                    headExpression = head.type === 'expression' ? head.expression : new Expression(head),
+                    refExpression = ref.type === 'expression' ? ref.expression : new Expression(ref);
+                expression.addArgument(headExpression);
+                expression.addArgument(refExpression);
+                return tree;
+            }
         };
 
         Map.prototype.setTentative = function(tentative) {
