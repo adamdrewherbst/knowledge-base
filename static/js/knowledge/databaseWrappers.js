@@ -1,19 +1,22 @@
         var Misc = {};
 
         Misc.getIndex = function(obj) {
-            let ref = obj, n = arguments.length;
+            let ref = obj, args = Misc.cleanArguments(arguments), n = args.length;
             for(let i = 1; i < n; i++) {
+                let index = args[i];
+                if(index === undefined) continue;
                 if(typeof ref !== 'object'
-                    || !ref.hasOwnProperty(arguments[i])) return undefined;
-                ref = ref[arguments[i]];
+                    || !ref.hasOwnProperty(index)) return undefined;
+                ref = ref[index];
             }
             return ref;
         };
 
         Misc.getOrCreateIndex = function(obj) {
-            let ref = obj, n = arguments.length;
+            let ref = obj, args = Misc.cleanArguments(arguments), n = args.length;
             for(let i = 1; i < n; i++) {
-                let index = arguments[i];
+                let index = args[i];
+                if(index === undefined) continue;
                 if(!ref[index]) ref[index] = {};
                 ref = ref[index];
             }
@@ -21,27 +24,36 @@
         };
 
         Misc.setIndex = function(obj) {
-            let ref = obj, n = arguments.length;
+            let ref = obj, args = Misc.cleanArguments(arguments), n = args.length;
             for(let i = 1; i < n-2; i++) {
-                let index = arguments[i];
+                let index = args[i];
+                if(index === undefined) continue;
                 if(!ref[index]) ref[index] = {};
                 ref = ref[index];
             }
-            ref[arguments[n-2]] = arguments[n-1];
+            ref[args[n-2]] = args[n-1];
         };
 
         Misc.deleteIndex = function(obj) {
-            let ref = obj, refs = [], n = arguments.length, i = 1;
+            let ref = obj, refs = [], args = Misc.cleanArguments(arguments), n = args.length, i = 1;
             for(; i < n-1; i++) {
-                let index = arguments[i];
+                let index = args[i];
+                if(index === undefined) continue;
                 if(!ref[index]) return;
                 refs.push(ref);
                 ref = ref[index];
             }
             while(ref && Object.keys(ref).length === 0) {
-                delete ref[arguments[i--]];
+                delete ref[args[i--]];
                 ref = refs.pop();
             }
+        };
+
+        Misc.cleanArguments = function(args) {
+            let clean = [];
+            for(let i = 0; i < args.length; i++)
+                if(args[i] !== undefined) clean.push(args[i]);
+            return clean;
         };
 
 

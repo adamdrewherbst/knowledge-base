@@ -268,53 +268,43 @@
             return newNode;
         };
 
-        Map.prototype.appendDataNode = function(node, headObj, refObj) {
+        Map.prototype.appendDataNode = function(node, head, ref) {
             let self = this;
-
-            let parents = [];
-            for(let i = 0; i < 2; i++) {
-                let parentObj = i == 0 ? headObj : refObj, parent = {};
-                if(parentObj.prototype.isPrototypeOf(Node) {
-                    parent.type = 'node';
-                    parent.node = parentObj;
-                    parent.data = parentObj.data;
-                } else if(parentObj.prototype.isPrototypeOf(NodeData)) {
-                    parent.type = 'data';
-                    parent.node = parentObj.node;
-                    parent.data = parentObj;
-                } else if(parentObj.prototype.isPrototypeOf(Expression)) {
-                    parentObj.type = 'expression';
-                    parentObj.expression = parent;
-                } else parent = null;
-                parents.push(parent);
-            }
-            let head = parents[0], ref = parents[1];
-
             if(!head) return false;
+            let headIsNode = typeof head === 'object' && head.prototype.isPrototypeOf(Node);
+            if(headIsNode) head = {type: 'node', node: head};
 
             //if this is part of a data tree, just return the key
             if(!ref) {
-                if(head.type === 'data')
-                    return head.data.getKey(node.getDataKey(), true);
-                else return false;
+                if(head.type === 'node') {
+                    return {
+                        type: 'data',
+                        node: head.node,
+                        key: node.getDataKey()
+                    };
+                } else if(head.type === 'data') {
+                    head.key += '.' + node.getDataKey();
+                    return head;
+                } else return false;
             } else if(node.isDeep) {
-                let command = new NodeDataCommand(head.node);
-                //the head is treated as a data key
-                command.editKey = head.data.getKeyString() || 'value';
-                //the reference is treated as an expression
-                if(ref.type === 'expression') command.expressionTree = ref;
-                else command.expression = new Expression(ref.data);
-                //the deep node specifies the editing operation
-                command.operation = node.getDataKey();
+                if(head.type !== 'data') return false;
+                let expression = null;
+                if(ref.type === 'expression') expression = ref.expression;
+                else if(ref.type === 'data') expression = new Expression(ref.node.getId() + '.' + ref.key);
+                else return false;
+                let command = new NodeDataCommand(head.node, head.key || 'value', node.getDataKey(), expression);
                 command.setup();
                 return command;
             } else {
-                let expression = new Expression(node.getDataKey()),
-                    headExpression = head.type === 'expression' ? head.expression : new Expression(head),
-                    refExpression = ref.type === 'expression' ? ref.expression : new Expression(ref);
+                let expression = new Expression(node.getDataKey()), headExpression = null, refExpression = null;
+                if(head.type === 'expression') headExpression = head.expression;
+                else if(head.type === 'data') headExpression = new Expression(head.node.getId() + '.' + head.key);
+                if(ref.type === 'expression') refExpression = ref.expression;
+                else if(ref.type === 'data') refExpression = new Expression(ref.node.getId() + '.' + ref.key);
+                if(!headExpression || !refExpression) return false;
                 expression.addArgument(headExpression);
                 expression.addArgument(refExpression);
-                return tree;
+                return {type: 'expression', expression: expression};
             }
         };
 

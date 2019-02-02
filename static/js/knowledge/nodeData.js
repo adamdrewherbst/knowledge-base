@@ -105,17 +105,13 @@ Node.prototype.setupDataDependencies = function(type) {
 
     commands.forEach(function(commandStr) {
 
-        let command = new NodeDataCommand(command);
-        command.parse();
-
-        let tokens = command.split(' '), targetStr = tokens[0];
-        let parse = self.parseDataKey(targetStr),
-            targets = self.getConnectedNodes(parse.nodes || 'S'),
-            targetKey = parse.key;
-        command = command.replace(targetStr, targetKey);
+        let tokens = commandStr.split(' '), targetStr = tokens.shift(), op = tokens.shift();
+        if(!self.isDataKey(targetStr)) return;
+        let parse = self.parseDataKey(targetStr), targets = parse.nodes, targetKey = parse.key;
+        let expression = new Expression(tokens, self);
 
         targets.forEach(function(target) {
-            target.addDataCommand(command);
+            let command = new NodeDataCommand(target, targetKey, op, expression);
         });
     });
 };
@@ -133,7 +129,7 @@ Node.prototype.parseDataKey = function(str) {
         else break;
     }
     let nodes = str.substring(0, Math.max(splitPos-1, 0)), dataKey = str.substring(splitPos);
-    return {nodes: nodes, key: dataKey};
+    return {nodes: self.getConnectedNodes(nodes || 'S'), key: dataKey};
 };
 
 //generate a syntax tree from a node data command
@@ -167,23 +163,20 @@ Node.prototype.collectData = function(rootNode) {
 };
 
 
-function NodeData(node) {
-    this.type = 'data';
-    this.id = null;
-    this.node = node;
-    this.key = key;
+function Dependency() {
+    this.key = null;
+    this.value = null;
     this.parent = null;
     this.children = {};
-    this.value = null;
     this.waiting = {};
     this.triggers = {};
 }
 
-NodeData.prototype.insert = function(key, value) {
+Dependency.prototype.insert = function(key, value) {
     self.getKey(key, true).setValue(value);
 };
 
-NodeData.prototype.getKey = function(key, create) {
+Dependency.prototype.getKey = function(key, create) {
     let self = this;
     if(typeof key !== 'object') key = key.split('.');
 
@@ -195,7 +188,7 @@ NodeData.prototype.getKey = function(key, create) {
     return child.getKey(key, create);
 };
 
-NodeData.prototype.getChild = function(key, create) {
+Dependency.prototype.getChild = function(key, create) {
     let self = this;
     if(!self.children.hasOwnProperty(key)) {
         if(!create) return null;
@@ -204,54 +197,87 @@ NodeData.prototype.getChild = function(key, create) {
     return self.children[key];
 };
 
-NodeData.prototype.getValue = function() {
+Dependency.prototype.getValue = function() {
     return this.value;
 };
 
-NodeData.prototype.setValue = function(value) {
+Dependency.prototype.setValue = function(value) {
     this.value = value === undefined ? null : value;
 };
 
-NodeData.prototype.wait = function(command) {
-    this.waiting[command.id] = command;
+Dependency.prototype.getKeyString = function() {
+    let parentStr = this.parent ? this.parent.getKeyString() + '.' : '';
+    return parentStr + this.key;
 };
 
-NodeData.prototype.addTrigger = function(node) {
-    Misc.setIndex(this.triggers, node.getId(), node);
+Dependency.prototype.getDependencyId = function() {
+    return undefined;
 };
 
-NodeData.prototype.resolve = function(command) {
-    let self = this;
-    delete self.waiting[command.id];
-    if(Object.keys(self.waiting).length === 0) {
-        for(let id in triggers) {
-            self.triggers[id].resolve(self);
+Dependency.prototype.getDependencyKey = function() {
+    return undefined;
+};
+
+Dependency.prototype.wait = function(dep, key) {
+    Misc.setIndex(this.waiting, dep.getDependencyId(), key, true);
+    dep.addTrigger(this, key);
+};
+
+Dependency.prototype.addTrigger = function(dep, key) {
+    Misc.setIndex(this.triggers, dep.getDependencyId(), key, dep);
+};
+
+Dependency.prototype.resolve = function(dep, key) {
+    Misc.deleteIndex(this.waiting, dep.getId());
+    if(Object.keys(waiting).length === 0) {
+        for(let id in this.triggers) {
+            let dep = this.triggers[id];
+            if(typeof dep === 'object' && dep.prototype.isPrototypeOf(Dependency))
+                dep.resolve(this, this.getDependencyKey());
         }
     }
 };
 
-NodeData.prototype.getKeyString = function() {
-    let parentStr = this.parent ? this.parent.getKeyString() + '.' : '';
-    return parentStr + this.key;
+
+function NodeData(node) {
+    this.node = node;
+    this.key = key;
+    this.parent = null;
+    this.children = {};
+    this.value = null;
+}
+NodeData.prototype = Object.create(Dependency.prototype);
+NodeData.constructor = NodeData;
+
+NodeData.prototype.getDependencyId = function() {
+    return this.node.getId();
+};
+
+NodeData.prototype.getDependencyKey = function() {
+    return this.getKeyString();
 };
 
 NodeData.prototype.getReferenceString = function() {
     return this.node.getId() + '.' + this.getKeyString();
 };
 
+NodeData.prototype.resolve = function(command, key) {
+    let self = this, data = self.getKey(key, true);
+    data.applyOperation()
+};
+
 
 function NodeDataCommand(command) {
-    this.id = NodeDataCommand.id++;
     this.node = node;
     this.command = command;
     this.originalCommand = command;
     this.editKey = null;
     this.operation = null;
-    this.waiting = {};
     this.values = {'sub': {}, 'all': {}};
     this.expressionTree = null;
 }
-NodeDataCommand.id = 0;
+NodeDataCommand.prototype = Object.create(Dependency.prototype);
+NodeDataCommand.constructor = NodeDataCommand;
 
 NodeDataCommand.prototype.parse = function() {
     let self = this, tokens = this.command.split(/\s+/), sources = [];
@@ -262,35 +288,33 @@ NodeDataCommand.prototype.parse = function() {
 
 NodeDataCommand.prototype.setup = function() {
     //the data key being edited by this command can't be resolved until the command completes
-    self.data = self.node.getDataKey(self.editKey, true);
-    self.data.wait(self);
+    self.node.getData().wait(self, self.editKey);
     self.expression.setup();
 };
 
-NodeDataCommand.prototype.wait = function(node, key) {
-    let data = node.getDataKey(key, true);
-    Misc.setIndex(this.waiting, node.getId(), key, true);
-    data.addTrigger(this);
-};
+NodeDataCommand.prototype.resolve = function(expression) {
 
-NodeDataCommand.prototype.resolve = function(data) {
-    let self = this, nodeId = data.node.getId(), keyStr = data.getKeyString(),
-        refStr = data.getReferenceString(),
-        value = data.value, children = data.getChildren();
+    /*
+    we now have a data key, operation, and expression, where the expression value
+    may have subkeys; the data key and any subkeys must be created if necessary,
+    then the operation applied
+    */
 
-    if(children.length > 0) {
-        children.forEach(function(child) {
-            Misc.setIndex(self.values, 'sub', child.key, refStr, value[k]);
-        });
-    } else {
-        Misc.setIndex(self.values, 'all', refStr, value);
+    let self = this, data = self.node.getKey(self.editKey, true);
+    switch(self.operation) {
+        case 'add':
+            break;
+        case 'clear':
+            break;
+        default:
+            self.expression.eachNode(function(node) {
+                let subData = data.getKey(node.getKey(), true);
+                eval('subData.value ' + self.operation + ' ' + self.expression.)
+            });
+            break;
     }
 
-    Misc.deleteIndex(self.waiting, nodeId, keyStr);
-    if(Object.keys(self.waiting).length === 0) {
-        self.resolveCommand();
-        self.node.resolve();
-    }
+    Dependency.prototype.resolve.call(this, expression);
 };
 
 NodeDataCommand.prototype.resolveCommand = function() {
@@ -321,15 +345,34 @@ NodeDataCommand.prototype.resolveCommandHelper = function(index) {
 };
 
 
-function Expression(exp) {
-    this.expression = exp || null;
-    this.arguments = [];
-    this.dependencies = [];
+function Expression(exp, node) {
+    this.node = node || null;
+    this.parent = null;
+    this.children = [];
+    this.waiting = {};
+
+    if(Array.isArray(exp)) {
+        this.expression = exp.join(' ');
+        let self = this;
+        tokens.forEach(function(token) {
+            if(self.node.isDataKey(token)) {
+                let parse = self.node.parseDataKey(token);
+                self.wait(parse.nodes[0], parse.key);
+            }
+        });
+    } else this.expression = exp;
 }
+Expression.prototype = Object.create(Dependency.prototype);
+Expression.constructor = Expression;
 
 Expression.prototype.addArgument = function(exp) {
     let child = new Expression(exp);
     this.children.push(child);
+    child.setParent(this);
+};
+
+Expression.prototype.setParent = function(exp) {
+    this.parent = exp;
 };
 
 Expression.prototype.setup = function() {
@@ -343,7 +386,22 @@ Expression.prototype.setup = function() {
     });
 };
 
-Expression.prototype.resolve = function() {
+Expression.prototype.wait = function(node, key) {
+    Dependency.prototype.wait.call(this, node.getData(), key);
+};
+
+Expression.prototype.resolve = function(data, key) {
+    let refStr = data.getReferenceString();
+    this.expression.replace(refStr, data.getValue());
+
+    /* once all dependencies are resolved, evaluate this expression;
+    matching subkeys between the two arguments are paired
+    */
+
+    if(this.resolved()) {
+
+        this.value = eval(this.expression);
+    }
     switch(typeof this.expression) {
         case 'string':
             if(args.length === 2) {
