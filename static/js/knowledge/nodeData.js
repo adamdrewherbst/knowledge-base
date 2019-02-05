@@ -101,45 +101,79 @@ Node.prototype.initData = function(type) {
 
 Node.prototype.setupDataDependencies = function(type) {
 
-    let self = this, concept = self.getConcept(), commands = concept.getCommands(type);
+    let self = this, concept = self.getConcept(), commandStrings = concept.getCommands(type);
 
-    commands.forEach(function(commandStr) {
+    commandStrings.forEach(function(commandStr) {
 
-        let tokens = commandStr.split(' '), targetStr = tokens.shift(), op = tokens.shift();
-        if(!self.isDataKey(targetStr)) return;
-        let parse = self.parseDataKey(targetStr), targets = parse.nodes, targetKey = parse.key;
-        let expression = new Expression(tokens, self);
+        let tokens = commandStr.split(/\s+/), tgt = tokens.shift(), op = tokens.shift(),
+            exp = tokens.join(' '), context = false;
 
-        targets.forEach(function(target) {
-            let command = new NodeDataCommand(target, targetKey, op, expression);
+        let tgtRef = self.parseReferences(tgt)[0];
+        if(!tgtRef || tgtRef[0].start > 0 || tgtRef[0].end < tgt.length) return;
+
+        if(tgtRef.type === 'var') {
+            let command = new NodeDataCommand(tgtRef.var, tgtRef.key, op);
+            command.wait(self.variables, tgtRef.var, function(ret) {
+                command.edit = ret.value;
+            });
+            commands.push(command);
+        } else if(tgtRef.type === 'node') {
+            tgtRef.nodes.forEach(function(node) {
+                commands.push(new NodeDataCommand(node, tgtRef.key, op));
+            });
+        }
+
+        let expression = null;
+        commands.forEach(function(command) {
+            if(!expression || tgtRef.nodeAsContext) {
+                let node = tgtRef.nodeAsContext ? command.edit : self;
+                expression = new Expression(exp);
+                let refs = node.parseReferences(expression);
+                refs.forEach(function(ref) {
+                    if(ref.type === 'var') {
+                        expression.wait(self.variables, ref.var, function(ret) {
+                            expression.wait(ret.value, ref.key, function(ret) {
+                                expression.setReplacement(ref, ret);
+                            });
+                        });
+                    } else if(ref.type === 'node') {
+                        expression.wait(ref.nodes[0], ref.key, function(ret) {
+                            expression.setReplacement(ref, ret);
+                        });
+                    }
+                });
+            }
+            command.expression = expression;
+            command.init();
         });
     });
 };
 
-Node.prototype.isDataKey = function(token) {
-    let oneWord = token.match(/^[0-9A-Za-z]$/);
-    if(oneWord) return NodeData.types.indexOf(token) >= 0;
-    return token.match(/^[0-9A-Za-z\.]+$/) !== null;
-};
-
-Node.prototype.parseDataKey = function(str) {
-    let self = this, parts = str.split('.'), nodeNames = ['S', 'A', 'B', 'C'], splitPos = 0;
-    for(let i = 0; i < parts.length; i++) {
-        if(nodeNames.indexOf(parts[i]) >= 0) splitPos += parts[i].length + 1;
-        else break;
+Node.prototype.parseReferences = function(str) {
+    let self = this,
+        re = /[^A-Za-z0-9'"](\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)((?:\.[A-Za-z0-9]+)*)[^A-Za-z0-9'"]/,
+        references = [];
+    while((match = re.exec(str)) !== null) {
+        let ref = {key: match[2], start: match.index, end: re.lastIndex}, data = match[1];
+        if(data[0] === '$') {
+            ref.type = 'var';
+            ref.var = data.substring(1);
+        } else {
+            if(data[data.length-1] === ':') {
+                ref.nodeAsContext = true;
+                data = data.substring(0, -1);
+            }
+            ref.type = 'node';
+            ref.nodes = self.getConnectedNodes(data);
+        }
+        references.push(ref);
     }
-    let nodes = str.substring(0, Math.max(splitPos-1, 0)), dataKey = str.substring(splitPos);
-    return {nodes: self.getConnectedNodes(nodes || 'S'), key: dataKey};
+    return references;
 };
 
 //generate a syntax tree from a node data command
 Node.prototype.splitDataCommand = function(command) {
     /* TODO */
-};
-
-Node.prototype.addDataCommand = function(command) {
-    let dep = new NodeDataCommand(this, command);
-    dep.init();
 };
 
 Node.prototype.getData = function(key, create) {
@@ -218,8 +252,8 @@ Dependency.prototype.getDependencyKey = function() {
     return undefined;
 };
 
-Dependency.prototype.wait = function(dep, key) {
-    Misc.setIndex(this.waiting, dep.getDependencyId(), key, true);
+Dependency.prototype.wait = function(dep, key, callback) {
+    Misc.setIndex(this.waiting, dep.getDependencyId(), key, callback || true);
     dep.addTrigger(this, key);
 };
 
@@ -228,8 +262,11 @@ Dependency.prototype.addTrigger = function(dep, key) {
 };
 
 Dependency.prototype.resolve = function(dep, key) {
-    Misc.deleteIndex(this.waiting, dep.getId());
+    let callback = Misc.getIndex(this.waiting, dep.getDependencyId(), key);
+    if(typeof callback === 'function') callback.call(this, dep);
+    Misc.deleteIndex(this.waiting, dep.getDependencyId());
     if(Object.keys(waiting).length === 0) {
+        this.fullyResolve();
         for(let id in this.triggers) {
             let dep = this.triggers[id];
             if(typeof dep === 'object' && dep.prototype.isPrototypeOf(Dependency))
@@ -237,6 +274,8 @@ Dependency.prototype.resolve = function(dep, key) {
         }
     }
 };
+
+Dependency.prototype.fullyResolve = function() {};
 
 
 function NodeData(node) {
