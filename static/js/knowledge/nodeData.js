@@ -119,26 +119,30 @@ Node.prototype.setupDataDependencies = function(type) {
             commands.push(command);
         } else if(tgtRef.type === 'node') {
             tgtRef.nodes.forEach(function(node) {
-                commands.push(new NodeDataCommand(node, tgtRef.key, op));
+                commands.push(new NodeDataCommand(node.getData(), tgtRef.key, op));
             });
         }
 
         let expression = null;
         commands.forEach(function(command) {
             if(!expression || tgtRef.nodeAsContext) {
-                let node = tgtRef.nodeAsContext ? command.edit : self;
+                let node = tgtRef.nodeAsContext ? command.edit.node : self;
                 expression = new Expression(exp);
-                let refs = node.parseReferences(expression);
+                let refs = node.parseReferences(exp), ind = 0;
                 refs.forEach(function(ref) {
+                    if(ref.start > ind)
+                        expression.addLiteralBlock(exp.substring(ind, ref.start));
+                    let refNum = expression.addReferenceBlock();
+                    ind = ref.end;
                     if(ref.type === 'var') {
                         expression.wait(self.variables, ref.var, function(ret) {
                             expression.wait(ret.value, ref.key, function(ret) {
-                                expression.setReplacement(ref, ret);
+                                expression.setReference(refNum, ret);
                             });
                         });
                     } else if(ref.type === 'node') {
-                        expression.wait(ref.nodes[0], ref.key, function(ret) {
-                            expression.setReplacement(ref, ret);
+                        expression.wait(ref.nodes[0].getData(), ref.key, function(ret) {
+                            expression.setReference(refNum, ret);
                         });
                     }
                 });
@@ -161,7 +165,7 @@ Node.prototype.parseReferences = function(str) {
         } else {
             if(data[data.length-1] === ':') {
                 ref.nodeAsContext = true;
-                data = data.substring(0, -1);
+                data = data.substring(0, data.length-1);
             }
             ref.type = 'node';
             ref.nodes = self.getConnectedNodes(data);
@@ -206,6 +210,10 @@ function Dependency() {
     this.triggers = {};
 }
 
+Dependency.prototype.getId = function() {
+    return undefined;
+}
+
 Dependency.prototype.insert = function(key, value) {
     self.getKey(key, true).setValue(value);
 };
@@ -244,14 +252,6 @@ Dependency.prototype.getKeyString = function() {
     return parentStr + this.key;
 };
 
-Dependency.prototype.getDependencyId = function() {
-    return undefined;
-};
-
-Dependency.prototype.getDependencyKey = function() {
-    return undefined;
-};
-
 Dependency.prototype.wait = function(dep, key, callback) {
     Misc.setIndex(this.waiting, dep.getDependencyId(), key, callback || true);
     dep.addTrigger(this, key);
@@ -270,7 +270,7 @@ Dependency.prototype.resolve = function(dep, key) {
         for(let id in this.triggers) {
             let dep = this.triggers[id];
             if(typeof dep === 'object' && dep.prototype.isPrototypeOf(Dependency))
-                dep.resolve(this, this.getDependencyKey());
+                dep.resolve(this, this.getKeyString());
         }
     }
 };
@@ -279,59 +279,36 @@ Dependency.prototype.fullyResolve = function() {};
 
 
 function NodeData(node) {
+    Dependency.call(this);
     this.node = node;
-    this.key = key;
-    this.parent = null;
-    this.children = {};
-    this.value = null;
 }
 NodeData.prototype = Object.create(Dependency.prototype);
-NodeData.constructor = NodeData;
+NodeData.prototype.constructor = NodeData;
 
-NodeData.prototype.getDependencyId = function() {
+NodeData.prototype.getId = function() {
     return this.node.getId();
 };
 
-NodeData.prototype.getDependencyKey = function() {
-    return this.getKeyString();
-};
-
-NodeData.prototype.getReferenceString = function() {
-    return this.node.getId() + '.' + this.getKeyString();
-};
-
-NodeData.prototype.resolve = function(command, key) {
-    let self = this, data = self.getKey(key, true);
-    data.applyOperation()
-};
 
 
-function NodeDataCommand(command) {
-    this.node = node;
-    this.command = command;
-    this.originalCommand = command;
-    this.editKey = null;
-    this.operation = null;
-    this.values = {'sub': {}, 'all': {}};
-    this.expressionTree = null;
+function NodeDataCommand(dep, key, op, exp) {
+    Dependency.call(this);
+    this.edit = dep;
+    this.editKey = key;
+    this.operation = op;
+    this.expression = exp;
 }
 NodeDataCommand.prototype = Object.create(Dependency.prototype);
-NodeDataCommand.constructor = NodeDataCommand;
+NodeDataCommand.prototype.constructor = NodeDataCommand;
 
-NodeDataCommand.prototype.parse = function() {
-    let self = this, tokens = this.command.split(/\s+/), sources = [];
-    self.editKey = tokens.shift();
-    self.operation = tokens.shift();
-    self.expression = new Expression(tokens.join(' '));
-};
-
-NodeDataCommand.prototype.setup = function() {
+NodeDataCommand.prototype.init = function() {
     //the data key being edited by this command can't be resolved until the command completes
-    self.node.getData().wait(self, self.editKey);
-    self.expression.setup();
+    self.expression.init();
+    self.wait(self.expression);
+    self.edit.wait(self, self.editKey);
 };
 
-NodeDataCommand.prototype.resolve = function(expression) {
+NodeDataCommand.prototype.fullyResolve = function() {
 
     /*
     we now have a data key, operation, and expression, where the expression value
@@ -339,127 +316,107 @@ NodeDataCommand.prototype.resolve = function(expression) {
     then the operation applied
     */
 
-    let self = this, data = self.node.getKey(self.editKey, true);
+    let self = this, data = self.edit;
     switch(self.operation) {
         case 'add':
+            let key = data.getKey(expression.value);
+            if(!key) self.value = data.getKey(expression.value, true);
+            else {
+                let index = 0;
+                for(; key.getKey(index); index++);
+                self.value = key.getKey(index, true);
+            }
             break;
         case 'clear':
+            data.removeChildren();
+            self.value = data;
             break;
         default:
             self.expression.eachNode(function(node) {
                 let subData = data.getKey(node.getKey(), true);
-                eval('subData.value ' + self.operation + ' ' + self.expression.)
+                eval('subData.value ' + self.operation + ' ' + node.value);
             });
-            break;
-    }
-
-    Dependency.prototype.resolve.call(this, expression);
-};
-
-NodeDataCommand.prototype.resolveCommand = function() {
-    for(let k in this.values.sub) this.resolveTree(this.expressionTree, k);
-    this.resolveTree(this.expressionTree, null);
-};
-
-NodeDataCommand.prototype.resolveCommandHelper = function(index) {
-
-    let self = this, key = self.editKey;
-    if(index) key += '.' + index;
-    let args = key.split('.');
-    args.unshift(self.node.data);
-    let editKey = Misc.getOrCreateIndex.apply(Misc, args);
-
-    let expression = self.resolveTree(self.tree, index);
-    switch(self.operation) {
-        case 'add': //specify an index to add to a data key
-            editKey[expression] = {};
-            break;
-        case 'clear': //empty out the given data key
-            for(let k in editKey) delete editKey[k];
-            break;
-        default:
-            eval('self.data.' + key + ' ' + self.operation + ' ' + expression);
+            self.value = data;
             break;
     }
 };
 
 
-function Expression(exp, node) {
-    this.node = node || null;
-    this.parent = null;
-    this.children = [];
-    this.waiting = {};
-
-    if(Array.isArray(exp)) {
-        this.expression = exp.join(' ');
-        let self = this;
-        tokens.forEach(function(token) {
-            if(self.node.isDataKey(token)) {
-                let parse = self.node.parseDataKey(token);
-                self.wait(parse.nodes[0], parse.key);
-            }
-        });
-    } else this.expression = exp;
+function Expression() {
+    Dependency.call(this);
+    this.references = [];
+    this.blocks = [];
 }
 Expression.prototype = Object.create(Dependency.prototype);
-Expression.constructor = Expression;
+Expression.prototype.constructor = Expression;
 
-Expression.prototype.addArgument = function(exp) {
-    let child = new Expression(exp);
-    this.children.push(child);
-    child.setParent(this);
+Expression.prototype.addLiteralBlock = function(value) {
+    this.blocks.push(value);
 };
 
-Expression.prototype.setParent = function(exp) {
-    this.parent = exp;
+Expression.prototype.addReferenceBlock = function() {
+    this.references.push(null);
+    let refNum = this.references.length - 1;
+    this.blocks.push({type: 'reference', index: refNum});
+    return refNum;
 };
 
-Expression.prototype.setup = function() {
-    let self = this, tokens = self.split(/\s+/);
-    //this expression has to wait for all dependent keys to be resolved
-    for(let i = 2; i < tokens.length; i++) {
-        if(self.node.isDataKey(tokens[i])) sources.push(self.node.parseDataKey(tokens[i]));
-    }
-    sources.forEach(function(source) {
-        self.wait(source.nodes[0], source.key);
-    });
+Expression.prototype.setReference = function(index, value) {
+    this.references[index] = value;
 };
 
-Expression.prototype.wait = function(node, key) {
-    Dependency.prototype.wait.call(this, node.getData(), key);
+Expression.prototype.init = function() {
 };
 
-Expression.prototype.resolve = function(data, key) {
-    let refStr = data.getReferenceString();
-    this.expression.replace(refStr, data.getValue());
+Expression.prototype.fullyResolve = function() {
 
-    /* once all dependencies are resolved, evaluate this expression;
-    matching subkeys between the two arguments are paired
+    /* once all dependencies are resolved, evaluate this expression,
+    matching subkeys between dependencies when possible
     */
-
-    if(this.resolved()) {
-
-        this.value = eval(this.expression);
-    }
-    switch(typeof this.expression) {
-        case 'string':
-            if(args.length === 2) {
-                let resolvedArgs = [];
-                this.arguments.forEach(function(arg) {
-                    resolvedArgs.push(arg.resolve());
-                });
-                return eval(resolvedArgs[0] + ' ' + this.expression + ' ' + resolvedArgs[1]);
-            } else {
-                let str = this.expression;
-                for(let key in this.dependencies) {
-                    str = str.replace(key, this.dependencies[key].getValue());
+    let self = this, keys = {};
+    self.references.forEach(function(ref) {
+        ref.eachKey(function(key) {
+            if(key.value) Misc.setIndex(keys, key, ref.getId(), true);
+        });
+    });
+    for(let key in keys) {
+        let refKey = {};
+        let match = self.references.every(function(ref) {
+            let prefix = key;
+            for(;
+                !((prefixKey = ref.getKey(prefix)) && prefixKey.value) && prefix.length > 0;
+                prefix = prefix.replace(/\.?[A-Za-z0-9]+$/, ''));
+            if(prefixKey.value) {
+                refKey[ref.getId()] = prefixKey;
+                return true;
+            } else return false;
+        });
+        if(match) {
+            let data = self.getKey(key, true), str = '';
+            let built = self.blocks.every(function(block) {
+                if(typeof block === 'object') {
+                    if(block.type !== 'reference' && block.index) {
+                        let ref = self.references[block.index];
+                        if(!ref) return false;
+                        let refData = refKey[ref.getId()];
+                        if(!refData) return false;
+                        str += '' + refData.getValue();
+                    }
+                } else {
+                    str += '' + block;
                 }
-                return eval(str);
-            }
-            break;
-        case 'object':
-            return expression.getValue();
-            break;
-        default: return null;
+            });
+            if(built) data.value = eval(str);
+        }
     }
 };
+
+
+
+
+
+
+
+
+
+
