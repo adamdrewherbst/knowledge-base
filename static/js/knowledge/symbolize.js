@@ -1,6 +1,6 @@
         Relation.prototype.symbolize = function() {
             let self = this;
-            self.law.propagateData('symbol');
+            self.law.resolveData('symbol');
             $('#symbolization-wrapper').empty();
             self.law.deepNodes.forEach(function(id) {
                 let node = self.findEntry('node', id);

@@ -275,7 +275,7 @@
                 node.updateMatches();
             }
             if(opts.propagate) {
-                for(let type in opts.propagate) self.propagateData(type);
+                for(let type in opts.propagate) self.resolveData(type);
             }
         };
 
@@ -306,32 +306,19 @@
             return true;
         };
 
-        Law.prototype.propagateData = function(type) {
+        Law.prototype.resolveData = function(type) {
             let self = this;
             //determine what nodes each node's data depends on
             self.eachNode(function(node) {
                 node.initData(type);
             });
             self.eachNode(function(node) {
-                node.setupData(type);
+                node.setupDataDependencies(type);
             });
-            let count = 0;
-            do {
-                //find all nodes that have now had their dependencies resolved,
-                //and pass their data to their dependents in turn
-                count = 0;
-                self.eachNode(function(node) {
-                    let data = node.data[type];
-                    if(data.known) return;
-                    if(Object.getOwnPropertyNames(data.waiting).length == 0) {
-                        count++;
-                        data.known = true;
-                        for(let id in data.trigger) {
-                            data.trigger[id].resolveDataDependency(type, node);
-                        }
-                    }
-                });
-            } while(count > 0);
+            self.eachNode(function(node) {
+                let data = node.getData(type);
+                if(data && data.resolved()) data.propagate();
+            });
         };
 
         Law.prototype.reset = function() {

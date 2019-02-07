@@ -23,6 +23,9 @@
             if(opts) self.options.evaluate = opts;
             opts = self.options.evaluate;
 
+            //we only propagate concept data during the actual evaluation
+            Dependency.propagate('concept');
+
             self.stats.evaluate.nodesChecked = 0;
             self.stats.evaluate.nodesAppended = 0;
 
@@ -33,6 +36,8 @@
             }
             self.law.evaluate();
             $('#evaluate-msg').text('Done evaluating');
+
+            Dependency.propagate(null);
 
             console.log('');
             console.log('Checked ' + self.stats.evaluate.nodesChecked + ' nodes');
@@ -290,20 +295,19 @@
                 if(head.type !== 'data') return false;
                 let expression = null;
                 if(ref.type === 'expression') expression = ref.expression;
-                else if(ref.type === 'data') expression = new Expression(ref.node.getId() + '.' + ref.key);
+                else if(ref.type === 'data') expression = Expression.fromNodeKey(ref.node, ref.key);
                 else return false;
-                let command = new NodeDataCommand(head.node, head.key || 'value', node.getDataKey(), expression);
-                command.setup();
+                let command = new NodeDataCommand(head.node.getData(), head.key || 'value', node.getDataKey(), expression);
+                command.init();
                 return command;
             } else {
-                let expression = new Expression(node.getDataKey()), headExpression = null, refExpression = null;
+                let headExpression = null, refExpression = null;
                 if(head.type === 'expression') headExpression = head.expression;
-                else if(head.type === 'data') headExpression = new Expression(head.node.getId() + '.' + head.key);
+                else if(head.type === 'data') headExpression = Expression.fromNodeKey(head.node, head.key);
                 if(ref.type === 'expression') refExpression = ref.expression;
-                else if(ref.type === 'data') refExpression = new Expression(ref.node.getId() + '.' + ref.key);
+                else if(ref.type === 'data') refExpression = Expression.fromNodeKey(ref.node, ref.key);
                 if(!headExpression || !refExpression) return false;
-                expression.addArgument(headExpression);
-                expression.addArgument(refExpression);
+                let expression = Expression.fromPair(headExpression, node.getDataKey(), refExpression);
                 return {type: 'expression', expression: expression};
             }
         };
