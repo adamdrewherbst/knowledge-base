@@ -87,7 +87,7 @@ Node.prototype.initData = function(type) {
     data[type] = {};
     switch(type) {
         case 'concept':
-            self.setData('concept.' + self.concept, true);
+            self.setData('concept.' + self.concept, self.getConcept());
             break;
         case 'symbol':
             self.setData('symbol.text', self.name);
@@ -127,7 +127,7 @@ Node.prototype.setupDataDependencies = function(type) {
         commands.forEach(function(command) {
             if(!expression || tgtRef.nodeAsContext) {
                 let node = tgtRef.nodeAsContext ? command.edit.node : self;
-                expression = new Expression(exp);
+                expression = new Expression(null);
                 let refs = node.parseReferences(exp), ind = 0;
                 refs.forEach(function(ref) {
                     if(ref.start > ind)
@@ -191,25 +191,27 @@ Node.prototype.setData = function(key, value) {
 //data may be stored in the data tree/command set, or as child nodes;
 //this function merges all child nodes into the tree/command format
 //so they can all be evaluated together
-Node.prototype.collectData = function(rootNode) {
-    let self = this, dataConcept = self.relation.getSpecialConcept('data'),
-        children = self.getChildrenByConcept(dataConcept);
-    if(rootNode === undefined) rootNode = self;
-    children.forEach(function(child) {
-        child.collectData(rootNode);
+Node.prototype.collectData = function(key) {
+    let obj = {}, data = this.getData(key);
+    if(!data) return obj;
+    data.eachChild(function(child) {
+        child.collectData(obj);
     });
+    return obj;
 };
 
 
 function Dependency(parent, key, value) {
     this.id = Dependency.nextId++;
+    if(parent === null) this.rootId = this.id;
+    else this.rootId = null;
     this.key = key || null;
     this.value = value || null;
     this.parent = parent || null;
     this.children = {};
     this.waiting = {};
     this.triggers = {};
-    this.active = false;
+    this.active = {};
 }
 Dependency.nextId = 0;
 Dependency.propagate = {};
@@ -221,6 +223,11 @@ Dependency.propagate = function(type) {
     } else Dependency.propagate[type] = true;
 };
 
+Dependency.setPropagate = function(type) {
+    Dependency.propagate(null);
+    Dependency.propagate(type);
+};
+
 Dependency.propagating = function(type) {
     if(Dependency.propagate['ALL']) return true;
     return Dependency.propagate[type] ? true : false;
@@ -228,6 +235,14 @@ Dependency.propagating = function(type) {
 
 Dependency.prototype.getId = function() {
     return this.id;
+};
+
+Dependency.prototype.getRootId = function() {
+    return this.rootId;
+};
+
+Dependency.prototype.setRootId = function(id) {
+    this.rootId = id;
 };
 
 Dependency.prototype.insert = function(key, value) {
@@ -257,8 +272,33 @@ Dependency.prototype.addChild = function(key) {
     let child = new this();
     child.setParent(this);
     child.setKey(key);
+    child.setRootId(this.rootId);
+    //let the child know if anything is waiting on it, or if it is active
+    for(let k in this.triggers) {
+        let arr = k.split('.'), first = arr.shift(), rest = arr.join('.');
+        if(first === key) {
+            for(let id in this.triggers[k]) {
+                child.addTrigger(this.triggers[k][id], rest);
+            }
+            delete this.triggers[k];
+        }
+    }
+    for(let k in this.active) {
+        let arr = k.split('.'), first = arr.shift(), rest = arr.join('.');
+        if(first === key) {
+            child.activate(rest);
+            delete this.active[k];
+        }
+    }
     this.children[key] = child;
     return child;
+};
+
+Dependency.prototype.eachChild = function(callback) {
+    for(let key in this.children) {
+        let child = this.children[key];
+        callback.call(child);
+    }
 };
 
 Dependency.prototype.removeChildren = function() {
@@ -285,9 +325,12 @@ Dependency.prototype.setValue = function(value) {
     this.value = value === undefined ? null : value;
 };
 
-Dependency.prototype.getKeyString = function() {
-    let parentStr = this.parent ? this.parent.getKeyString() + '.' : '';
-    return parentStr + this.key;
+Dependency.prototype.getKeyString = function(subkey) {
+    let str = this.parent ? this.parent.getKeyString() : '';
+    if(str && this.key) str += '.';
+    str += this.key || '';
+    if(str && subkey) str += '.';
+    str += subkey || '';
 };
 
 Dependency.prototype.eachKey = function(callback) {
@@ -299,20 +342,33 @@ Dependency.prototype.eachKey = function(callback) {
 };
 
 Dependency.prototype.active = function() {
-    return this.active;
+    return this.active[''] || false;
 };
 
-Dependency.prototype.activate = function() {
-    this.active = true;
-    for(let id in this.waiting) {
-        for(let key in this.waiting[id]) {
+Dependency.prototype.activate = function(key) {
+    key = key || '';
+    this.active[key] = true;
+    if(key !== '') return;
 
+    if(this.checkResolved()) return;
+
+    for(let id in this.waiting) {
+        for(let k in this.waiting[id]) {
+            let obj = this.waiting[id][k], dep = obj.dep;
+            if(dep) dep.activate(k);
         }
     }
 };
 
+Dependency.prototype.checkResolved = function() {
+    if(!this.active() || !this.resolved()) return false;
+    this.fullyResolve();
+    this.propagate();
+    return true;
+};
+
 Dependency.prototype.wait = function(dep, key, callback) {
-    Misc.setIndex(this.waiting, dep.getId(), key || '', {
+    Misc.setIndex(this.waiting, dep.getRootId(), dep.getKeyString(key), {
         dep: dep,
         callback: callback
     });
@@ -320,34 +376,41 @@ Dependency.prototype.wait = function(dep, key, callback) {
 };
 
 Dependency.prototype.addTrigger = function(dep, key) {
-    Misc.setIndex(this.triggers, dep.getId(), key, dep);
+    Misc.setIndex(this.triggers, key, dep.getId(), dep);
 };
 
-Dependency.prototype.resolve = function(dep, key) {
-    let obj = Misc.getIndex(this.waiting, dep.getId(), key),
-        callback = obj.callback, dep = obj.dep;
-    if(typeof callback === 'function') callback.call(this, dep);
-    Misc.deleteIndex(this.waiting, dep.getId(), key);
+Dependency.prototype.resolve = function(dep) {
+    let id = dep.getRootId(), key = dep.getKeyString(), obj = Misc.getIndex(this.waiting, id, key);
+    if(!obj) return;
 
-    if(this.resolved()) {
-        this.fullyResolve();
-        this.propagate();
-    }
+    let callback = obj.callback;
+    if(typeof callback === 'function') callback.call(this, dep);
+
+    Misc.deleteIndex(this.waiting, id, key);
+
+    this.checkResolved();
 };
 
 Dependency.prototype.resolved = function() {
     return Object.keys(waiting).length === 0;
 };
 
+Dependency.prototype.fullyResolve = function() {};
+
 Dependency.prototype.propagate = function() {
-    for(let id in this.triggers) {
-        let dep = this.triggers[id];
-        if(typeof dep === 'object' && dep.prototype.isPrototypeOf(Dependency))
-            dep.resolve(this, this.getKeyString());
+    for(let id in this.triggers['']) {
+        let dep = this.triggers[''][id];
+        dep.resolve(this);
     }
 };
 
-Dependency.prototype.fullyResolve = function() {};
+Dependency.prototype.collectData = function(obj) {
+    let self = this;
+    obj[self.key] = {_value: self.value};
+    self.eachChild(function(child) {
+        child.collectData(obj[self.key]);
+    });
+};
 
 
 function NodeData(node) {
@@ -364,7 +427,7 @@ NodeData.prototype.setParent = function(parent) {
 
 
 function NodeDataCommand(dep, key, op, exp) {
-    Dependency.call(this);
+    Dependency.call(this, null);
     this.operation = op;
     this.expression = exp;
     this.setTarget(dep, key);
@@ -374,6 +437,7 @@ NodeDataCommand.prototype.constructor = NodeDataCommand;
 
 NodeDataCommand.prototype.init = function() {
     //the data key being edited by this command can't be resolved until the command completes
+    let self = this;
     self.expression.init();
     self.wait(self.expression);
     self.target.wait(self, self.editKey);
@@ -412,12 +476,19 @@ NodeDataCommand.prototype.fullyResolve = function() {
     let self = this, data = self.target;
     switch(self.operation) {
         case 'add':
-            let key = data.getNode(expression.value);
-            if(!key) self.value = data.getNode(expression.value, true);
-            else {
-                let index = 0;
-                for(; key.getNode(index); index++);
-                self.value = key.getNode(index, true);
+            if(typeof expression.value === 'string') {
+                let key = data.getNode(expression.value);
+                if(!key) self.value = data.getNode(expression.value, true);
+                else {
+                    let index = 0;
+                    for(; key.getNode(index); index++);
+                    self.value = key.getNode(index, true);
+                }
+            } else {
+                self.expression.eachKey(function(key, node) {
+                    data.getNode(key, true);
+                });
+                self.value = data;
             }
             break;
         case 'clear':
@@ -444,7 +515,7 @@ Expression.prototype = Object.create(Dependency.prototype);
 Expression.prototype.constructor = Expression;
 
 Expression.fromNodeKey = function(node, key) {
-    let expression = new Expression(), data = node.getData();
+    let expression = new Expression(null), data = node.getData();
     let refNum = expression.addReferenceBlock();
     expression.wait(data, key, function(ret) {
         expression.setReference(refNum, ret);
@@ -453,7 +524,7 @@ Expression.fromNodeKey = function(node, key) {
 };
 
 Expression.fromPair = function(e1, op, e2) {
-    let expression = new Expression();
+    let expression = new Expression(null);
     expression.addReferenceBlock();
     expression.addReferenceBlock();
     expression.wait(e1);

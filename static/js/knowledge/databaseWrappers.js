@@ -385,6 +385,13 @@
             return this.findEntry('concept', this.concept);
         };
 
+        Node.prototype.getAllConcepts = function() {
+            let concepts = this.getConcept().getAllConcepts(),
+                conceptData = this.collectData('concept');
+            for(let concept in conceptData) concepts[concept] = conceptData[concept]._value;
+            return concepts;
+        };
+
         Node.prototype.instanceOf = function(concept) {
             return this.getConcept().instanceOf(concept);
         };
@@ -562,8 +569,20 @@
         Node.prototype.updateMatches = function() {
             let self = this, opts = self.relation.options.evaluate;
 
+            //this node may be an instance of multiple concepts; we only check matches for
+            //those concepts that haven't yet been checked (ie. they were added during evaluation)
+            let concepts = self.collectData('concept');
+            for(let concept in concepts) {
+                //this concept was previously checked on this node - ignore it
+                if(concepts[concept].checked) delete concepts[concept];
+                //it is being checked now, so mark it for next time
+                else self.setData('concept.'+concept+'.checked', true);
+            }
+            //all concepts have been checked => nothing to do
+            if(Object.keys(concepts).length === 0) return;
+
             //first check if I match a top-level node from any predicate description
-            let concepts = self.getConcept().getAllConcepts(), wildcard = Concept.prototype.wildcardConcept;
+            let wildcard = Concept.prototype.wildcardConcept;
             concepts[wildcard] = self.relation.findEntry('concept', wildcard);
             for(let concept in concepts) {
                 for(let nodeId in Law.predicateTop[concept]) {
@@ -585,8 +604,15 @@
                     parentMatch.getChildren(i).forEach(function(childMatch) {
 
                         //first, this node's concept must match that of the child node's concept
-                        let concept = self.getConcept(), matchConcept = childMatch.getConcept();
-                        if(!concept.instanceOf(childMatch.concept)) return;
+                        let match = false, matchConcept = childMatch.getConcept();
+                        for(let c in concepts) {
+                            let concept = concepts[c]._value;
+                            if(concept.instanceOf(childMatch.concept)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if(!match) return;
                         if(matchConcept.isData() && (!concept.isData() ||
                             self.getDataKey() !== childMatch.getDataKey())) return;
 
