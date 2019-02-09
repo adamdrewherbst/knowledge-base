@@ -49,10 +49,14 @@
             }
         };
 
-        Misc.cleanArguments = function(args) {
-            let clean = [];
-            for(let i = 0; i < args.length; i++)
-                if(args[i] !== undefined) clean.push(args[i]);
+        Misc.cleanArguments = function(args, clean) {
+            if(!clean) clean = [];
+            for(let i = 0; i < args.length; i++) {
+                if(args[i] === undefined) clean.push('');
+                else if(Array.isArray(args[i])) {
+                    Misc.cleanArguments(args[i], clean);
+                } else clean.push(args[i]);
+            }
             return clean;
         };
 
