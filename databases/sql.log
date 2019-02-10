@@ -345,3 +345,7 @@ CREATE TABLE set(
     set_id INT,
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
+timestamp: 2019-02-10T04:13:31.639291
+ALTER TABLE node ADD data_key VARCHAR(512);
+success!
+success!
