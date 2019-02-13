@@ -15,6 +15,20 @@
         from L.  As we keep merging maps, eventually we may have a map whose predicate nodes completely satisfy L.
         At that point, we can append to our relation R the additional knowledge (relations) that L provides us.
 
+        Meta-Relations:
+        There can be general relations between concepts independent of any context.  For example, 'sum' and 'difference'
+        are inverses, as are several other pairs of mathematical concepts.  We express this as 'sum.inverse => difference'
+        and 'difference.inverse => sum'.
+            How do we apply this?  We can append '.inverse => difference' to every 'sum' in the relation, ie. have 'sum' and
+        'difference' be predicates in the above relation.  Or, we can have it be a concept relation with no predicates,
+        in which case it never gets appended to a relation but can itself be used as a predicate.  But then we can't match
+        on the 'inverse' node because it won't be in the relation.  Instead, seeing that 'inverse' is a meta-relation,
+        we have to check all meta-relation children of 'sum' to see if one of them is 'inverse', and then keep going from that
+        match.
+            Is this related to matching on node data?  A node may have data which is not itself represented as a node -
+        but it will be represented as a node in the law's predicate.  Once the node is matched, we match the data child by
+        seeing if the node has that data.  If it does, the node is marked as matching that data node.
+
         */
 
         Relation.prototype.evaluate = function(opts) {
@@ -22,9 +36,6 @@
             let self = this;
             if(opts) self.options.evaluate = opts;
             opts = self.options.evaluate;
-
-            //we only propagate concept data during the actual evaluation
-            Dependency.propagate('concept');
 
             self.stats.evaluate.nodesChecked = 0;
             self.stats.evaluate.nodesAppended = 0;
@@ -34,10 +45,9 @@
                 self.reset();
                 self.syncGraph();
             }
+
             self.law.evaluate();
             $('#evaluate-msg').text('Done evaluating');
-
-            Dependency.propagate(null);
 
             console.log('');
             console.log('Checked ' + self.stats.evaluate.nodesChecked + ' nodes');
@@ -48,6 +58,10 @@
 
         Relation.prototype.reset = function() {
             this.law.reset();
+        };
+
+        Relation.prototype.getEvaluateTag = function() {
+            return Misc.getIndex(this.options, 'evaluate', 'tag') || '';
         };
 
 
@@ -224,8 +238,10 @@
             let tentative = relation.options.evaluate.tentative || false;
 
             //if the head and reference of this node haven't been appended yet, do that first
-            newHead = self.appendHelper(head);
-            if(newHead == null) return null;
+            if(head) {
+                newHead = self.appendHelper(head);
+                if(newHead == null) return null;
+            }
             if(reference) {
                 newReference = self.appendHelper(reference);
                 if(newReference == null) return null;
@@ -236,13 +252,15 @@
 
             //if the head and reference are already related by this concept, don't add the node
             let childMatch = null;
-            newHead.getChildren(0).every(function(child) {
-                if(child.concept == node.concept && (!reference || child.reference == newReference.getId())) {
-                    childMatch = child;
-                    return false;
-                }
-                return true;
-            });
+            if(head) {
+                newHead.getChildren(0).every(function(child) {
+                    if(child.concept == node.concept && (!reference || child.reference == newReference.getId())) {
+                        childMatch = child;
+                        return false;
+                    }
+                    return true;
+                });
+            }
             if(childMatch) {
                 childMatch.addFromMap(self);
                 return childMatch;
@@ -251,7 +269,7 @@
             let newNode = law.addNode({
                 'law': law.id,
                 'concept': node.concept,
-                'head': parseInt(newHead),
+                'head': newHead ? parseInt(newHead) : null,
                 'reference': newReference ? parseInt(newReference) : null,
                 'value': node.value,
                 'tentative': tentative,

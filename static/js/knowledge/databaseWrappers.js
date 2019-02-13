@@ -151,12 +151,15 @@
         };
 
         //compile symbols of this concept and all dependencies into one
-        Concept.prototype.getCommands = function(type) {
-            let self = this, str = self[type], commands = [];
+        Concept.prototype.getCommands = function() {
+            return this.commands;
+        };
+
+        Concept.prototype.getAllCommands = function() {
+            let self = this, commands = [];
             let concepts = self.getAllConcepts();
             for(let id in concepts) {
-                let str = concepts[id][type];
-                if(str) commands = commands.concat(str.trim().split("\n"));
+                commands.push.apply(commands, concepts[id].getCommands());
             }
             return commands;
         };
@@ -266,9 +269,24 @@
             return nodes;
         };
 
+        Law.prototype.initData = function(type) {
+            let self = this;
+            Dependency.setPropagating(type);
+            self.eachNode(function(node) {
+                node.deactivateCommands();
+            });
+            self.eachNode(function(node) {
+                node.initData(type);
+            });
+            self.eachNode(function(node) {
+                node.updateDataDependencies();
+            });
+        };
+
         /* make a list of nodes where each is behind both of its parents */
         Law.prototype.evaluate = function() {
             let self = this, opts = self.relation.options.evaluate;
+            self.initData('concept');
             self.evaluateQueue = [];
             self.deepNodes.forEach(function(id) {
                 let node = self.findEntry('node', id);
@@ -317,11 +335,7 @@
                 node.initData(type);
             });
             self.eachNode(function(node) {
-                node.setupDataDependencies(type);
-            });
-            self.eachNode(function(node) {
-                let data = node.getData(type);
-                if(data && data.resolved()) data.propagate();
+                node.setupDataDependencies();
             });
         };
 
@@ -343,16 +357,16 @@
 
 
         function Node() {
-            let self = this;
-            self.children = {0: {}, 1: {}};
-            self.symbol = new Symbol();
-            self.value = new Value();
-            self.data = {};
-            self.dataTriggers = {};
-            self.dataWaiting = {};
-            self.tentative = false;
-            self.fromMap = {};
-            self.reset();
+            this.children = {0: {}, 1: {}};
+            this.triads = {};
+            this.symbol = new Symbol();
+            this.value = new Value();
+            this.conceptInfo = {};
+            this.data = new NodeData(this);
+            this.tentative = false;
+            this.fromMap = {};
+            this.evaluated = {};
+            this.reset();
         }
 
         Node.prototype = Object.create(Entry.prototype);
@@ -389,10 +403,22 @@
             return this.findEntry('concept', this.concept);
         };
 
+        Node.prototype.getConcepts = function() {
+            let concepts = {}, conceptData = this.collectData('concept');
+            for(let id in conceptData) {
+                concepts[id] = conceptData[id]._value;
+            }
+            return concepts;
+        };
+
         Node.prototype.getAllConcepts = function() {
-            let concepts = this.getConcept().getAllConcepts(),
-                conceptData = this.collectData('concept');
-            for(let concept in conceptData) concepts[concept] = conceptData[concept]._value;
+            let concepts = {}, conceptData = this.collectData('concept');
+            for(let id in conceptData) {
+                let concept = conceptData[id]._value, all = concept.getAllConcepts();
+                for(let cid in all) {
+                    concepts[cid] = all[cid];
+                }
+            }
             return concepts;
         };
 
@@ -425,24 +451,30 @@
         };
 
         Node.prototype.setHead = function(id) {
-            let currentHead = this.findEntry('node', this.head);
-            if(currentHead) currentHead.removeChild(0, this.id);
-            this.head = id;
-            let newHead = this.findEntry('node', this.head);
-            if(newHead) newHead.addChild(0, this);
+            this.setParent(0, id);
         };
 
         Node.prototype.setReference = function(id) {
-            let currentReference = this.findEntry('node', this.reference);
-            if(currentReference) currentReference.removeChild(1, this.id);
-            this.reference = id;
-            let newReference = this.findEntry('node', this.reference);
-            if(newReference) newReference.addChild(1, this);
+            this.setParent(1, id);
+        };
+
+        Node.prototype.setParent = function(type, id) {
+            let name = type === 0 ? 'head' : 'reference';
+            let currentParent = this.findEntry('node', this[name]);
+            if(currentParent) currentParent.removeChild(type, this.id);
+            this[name] = id;
+            let newParent = this.findEntry('node', this[name]);
+            if(newParent) newParent.addChild(type, this);
         };
 
         //type == 0 for children whose head is me, 1 for children whose reference is me
         Node.prototype.addChild = function(type, node) {
-            this.children[type][node.id] = node;
+            Misc.setIndex(this.children, type, node.id, node);
+            //also store triads of [me - child - other parent] for use in updateMatches()
+            if(node.head !== undefined && node.reference !== undefined) {
+                let otherParent = type === 0 ? node.reference : node.head;
+                Misc.setIndex(this.triads, type, node.concept, otherParent, node);
+            }
         };
 
         Node.prototype.getChildren = function(type) {
@@ -566,86 +598,90 @@
             law.addToEvaluateQueue(self);
         };
 
+        Node.prototype.evaluated = function() {
+            return this.evaluated[self.relation.getEvaluateTag()];
+        };
+
+        Node.prototype.setEvaluated = function(evaluated) {
+            this.evaluated[self.relation.getEvaluateTag()] = evaluated;
+        };
+
         /*
         Determine what nodes in any predicate description I match,
         based on my concept and what my parents have already matched
         */
         Node.prototype.updateMatches = function() {
-            let self = this, opts = self.relation.options.evaluate;
-
-            //this node may be an instance of multiple concepts; we only check matches for
-            //those concepts that haven't yet been checked (ie. they were added during evaluation)
-            let concepts = self.collectData('concept');
-            for(let concept in concepts) {
-                //this concept was previously checked on this node - ignore it
-                if(concepts[concept].checked) delete concepts[concept];
-                //it is being checked now, so mark it for next time
-                else self.setData('concept.'+concept+'.checked', true);
-            }
-            //all concepts have been checked => nothing to do
-            if(Object.keys(concepts).length === 0) return;
+            let self = this, concepts = self.getAllConcepts(),
+                newMatch = false;
 
             //first check if I match a top-level node from any predicate description
             let wildcard = Concept.prototype.wildcardConcept;
             concepts[wildcard] = self.relation.findEntry('concept', wildcard);
-            for(let concept in concepts) {
-                for(let nodeId in Law.predicateTop[concept]) {
-                    self.setMatch(nodeId);
+            for(let cid in concepts) {
+                if(Misc.getIndex(self.conceptInfo, cid, 'evaluated')) continue;
+                Misc.setIndex(self.conceptInfo, cid, 'evaluated', true);
+                for(let nodeId in Law.predicateTop[cid]) {
+                    if(self.setMatch(nodeId)) newMatch = true;
                 }
             }
 
             //then check existing partial matches on my parents, and add me to them if appropriate
-            let candidates = {};
-            for(let i = 0; i < 2; i++) {
-                let parent = self.getParent(i);
-                if(!parent) continue;
-                for(let matchId in parent.matches) {
-                    let parentMatch = self.findEntry('node', matchId);
+            //check each triad of: head match - self concept - reference match
+            //but only where at least one of the 3 is new since last time
+            for(let cid in concepts) {
+                let concept = concepts[cid],
+                    head = self.getHead(), headMatches = head ? head.matches : {0: null},
+                    ref = self.getReference(), refMatches = ref ? ref.matches : {0: null};
+                for(let hid in headMatches) {
 
-                    //if the node my parent matched was already deep, we can't go any deeper
-                    if(parentMatch.isDeepPredicate) continue;
+                    //if the node my head matched was already deep, we can't go any deeper
+                    let headMatch = headMatches[hid];
+                    if(headMatch && headMatch.isDeepPredicate) continue;
 
-                    parentMatch.getChildren(i).forEach(function(childMatch) {
+                    for(let rid in refMatches) {
+                        //see if this triad was previously checked
+                        if(Misc.getIndex(self.conceptInfo, cid, hid, rid, 'evaluated')) continue;
+                        Misc.setIndex(self.conceptInfo, cid, hid, rid, 'evaluated', true);
 
-                        //first, this node's concept must match that of the child node's concept
-                        let match = false, matchConcept = childMatch.getConcept();
-                        for(let c in concepts) {
-                            let concept = concepts[c]._value;
-                            if(concept.instanceOf(childMatch.concept)) {
-                                match = true;
-                                break;
-                            }
-                        }
-                        if(!match) return;
-                        if(matchConcept.isData() && (!concept.isData() ||
-                            self.getDataKey() !== childMatch.getDataKey())) return;
+                        //same check as above, but for reference
+                        let refMatch = refMatches[rid];
+                        if(refMatch && refMatch.isDeepPredicate) continue;
 
-                        let childId = childMatch.id;
-                        if(candidates[childId]) return self.setMatch(childId);
-
-                        //if the matching node has no other parent anyway, the match is complete
-                        let childMatchOtherParent = childMatch.getParent((i+1)%2);
-                        if(childMatchOtherParent == null) return self.setMatch(childId);
-
-                        //otherwise, we mark this child as matched pending a match with the other parent
-                        if(i == 0) candidates[childId] = true;
-                    });
+                        //finally see if this triad is a match
+                        let match = null;
+                        if(headMatch) match = headMatch.getMatch(0, cid, rid);
+                        else if(refMatch) match = refMatch.getMatch(1, cid, hid);
+                        if(match && self.setMatch(match)) newMatch = true;;
+                    }
                 }
             }
 
-            self.evaluated[opts.tag || 'all'] = true;
+            //if I was matched to anything new, my children need to be re-checked
+            if(newMatch) {
+                self.getChildren().forEach(function(child) {
+                    child.setEvaluated(false);
+                    child.addToEvaluateQueue();
+                })
+            }
+
+            self.setEvaluated(true);
         };
 
-        Node.prototype.isData = function() {
-            return this.getConcept().isData();
+        Node.prototype.getMatch = function(type, conceptId, nodeId) {
+            return Misc.getIndex(this.triads, type, conceptId, nodeId) || null;
         };
 
-        Node.prototype.getDataKey = function() {
-            return this.data_key;
-        };
+        Node.prototype.setMatch = function(node, direction) {
+            let self = this, nodeId = null;
+            if(typeof node === 'object') {
+                nodeId = node.getId();
+            } else {
+                nodeId = node;
+                node = self.findEntry('node', nodeId);
+            }
+            if(!node) return false;
 
-        Node.prototype.setMatch = function(nodeId, direction) {
-            let self = this, node = self.findEntry('node', nodeId), law = node.getLaw();
+            let law = node.getLaw();
             let opts = self.relation.options.evaluate;
             if(law.hasTag('inactive') ||
                 opts.frameworks && opts.frameworks.indexOf(law.framework) < 0 ||
@@ -653,14 +689,28 @@
                 (opts.tag && !law.hasTag(opts.tag)) ||
                 (!opts.tag && law.hasTag('visualization')))
                     return;
-            self.matches[nodeId] = true;
+            self.matches[nodeId] = node;
 
             if(node.isDeepPredicate) {
                 if(!self.getLaw().addMapFromNodes(self, node)) {
                     console.err("Couldn't create map for node " + self.id + ' [' + self.getConcept().name + ']');
                     console.err('  mapped to ' + node.toString());
+                    return false;
                 }
             }
+            return true;
+        };
+
+        Node.prototype.getData = function() {
+            return this.data;
+        };
+
+        Node.prototype.isData = function() {
+            return this.getConcept().isData();
+        };
+
+        Node.prototype.getDataKey = function() {
+            return this.getConcept().name;
         };
 
         Node.prototype.toString = function() {
