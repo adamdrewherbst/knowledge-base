@@ -294,8 +294,7 @@
         Map.prototype.appendDataNode = function(node, head, ref) {
             let self = this;
             if(!head) return false;
-            let headIsNode = typeof head === 'object' && head.prototype.isPrototypeOf(Node);
-            if(headIsNode) head = {type: 'node', node: head};
+            if(head instanceof Node) head = {type: 'node', node: head};
 
             //if this is part of a data tree, just return the key
             if(!ref) {

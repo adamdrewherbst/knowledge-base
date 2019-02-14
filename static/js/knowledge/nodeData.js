@@ -100,17 +100,7 @@ Node.prototype.initData = function(type) {
 };
 
 Node.prototype.updateDataDependencies = function() {
-
     let self = this;
-    //only compile commands from concepts that have not yet been compiled on this node
-    let concepts = self.getAllConcepts(), commandStrings = [];
-    for(let id in concepts) {
-        if(Misc.getIndex(self.conceptInfo, id, 'compiled')) delete concepts[id];
-        else {
-            commandStrings.push.apply(commands, concepts[id].getCommands());
-            Misc.setIndex(self.conceptInfo, id, 'compiled', true);
-        }
-    }
 
     //any commands that already exist on this node should be activated
     //if we are currently propagating that type of data
@@ -118,13 +108,24 @@ Node.prototype.updateDataDependencies = function() {
         self.commands[id].checkActive();
     }
 
+    //only compile commands from concepts that have not yet been compiled on this node
+    let concepts = self.getAllConcepts(), commandStrings = [], commands = [];
+    for(let id in concepts) {
+        if(Misc.getIndex(self.conceptInfo, id, 'compiled')) delete concepts[id];
+        else {
+            commandStrings.push.apply(commandStrings, concepts[id].getCommands());
+            Misc.setIndex(self.conceptInfo, id, 'compiled', true);
+        }
+    }
+
     commandStrings.forEach(function(commandStr) {
+        if(!commandStr) return;
 
         let tokens = commandStr.split(/\s+/), tgt = tokens.shift(), op = tokens.shift(),
             exp = tokens.join(' '), context = false;
 
         let tgtRef = self.parseReferences(tgt)[0];
-        if(!tgtRef || tgtRef[0].start > 0 || tgtRef[0].end < tgt.length) return;
+        if(!tgtRef || tgtRef.start > 0 || tgtRef.end < tgt.length) return;
 
         if(tgtRef.type === 'var') {
             let command = new NodeDataCommand(null, null, op);
@@ -167,10 +168,14 @@ Node.prototype.updateDataDependencies = function() {
 
 Node.prototype.parseReferences = function(str) {
     let self = this,
-        re = /[^A-Za-z0-9'"](\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)((?:\.[A-Za-z0-9]+)*)[^A-Za-z0-9'"]/,
+        re = /(^|[^A-Za-z0-9'"])(\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)((?:\.[A-Za-z0-9]+)*)([^A-Za-z0-9'"]|$)/g,
         references = [];
     while((match = re.exec(str)) !== null) {
-        let ref = {key: match[2], start: match.index, end: re.lastIndex}, data = match[1];
+        let ref = {key: match[3] || '', start: match.index, end: re.lastIndex}, data = match[2];
+        let bounded = match[1] === '{' && match[4] === '}';
+        if(match[1] && !bounded) ref.start++;
+        if(match[4] && !bounded) ref.end--;
+        if(ref.key && ref.key[0] === '.') ref.key = ref.key.substring(1);
         if(data[0] === '$') {
             ref.type = 'var';
             ref.var = data.substring(1);
@@ -193,7 +198,7 @@ Node.prototype.addCommand = function(command) {
 
 Node.prototype.deactivateCommands = function() {
     for(let id in this.commands) {
-        this.commands[id].activate(false);
+        this.commands[id].activate('', false);
     }
 };
 
@@ -207,26 +212,22 @@ Node.prototype.setData = function(key, value) {
 };
 
 Node.prototype.collectData = function(key) {
-    let obj = {}, data = this.getData();
-    data.eachChild(key, function(child) {
-        child.collectData(obj);
-    });
-    return obj;
+    return this.getData().collectData(key);
 };
 
 
-function Dependency(parent, key, value) {
-    this.id = Dependency.nextId++;
+function Dependency() {
+    this.id = Dependency.prototype.nextId++;
     this.key = {};
 }
-Dependency.nextId = 0;
-Dependency.propagate = {};
+Dependency.prototype.nextId = 0;
+Dependency.prototype.propagate = {};
 
 Dependency.propagate = function(type) {
     if(!type) {
-        for(let key in Dependency.propagate)
-            delete Dependency.propagate[key];
-    } else Dependency.propagate[type] = true;
+        for(let key in Dependency.prototype.propagate)
+            delete Dependency.prototype.propagate[key];
+    } else Dependency.prototype.propagate[type] = true;
 };
 
 Dependency.setPropagating = function(type) {
@@ -235,19 +236,24 @@ Dependency.setPropagating = function(type) {
 };
 
 Dependency.propagating = function(type) {
-    if(Dependency.propagate['ALL']) return true;
-    return Dependency.propagate[type] ? true : false;
+    if(Dependency.prototype.propagate['ALL']) return true;
+    return Dependency.prototype.propagate[type] ? true : false;
 };
 
-Dependency.inSubtree = function(subkey, key) {
-    let len = key.length;
-    return subkey.indexOf(key) === 0 && (subkey.length === len || subkey[len] === '.');
+Dependency.subkey = function(key, subkey) {
+    key = key || '';
+    subkey = subkey || '';
+    if(subkey.length < key.length) return false;
+    if(!key || subkey === key) return '';
+    if(subkey.indexOf(key) !== 0 || subkey[key.length] !== '.') return false;
+    return subkey.substring(key.length+1);
 };
 
 Dependency.isChild = function(subkey, key) {
+    if(!key) return subkey.match(/^[A-Za-z0-9]+$/) ? true : false;
     let len = key.length;
-    return subkey.indexOf(key) !== 0 &&
-        subkey.substring(len).match(/^\.[A-Za-z0-9]+$/);
+    return subkey.indexOf(key) === 0 &&
+        subkey.substring(len).match(/^\.[A-Za-z0-9]+$/) ? true : false;
 };
 
 Dependency.concatKey = function(key1, key2) {
@@ -266,15 +272,22 @@ Dependency.prototype.getKeys = function() {
 };
 
 Dependency.prototype.getKey = function(key, create) {
-    let node = this.key[key || ''];
-    if(create && !node) node = this.key[key || ''] = {waiting: {}, trigger: {}, active: false};
+    key = key || '';
+    let node = this.key[key];
+    if(create && !node) node = this.key[key] = {
+        waiting: {},
+        trigger: {},
+        active: false,
+        value: undefined
+    };
     return node;
 };
 
 Dependency.prototype.each = function(key, callback) {
     for(let k in this.key) {
-        if(Dependency.inSubtree(k, key)) {
-            if(callback.call(this, k, this.key[k]) === false) return false;
+        let subkey = Dependency.subkey(key, k);
+        if(subkey !== false) {
+            if(callback.call(this, subkey, this.key[k]) === false) return false;
         }
     }
     return true;
@@ -315,9 +328,9 @@ Dependency.prototype.activate = function(key, active) {
     if(active && this.checkResolved(key)) return;
 
     for(let depId in node.waiting) {
-        for(let depKey in node.waiting[id]) {
+        for(let depKey in node.waiting[depId]) {
             let obj = node.waiting[depId][depKey], dep = obj.dep;
-            if(dep) dep.activate(depKey);
+            if(dep) dep.activate(depKey, active);
         }
     }
 };
@@ -333,7 +346,7 @@ Dependency.prototype.wait = function(dep, depKey, myKey, callback) {
 
 Dependency.prototype.addTrigger = function(dep, key, depKey) {
     let node = this.getKey(key, true);
-    Misc.setIndex(node.triggers, dep.getId(), depKey, dep);
+    Misc.setIndex(node.trigger, dep.getId(), depKey, dep);
 };
 
 Dependency.prototype.resolve = function(dep, depKey, myKey) {
@@ -357,10 +370,7 @@ Dependency.prototype.resolved = function(key) {
 
 Dependency.prototype.checkResolved = function(key) {
     if(!this.active(key)) return false;
-    let resolved = this.each(key, function(k, node) {
-        return Object.keys(node.waiting).length === 0;
-    });
-    if(!resolved) return false;
+    if(!this.resolved(key)) return false;
     this.fullyResolve(key);
     this.propagate(key);
     return true;
@@ -379,9 +389,12 @@ Dependency.prototype.propagate = function(key) {
 };
 
 Dependency.prototype.collectData = function(key, obj) {
-    this.each(key, function(k, node) {
-        Misc.setIndex(obj, k.split('.'), '_value', node.value);
+    if(obj === undefined) obj = {};
+    this.each(key, function(subkey, node) {
+        if(!subkey) Misc.setIndex(obj, '_value', node.value);
+        else Misc.setIndex(obj, subkey.split('.'), '_value', node.value);
     });
+    return obj;
 };
 
 Dependency.prototype.addIndex = function(key) {
@@ -413,7 +426,7 @@ NodeData.prototype.constructor = NodeData;
 
 NodeData.prototype.setValue = function(key, value) {
     Dependency.prototype.setValue.call(this, key, value);
-    if(Dependency.inSubtree('concept', key)) {
+    if(Dependency.subkey('concept', key) !== false) {
         this.node.setEvaluated(false);
         this.node.addToEvaluateQueue();
     }
@@ -441,7 +454,7 @@ NodeDataCommand.prototype.init = function() {
 NodeDataCommand.prototype.setTarget = function(dep, key) {
     this.target = dep;
     if(key !== undefined) this.editKey = key;
-    if(typeof this.target === 'object' && this.target.prototype.isPrototypeOf(NodeData)) {
+    if(this.target instanceof NodeData) {
         this.setNode(this.target.node);
     }
     this.checkActive();
@@ -454,8 +467,7 @@ NodeDataCommand.prototype.setNode = function(node) {
 
 NodeDataCommand.prototype.checkActive = function() {
     let self = this;
-    if(typeof this.target !== 'object') return false;
-    if(!this.target.prototype.isPrototypeOf(NodeData)) return false;
+    if(!(this.target instanceof NodeData)) return false;
     let key = this.editKey.split('.')[0];
     if(Dependency.propagating(key)) this.activate();
 };
@@ -489,7 +501,7 @@ NodeDataCommand.prototype.fullyResolve = function() {
             break;
         default:
             self.expression.each('', function(key, node) {
-                let myKey = data.concatKey(self.editKey, key),
+                let myKey = Dependency.concatKey(self.editKey, key),
                     myValue = data.getValue(myKey);
                 eval('myValue ' + self.operation + ' ' + node.value);
                 data.setValue(myKey, myValue);
@@ -529,7 +541,7 @@ Expression.prototype.addLiteralBlock = function(value) {
 Expression.prototype.addReferenceBlock = function(dep, key) {
     this.blocks.push({type: 'reference', dep: dep, key: key});
     if(dep) this.wait(dep, key);
-    return refNum;
+    return this.blocks.length-1;
 };
 
 Expression.prototype.setReference = function(blockNum, dep, key) {
@@ -561,9 +573,8 @@ Expression.prototype.fullyResolve = function() {
     for(let key in keys) {
         let match = self.blocks.every(function(block) {
             if(block.type !== 'reference') return true;
-            let prefix = key;
-            for(;
-                !((parent = ref.getKey(prefix)) && parent.value) && prefix.length > 0;
+            for(let prefix = key;
+                !((parent = block.dep.getKey(prefix)) && parent.value) && prefix.length > 0;
                 prefix = prefix.replace(/\.?[A-Za-z0-9]+$/, ''));
             if(parent && parent.value) {
                 block.value = parent.value;
@@ -572,7 +583,7 @@ Expression.prototype.fullyResolve = function() {
         });
         if(match) {
             let node = self.getKey(key, true), str = '';
-            blocks.forEach(function(block) {
+            self.blocks.forEach(function(block) {
                 str += block.value;
             });
             node.value = eval(str);

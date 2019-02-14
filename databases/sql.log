@@ -349,3 +349,7 @@ timestamp: 2019-02-10T04:13:31.639291
 ALTER TABLE node ADD data_key VARCHAR(512);
 success!
 success!
+timestamp: 2019-02-13T18:17:54.901184
+ALTER TABLE concept ADD commands VARCHAR(512);
+success!
+success!

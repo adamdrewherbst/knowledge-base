@@ -83,8 +83,9 @@ def getEntry(table, data):
             ret['dependencies'][framework.id] = True
     elif table == 'concept':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
-            'law': entry.law, 'symmetric': entry.symmetric or False, 'head': entry.head, 'reference': entry.reference, \
-            'symbol': entry.symbol, 'value': entry.value, 'inherits': entry.inherits or False, 'dependencies': {}};
+            'law': entry.law, 'head': entry.head, 'reference': entry.reference, \
+            'symbol': entry.symbol, 'commands': entry.commands, 'dependencies': {},\
+            'symmetric': entry.symmetric or False, 'value': entry.value, 'inherits': entry.inherits or False};
         for dep in db(db.concept_dependency.concept == entry.id).iterselect():
             ret['dependencies'][dep.dependency] = True
     elif table == 'law':

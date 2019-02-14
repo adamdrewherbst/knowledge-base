@@ -43,7 +43,7 @@
                 refs.push(ref);
                 ref = ref[index];
             }
-            while(ref && Object.keys(ref).length === 0) {
+            while(ref && Object.keys(ref).length > 0) {
                 delete ref[args[i--]];
                 ref = refs.pop();
             }
@@ -125,6 +125,10 @@
         Concept.prototype.table = 'concept';
         Concept.prototype.wildcardConcept = 2;
 
+        Concept.prototype.postprocess = function() {
+            this.commands = (this.commands || '').split('<DELIM>');
+        };
+
         Concept.prototype.instanceOf = function(parent) {
             let self = this;
             if(typeof parent == 'string') parent = self.findId(self.table, {name: parent});
@@ -175,6 +179,7 @@
 
         function Law() {
             this.nodes = [];
+            this.evaluateQueue = [];
             this.maps = {};
             this.nextMapId = 0;
         }
@@ -191,7 +196,7 @@
             let hashtags = self.hashtags;
             self.hashtags = {};
             if(hashtags) hashtags.split(',').forEach(function(tag) {
-                self.hashtags[tag] = true;
+                if(tag) self.hashtags[tag] = true;
             });
             //update which nodes are deep nodes of this law
             self.calculateDeepNodes();
@@ -363,6 +368,7 @@
             this.value = new Value();
             this.conceptInfo = {};
             this.data = new NodeData(this);
+            this.commands = [];
             this.tentative = false;
             this.fromMap = {};
             this.evaluated = {};
@@ -414,7 +420,8 @@
         Node.prototype.getAllConcepts = function() {
             let concepts = {}, conceptData = this.collectData('concept');
             for(let id in conceptData) {
-                let concept = conceptData[id]._value, all = concept.getAllConcepts();
+                let concept = conceptData[id]._value;
+                let all = concept.getAllConcepts();
                 for(let cid in all) {
                     concepts[cid] = all[cid];
                 }
@@ -1020,7 +1027,7 @@
                     let entries = self.getTable(table);
                     if(entries) entries[entry.id] = entry;
                 }
-                if(typeof data == 'object') entry.store(data);
+                if(data && typeof data === 'object') entry.store(data);
             }
             return entry;
         };
@@ -1043,7 +1050,7 @@
         Relation.prototype.findOrCreateEntry = function(table, id) {
             let self = this, entry = self.findEntry(table, id);
             if(entry !== null) return entry;
-            return self.createEntry(table, {id: id});
+            return self.createEntry(table, {id: id}, true);
         }
 
 

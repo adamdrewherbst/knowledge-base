@@ -209,11 +209,12 @@
             $form.find('[name="description"]').val(entry.description);
             $modal.find('.framework-filter').val(entry.framework);
             if(table == 'concept') {
-                $form.find('[name="law_specific"]').attr('checked', entry.law > 0);
+                $form.find('[name="law_specific"]').attr('checked', false); //entry.law > 0);
                 $form.find('[name="law"]').val(self.law.id);
-                $form.find('[name="symbol"]').val(entry.symbol);
-                $form.find('[name="value"]').val(entry.value);
-                $form.find('[name="symmetric"]').attr('checked', entry.symmetric);
+                $form.find('[name="commands"]').val(entry.commands.join("\n"));
+                //$form.find('[name="symbol"]').val(entry.symbol);
+                //$form.find('[name="value"]').val(entry.value);
+                //$form.find('[name="symmetric"]').attr('checked', entry.symmetric);
                 $form.find('[name="head"]').val(entry.head);
                 $form.find('[name="reference"]').val(entry.reference);
             }

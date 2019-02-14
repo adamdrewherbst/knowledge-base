@@ -470,6 +470,7 @@
                         }
                     } else if(table == 'concept') {
                         obj.law = null;
+                        obj.commands = (obj.commands || '').replace(/\n/g, '<DELIM>');
                     }
 
                     console.log('saving entry');
