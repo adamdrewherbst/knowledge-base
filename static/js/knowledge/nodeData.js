@@ -150,7 +150,7 @@ Node.prototype.updateDataDependencies = function() {
                         expression.addLiteralBlock(exp.substring(ind, ref.start));
                     if(ref.type === 'var') {
                         let blockNum = expression.addReferenceBlock();
-                        expression.wait(self.variables, ref.var, null, function(vars, varKey) {
+                        expression.wait(self.variables, ref.var, '', function(vars, varKey) {
                             let value = vars.getValue(varKey);
                             expression.setReference(blockNum, value.dep, Dependency.concatKey(value.key, ref.key));
                         });
@@ -196,9 +196,9 @@ Node.prototype.addCommand = function(command) {
     this.commands[command.getId()] = command;
 };
 
-Node.prototype.deactivateCommands = function() {
+Node.prototype.resetCommands = function() {
     for(let id in this.commands) {
-        this.commands[id].activate('', false);
+        this.commands[id].reset();
     }
 };
 
@@ -323,25 +323,42 @@ Dependency.prototype.activate = function(key, active) {
 
     let node = this.getKey(key);
     if(!node) return;
+    if(node.active == active) return;
     node.active = active;
 
     if(active && this.checkResolved(key)) return;
 
     for(let depId in node.waiting) {
         for(let depKey in node.waiting[depId]) {
-            let obj = node.waiting[depId][depKey], dep = obj.dep;
-            if(dep) dep.activate(depKey, active);
+            let obj = node.waiting[depId][depKey];
+            obj.dep.activate(depKey, active);
         }
     }
+};
+
+Dependency.prototype.reset = function() {
+    this.each('', function(key, node) {
+        if(!node.active) return;
+        node.active = false;
+        for(let depId in node.waiting) {
+            for(let depKey in node.waiting[depId]) {
+                let obj = node.waiting[depId][depKey];
+                obj.resolved = false;
+                obj.dep.reset();
+            }
+        }
+    });
 };
 
 Dependency.prototype.wait = function(dep, depKey, myKey, callback) {
     let node = this.getKey(myKey, true);
     Misc.setIndex(node.waiting, dep.getId(), depKey, {
         dep: dep,
-        callback: callback
+        callback: callback,
+        resolved: false
     });
     dep.addTrigger(this, depKey, myKey);
+    console.log(this.toString(myKey) + ' waiting on ' + dep.toString(depKey));
 };
 
 Dependency.prototype.addTrigger = function(dep, key, depKey) {
@@ -354,17 +371,24 @@ Dependency.prototype.resolve = function(dep, depKey, myKey) {
     obj = Misc.getIndex(node.waiting, depId, depKey);
     if(!obj) return;
 
+    console.log(this.toString(myKey) + ' resolving ' + dep.toString(depKey) + ' to ' + dep.getValue(depKey));
+
     let callback = obj.callback;
     if(typeof callback === 'function') callback.call(this, dep, depKey, myKey);
 
-    Misc.deleteIndex(node.waiting, depId, depKey);
+    Misc.setIndex(node.waiting, depId, depKey, 'resolved', true);
 
     this.checkResolved(myKey);
 };
 
 Dependency.prototype.resolved = function(key) {
     return this.each(key, function(k, node) {
-        return Object.keys(node.waiting).length === 0;
+        for(let depId in node.waiting) {
+            for(let depKey in node.waiting[depId]) {
+                if(!node.waiting[depId][depKey].resolved) return false;
+            }
+        }
+        return true;
     });
 };
 
@@ -416,6 +440,21 @@ Dependency.prototype.clear = function(key) {
     });
 };
 
+Dependency.prototype.toString = function(key) {
+    return (key ? key + ' of ' : '') + 'DEP-' + this.id;
+};
+
+Dependency.prototype.print = function(key) {
+    console.log(this.toString(key));
+    let node = this.getKey(key);
+    if(!node) return;
+    for(let depId in node.waiting) {
+        for(let depKey in node.waiting[depId]) {
+            console.log(' <= ' + node.waiting[depId].dep.toString(key));
+        }
+    }
+};
+
 
 function NodeData(node) {
     Dependency.call(this);
@@ -430,6 +469,12 @@ NodeData.prototype.setValue = function(key, value) {
         this.node.setEvaluated(false);
         this.node.addToEvaluateQueue();
     }
+};
+
+NodeData.prototype.toString = function(key) {
+    let str = key ? key + ' of ' : '';
+    if(this.node) str += this.node.getId();
+    return str;
 };
 
 
@@ -448,7 +493,7 @@ NodeDataCommand.prototype.init = function() {
     let self = this;
     self.expression.init();
     self.wait(self.expression);
-    self.target.wait(self, null, self.editKey);
+    self.target.wait(self, '', self.editKey);
 };
 
 NodeDataCommand.prototype.setTarget = function(dep, key) {
@@ -511,6 +556,15 @@ NodeDataCommand.prototype.fullyResolve = function() {
     }
 };
 
+NodeDataCommand.prototype.toString = function(key) {
+    let str = key ? key + ' of ' : '';
+    if(this.target instanceof Dependency && this.target.node) str += this.target.node.getId();
+    if(str && this.editKey) str += '.';
+    str += this.editKey + ' ' + this.operation;
+    if(this.expression instanceof Expression) str += ' ' + this.expression.toString();
+    return str;
+}
+
 
 function Expression() {
     Dependency.call(this);
@@ -559,24 +613,24 @@ Expression.prototype.fullyResolve = function() {
     /* once all dependencies are resolved, evaluate this expression,
     matching subkeys between dependencies when possible
     */
-    let self = this, keys = {};
+    let self = this, expKeys = {};
     //first identify all keys that are in at least one reference
     self.blocks.forEach(function(block) {
         if(block.type === 'reference') {
             block.dep.each(block.key, function(key, node) {
-                if(node.value) Misc.setIndex(keys, key, true);
+                if(node.value) Misc.setIndex(expKeys, key, true);
             });
         }
     });
     //for each key, if every reference has that key or an ancestor of it,
     //evaluate the expression on that key
-    for(let key in keys) {
+    for(let key in expKeys) {
         let match = self.blocks.every(function(block) {
             if(block.type !== 'reference') return true;
-            for(let prefix = key;
+            for(let prefix = Dependency.concatKey(block.key, key);
                 !((parent = block.dep.getKey(prefix)) && parent.value) && prefix.length > 0;
                 prefix = prefix.replace(/\.?[A-Za-z0-9]+$/, ''));
-            if(parent && parent.value) {
+            if(parent && parent.value && (typeof parent.value === 'number' || typeof parent.value === 'string')) {
                 block.value = parent.value;
                 return true;
             } else return false;
@@ -584,11 +638,29 @@ Expression.prototype.fullyResolve = function() {
         if(match) {
             let node = self.getKey(key, true), str = '';
             self.blocks.forEach(function(block) {
-                str += block.value;
+                str += '' + block.value;
             });
             node.value = eval(str);
         }
     }
+};
+
+Expression.prototype.toString = function(key) {
+    let str = key ? key + ' of ' : '';
+    this.blocks.forEach(function(block) {
+        switch(block.type) {
+            case 'literal': str += block.value; break;
+            case 'reference':
+                let substr = '';
+                if(block.dep instanceof Dependency) substr += block.dep.toString();
+                if(substr && block.key) substr += '.';
+                substr += block.key || '';
+                str += substr;
+                break;
+            default: break;
+        }
+    });
+    return str;
 };
 
 

@@ -278,7 +278,7 @@
             let self = this;
             Dependency.setPropagating(type);
             self.eachNode(function(node) {
-                node.deactivateCommands();
+                node.resetCommands();
             });
             self.eachNode(function(node) {
                 node.initData(type);
