@@ -1,7 +1,7 @@
         var Misc = {};
 
-        Misc.getIndex = function(obj) {
-            let ref = obj, args = Misc.cleanArguments(arguments), n = args.length;
+        Misc.getIndex = function() {
+            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
             for(let i = 1; i < n; i++) {
                 let index = args[i];
                 if(index === undefined) continue;
@@ -12,8 +12,8 @@
             return ref;
         };
 
-        Misc.getOrCreateIndex = function(obj) {
-            let ref = obj, args = Misc.cleanArguments(arguments), n = args.length;
+        Misc.getOrCreateIndex = function() {
+            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
             for(let i = 1; i < n; i++) {
                 let index = args[i];
                 if(index === undefined) continue;
@@ -24,7 +24,7 @@
         };
 
         Misc.setIndex = function(obj) {
-            let ref = obj, args = Misc.cleanArguments(arguments), n = args.length;
+            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
             for(let i = 1; i < n-2; i++) {
                 let index = args[i];
                 if(index === undefined) continue;
@@ -35,7 +35,7 @@
         };
 
         Misc.deleteIndex = function(obj) {
-            let ref = obj, refs = [], args = Misc.cleanArguments(arguments), n = args.length, i = 1;
+            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0], i = 1, refs = [];
             for(; i < n-1; i++) {
                 let index = args[i];
                 if(index === undefined) continue;
@@ -49,6 +49,34 @@
             }
         };
 
+        //apply a callback function to a sub-object of an object, treating the sub-object
+        //as an array according to its keys
+        Misc.eachKey = function() {
+
+            let n = arguments.length;
+            if(n < 2) return;
+            let callback = arguments[n-1];
+            if(typeof callback !== 'function') return;
+            delete arguments[n-1];
+
+            //get the requested sub-object
+            let sub = Misc.getKey(arguments);
+            if(!sub || typeof sub !== 'object') return;
+
+            //if this key has keys 0,1,2... then it is an array
+            //and we must perform the callback on each element
+            let keys = Object.keys(sub), ordered = true;
+            for(let i = 0; i < keys.length && (ordered = keys[i] === i); i++);
+
+            if(ordered) {
+                for(let i = 0; i < keys.length; i++) {
+                    callback.call(this, sub[i]);
+                }
+            } else {
+                callback.call(this, sub);
+            }
+        };
+
         Misc.cleanArguments = function(args, clean) {
             if(!clean) clean = [];
             for(let i = 0; i < args.length; i++) {
@@ -59,6 +87,7 @@
             }
             return clean;
         };
+
 
 
         function Entry() {

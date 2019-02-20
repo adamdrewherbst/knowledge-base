@@ -53,6 +53,14 @@ More Examples:
         (which represents the pixel delta of the direction's unit vector) and applies the 'x'
         of the latter to the 'x' of the former etc.
 
+    'rectangular coordinate system' - S.visual.scale = 50
+                                        S.visual.angle = 0
+
+    'x-coordinate' - S.visual.delta.x = A.visual.scale * Math.cos(A.visual.angle)
+                    S.visual.delta.y = A.visual.scale * Math.sin(A.visual.angle)
+    'y-coordinate' - S.visual.delta.y = A.visual.scale * Math.sin(A.visual.angle)
+                    S.visual.delta.x = A.visual.scale * Math.cos(A.visual.angle)
+
     'sum' - value = A + B
             symbol = A + B
 

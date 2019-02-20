@@ -1,50 +1,32 @@
-        Relation.prototype.visualize = function() {
-            let self = this, canvas = self.canvas;
+Relation.prototype.visualize = function() {
+    let self = this, law = self.law;
+    if(!law) return;
 
-            //self.syncGraph();
-            self.evaluate({
-                tag: 'visualization',
-                propagate: {value: true}
-            });
+    law.initData('visual');
 
-            canvas.strokeColor = 'red';
-            canvas.lineWidth = 4;
-            canvas.fillColor = 'blue';
-
-            //all the visualization objects will have been determined in the relation
-            let objects = self.law.getNodesByConcept('visual');
-            objects.forEach(function(object) {
-                let originNode = object.getChildrenByConcept('origin')[0], origin = null;
-                if(originNode) {
-                    let opt = self.getChildTree(originNode);
-                    if(opt.x && opt.y) origin = {x: opt.x._value, y: opt.y._value};
-                }
-                let head = object.getHead();
-                console.log('visualizing ' + head.getConcept().name + ' [' + head.id + ']');
-                if(origin) console.log('from (' + origin.x + ', ' + origin.y + ')');
-                let shapes = object.getChildrenByConcept('shape');
-                shapes.forEach(function(shape) {
-                    let shapeName = shape.getConcept().name, opt = self.getChildTree(shape);
-                    console.log('drawing shape ' + shapeName);
-                    console.info(opt);
-                    switch(shapeName) {
+    law.eachNode(function(node) {
+        let visual = node.collectData('visual');
+        if(visual.shape) {
+            for(let shape in visual.shape) {
+                Misc.eachIndex(visual.shape, shape, function(shape) {
+                    switch(shape) {
                         case 'line':
                             let x1 = null, y1 = null, x2 = null, y2 = null;
-                            if(origin) {
-                                x1 = origin.x;
-                                y1 = origin.y;
+                            if(shape.origin) {
+                                x1 = shape.origin.x._value;
+                                y1 = shape.origin.y._value;
                             }
-                            if(opt.start && opt.start.x && opt.start.y) {
-                                x1 += opt.start.x._value;
-                                y1 += opt.start.y._value;
+                            if(shape.start) {
+                                x1 += shape.start.x._value;
+                                y1 += shape.start.y._value;
                             }
-                            if(opt.end && opt.end.x && opt.end.y) {
-                                x2 = opt.end.x._value;
-                                y2 = opt.end.y._value;
+                            if(shape.end) {
+                                x2 = shape.end.x._value;
+                                y2 = shape.end.y._value;
                             }
-                            else if(opt.delta && opt.delta.x && opt.delta.y) {
-                                x2 = x1 + opt.delta.x._value;
-                                y2 = y1 + opt.delta.y._value;
+                            else if(shape.delta) {
+                                x2 = x1 + shape.delta.x._value;
+                                y2 = y1 + shape.delta.y._value;
                             }
                             if(typeof x1 == 'number' && typeof x2 == 'number' && typeof y1 == 'number' && typeof y2 == 'number') {
                                 console.log('line from (' + x1 + ',' + y1 + ') to (' + x2 + ',' + y2 + ')');
@@ -57,11 +39,13 @@
                         case 'arrow':
                             break;
                         case 'arc':
-                            break;
                         case 'circle':
-                            if(origin && opt.radius) {
+                            let angleStart = 0, angleEnd = 2*Math.PI;
+                            if(shape.origin && shape.radius) {
+                                if(shape.angleStart) angleStart = shape.angleStart._value;
+                                if(shape.angleEnd) angleEnd = shape.angleEnd._value;
                                 canvas.beginPath();
-                                canvas.arc(origin.x, origin.y, opt.radius._value, 0, 2*Math.PI);
+                                canvas.arc(shape.origin.x._value, shape.origin.y._value, shape.radius._value, angleStart, angleEnd);
                                 canvas.stroke();
                             }
                             break;
@@ -72,18 +56,8 @@
                         default: break;
                     }
                 });
-            });
-        };
+            }
+        }
+    });
+};
 
-
-        Relation.prototype.getChildTree = function(node) {
-            let self = this, val = node.value.toString();
-            if(!isNaN(val)) val = parseFloat(val);
-            let opts = {_value: val};
-            let children = node.getChildren(0);
-            children.forEach(function(child) {
-                let concept = child.getConcept();
-                opts[concept.name] = self.getChildTree(child);
-            });
-            return opts;
-        };
