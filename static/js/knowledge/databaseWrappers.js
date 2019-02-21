@@ -155,7 +155,7 @@
         Concept.prototype.wildcardConcept = 2;
 
         Concept.prototype.postprocess = function() {
-            this.commands = (this.commands || '').split('<DELIM>');
+            this.commands = (this.commands || '').split('<DELIM>').map(s => s.trim());
         };
 
         Concept.prototype.instanceOf = function(parent) {
@@ -314,6 +314,21 @@
             });
             self.eachNode(function(node) {
                 node.updateDataDependencies();
+            });
+            self.eachCommand(function(cmd) {
+                cmd.checkActive();
+            });
+            self.eachCommand(function(cmd) {
+                cmd.checkResolved('', true);
+            });
+        };
+
+        Law.prototype.eachCommand = function(callback) {
+            let self = this;
+            self.eachNode(function(node) {
+                for(let cid in node.commands) {
+                    callback.call(self, node.commands[cid]);
+                }
             });
         };
 

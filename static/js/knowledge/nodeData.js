@@ -87,6 +87,11 @@ and A and B's 'visual.delta' subtrees had 'x' and 'y' subkeys with numerical val
 The data tree of a node can also be included directly in a relation, as child nodes of that node which
 have no reference link.
 
+
+We need to make sure no dependency is accidentally resolved before it is linked to its requirements.
+When we initialize data, we have to set all links before allowing anything to resolve.
+And when a command is added during evaluation, it's fine because everything else is already set...
+
 */
 
 
@@ -117,7 +122,7 @@ Node.prototype.updateDataDependencies = function() {
     }
 
     //only compile commands from concepts that have not yet been compiled on this node
-    let concepts = self.getAllConcepts(), commandStrings = [], commands = [];
+    let concepts = self.getAllConcepts(), commandStrings = [];
     for(let id in concepts) {
         if(Misc.getIndex(self.conceptInfo, id, 'compiled')) delete concepts[id];
         else {
@@ -135,6 +140,7 @@ Node.prototype.updateDataDependencies = function() {
         let tgtRef = self.parseReferences(tgt)[0];
         if(!tgtRef || tgtRef.start > 0 || tgtRef.end < tgt.length) return;
 
+        let commands = []
         if(tgtRef.type === 'var') {
             let command = new NodeDataCommand(null, null, op);
             command.wait(self.variables, tgtRef.var, function(ret) {
@@ -167,6 +173,7 @@ Node.prototype.updateDataDependencies = function() {
                     }
                     ind = ref.end;
                 });
+                if(ind < exp.length) expression.addLiteralBlock(exp.substring(ind));
             }
             command.expression = expression;
             command.init();
@@ -226,16 +233,18 @@ Node.prototype.collectData = function(key) {
 
 function Dependency() {
     this.id = Dependency.prototype.nextId++;
+    Dependency.prototype.instance[this.id] = this;
     this.key = {};
 }
 Dependency.prototype.nextId = 0;
-Dependency.prototype.propagate = {};
+Dependency.prototype.instance = {};
+Dependency.prototype.propagateKey = {};
 
 Dependency.propagate = function(type) {
     if(!type) {
-        for(let key in Dependency.prototype.propagate)
-            delete Dependency.prototype.propagate[key];
-    } else Dependency.prototype.propagate[type] = true;
+        for(let key in Dependency.prototype.propagateKey)
+            delete Dependency.prototype.propagateKey[key];
+    } else Dependency.prototype.propagateKey[type] = true;
 };
 
 Dependency.setPropagating = function(type) {
@@ -244,8 +253,8 @@ Dependency.setPropagating = function(type) {
 };
 
 Dependency.propagating = function(type) {
-    if(Dependency.prototype.propagate['ALL']) return true;
-    return Dependency.prototype.propagate[type] ? true : false;
+    if(Dependency.prototype.propagateKey['']) return true;
+    return Dependency.prototype.propagateKey[type] ? true : false;
 };
 
 Dependency.subkey = function(key, subkey) {
@@ -312,7 +321,7 @@ Dependency.prototype.eachChild = function(key, callback) {
 
 Dependency.prototype.getValue = function(key) {
     let node = this.getKey(key);
-    if(node) return node.value || undefined;
+    if(node) return node.value;
     else return undefined;
 };
 
@@ -334,7 +343,7 @@ Dependency.prototype.activate = function(key, active) {
     if(node.active == active) return;
     node.active = active;
 
-    if(active && this.checkResolved(key)) return;
+    //if(active && this.checkResolved(key)) return;
 
     for(let depId in node.waiting) {
         for(let depKey in node.waiting[depId]) {
@@ -375,6 +384,8 @@ Dependency.prototype.addTrigger = function(dep, key, depKey) {
 };
 
 Dependency.prototype.resolve = function(dep, depKey, myKey) {
+    if(!this.active(myKey)) return false;
+
     let depId = dep.getId(), node = this.getKey(myKey),
     obj = Misc.getIndex(node.waiting, depId, depKey);
     if(!obj) return;
@@ -389,23 +400,36 @@ Dependency.prototype.resolve = function(dep, depKey, myKey) {
     this.checkResolved(myKey);
 };
 
-Dependency.prototype.resolved = function(key) {
-    return this.each(key, function(k, node) {
+Dependency.prototype.eachWaiting = function(key, callback) {
+    let self = this;
+    return self.each(key, function(k, node) {
         for(let depId in node.waiting) {
             for(let depKey in node.waiting[depId]) {
-                if(!node.waiting[depId][depKey].resolved) return false;
+                let obj = node.waiting[depId][depKey];
+                if(callback.call(self, obj, depKey, depId) === false) return false;
             }
         }
         return true;
     });
 };
 
-Dependency.prototype.checkResolved = function(key) {
+Dependency.prototype.resolved = function(key) {
+    return this.eachWaiting(key, function(obj) {
+        return obj.resolved ? true : false;
+    });
+};
+
+Dependency.prototype.checkResolved = function(key, recursive) {
     if(!this.active(key)) return false;
-    if(!this.resolved(key)) return false;
-    this.fullyResolve(key);
-    this.propagate(key);
-    return true;
+    let resolved = this.eachWaiting(key, function(obj, depKey) {
+        if(recursive) return obj.dep.checkResolved(depKey);
+        else return obj.resolved ? true : false;
+    });
+    if(resolved) {
+        this.fullyResolve(key);
+        this.propagate(key);
+        return true;
+    } else return false;
 };
 
 Dependency.prototype.fullyResolve = function(key) {};
@@ -482,7 +506,7 @@ NodeData.prototype.setValue = function(key, value) {
 NodeData.prototype.toString = function(key) {
     let str = key ? key + ' of ' : '';
     if(this.node) str += this.node.getId();
-    return str;
+    return str + ' [' + this.id + ']';
 };
 
 
@@ -501,7 +525,8 @@ NodeDataCommand.prototype.init = function() {
     let self = this;
     self.expression.init();
     self.wait(self.expression);
-    self.target.wait(self, '', self.editKey);
+    if(self.target instanceof Dependency)
+        self.target.wait(self, '', self.editKey);
 };
 
 NodeDataCommand.prototype.setTarget = function(dep, key) {
@@ -570,7 +595,7 @@ NodeDataCommand.prototype.toString = function(key) {
     if(str && this.editKey) str += '.';
     str += this.editKey + ' ' + this.operation;
     if(this.expression instanceof Expression) str += ' ' + this.expression.toString();
-    return str;
+    return str + ' [' + this.id + ']';
 }
 
 
@@ -621,7 +646,7 @@ Expression.prototype.fullyResolve = function() {
     /* once all dependencies are resolved, evaluate this expression,
     matching subkeys between dependencies when possible
     */
-    let self = this, expKeys = {};
+    let self = this, expKeys = {'': true};
     //first identify all keys that are in at least one reference
     self.blocks.forEach(function(block) {
         if(block.type === 'reference') {
@@ -636,9 +661,10 @@ Expression.prototype.fullyResolve = function() {
         let match = self.blocks.every(function(block) {
             if(block.type !== 'reference') return true;
             for(let prefix = Dependency.concatKey(block.key, key);
-                !((parent = block.dep.getKey(prefix)) && parent.value) && prefix.length > 0;
+                !((parent = block.dep.getKey(prefix)) && (typeof parent.value === 'number' || typeof parent.value === 'string'))
+                && prefix.length > block.key.length;
                 prefix = prefix.replace(/\.?[A-Za-z0-9]+$/, ''));
-            if(parent && parent.value && (typeof parent.value === 'number' || typeof parent.value === 'string')) {
+            if(parent && (typeof parent.value === 'number' || typeof parent.value === 'string')) {
                 block.value = parent.value;
                 return true;
             } else return false;
@@ -668,7 +694,7 @@ Expression.prototype.toString = function(key) {
             default: break;
         }
     });
-    return str;
+    return str + ' [' + this.id + ']';
 };
 
 
