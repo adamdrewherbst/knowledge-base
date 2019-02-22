@@ -338,6 +338,7 @@
             this.frameworks[-1] = new Framework();
             this.frameworks[-1].id = -1;
             this.frameworks[-1].relation = this;
+            this.framework = this.frameworks[-1];
 
             this.concepts = {};
 
@@ -345,6 +346,7 @@
             this.laws[-1] = new Law();
             this.laws[-1].id = -1;
             this.laws[-1].relation = this;
+            this.law = this.laws[-1];
 
             this.nodes = {};
             this.nodes[0] = new Node();
@@ -420,8 +422,7 @@
             let self = relation;
 
             self.initDiagram();
-            self.setLaw(-1);
-            self.useFramework(-1);
+            self.useFramework(7, 9);
 
             let $hideButton = null;
             $('.entry-modal button[data-dismiss=modal]').click(function(e) {

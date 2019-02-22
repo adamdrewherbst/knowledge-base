@@ -282,7 +282,7 @@
                 dataArray.push({
                     concept: concept.id,
                     framework: concept.framework,
-                    visible: self.framework.id <= 0 || concept.framework == self.framework.id
+                    visible: self.framework && (self.framework.id <= 0 || concept.framework == self.framework.id)
                 });
             }
             self.palette.model = $$(go.GraphLinksModel, {
@@ -295,7 +295,10 @@
         Relation.prototype.filterPalette = function(framework) {
             let self = this;
 
-            if(framework === undefined) framework = self.framework.id;
+            if(framework === undefined) {
+                if(self.framework) framework = self.framework.id;
+                else return;
+            }
             self.paletteFramework = framework;
             let frameworks = [];
             if(framework < 0) {

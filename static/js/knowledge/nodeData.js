@@ -615,9 +615,11 @@ NodeDataCommand.prototype.fullyResolve = function() {
             break;
         default:
             self.expression.each('', function(key, node) {
+                if(node.value === undefined) return;
                 let myKey = Dependency.concatKey(self.editKey, key),
                     myValue = data.getValue(myKey);
                 if(myValue === undefined) myValue = '';
+                else if(!isNaN(myValue)) myValue = parseFloat(myValue);
                 eval('myValue ' + self.operation + ' ' + node.value);
                 data.setValue(myKey, myValue);
             });

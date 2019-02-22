@@ -1005,14 +1005,16 @@
                     entry.postprocess();
                     switch(table) {
                         case 'framework':
-                            if(self.framework.id == id || self.framework.id == oldId) {
+                            if(self.framework && (self.framework.id == id || self.framework.id == oldId)) {
                                 self.setFramework(entry);
                                 frameworkReset = true;
                             }
                             break;
                         case 'law':
-                            if(self.law.id == entry.id || self.law.id == oldId) {
+                            if(self.law && (self.law.id == entry.id || self.law.id == oldId)) {
+                                let notDrawn = !self.law.name;
                                 self.setLaw(entry);
+                                if(notDrawn) self.draw();
                             }
                             break;
                         case 'concept':

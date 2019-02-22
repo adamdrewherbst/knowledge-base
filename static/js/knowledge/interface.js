@@ -88,36 +88,46 @@
         };
 
 
-        Relation.prototype.useFramework = function(id) {
-            let self = this;
-            self.setFramework(id);
+        Relation.prototype.useFramework = function(id, lawId) {
+            let self = this, framework = this.frameworks[id];
 
-            if(!self.framework.loaded) {
+            if(!framework || !framework.loaded) {
                 $.ajax({
                     url: self.loadFrameworkURL,
                     type: 'get',
                     dataType: 'json',
                     data: {
-                        framework: self.framework.id
+                        framework: id
                     },
                     success: function(data) {
                         self.storeEntries(data);
+                        self.setFramework(id);
                         self.setPaletteModel();
                         self.filterPalette();
                         self.updateFields();
+                        if(lawId) {
+                            self.useLaw(lawId);
+                        }
                     }
                 });
             } else {
+                self.setFramework(id);
                 self.setPaletteModel();
                 self.filterPalette();
             }
         };
 
 
-        Relation.prototype.setFramework = function(framework) {
+        Relation.prototype.setFramework = function(frameworkId) {
             let self = this;
-            if(!isNaN(framework)) framework = self.findEntry('framework', framework);
-            if(!framework) return;
+            if(isNaN(frameworkId)) return;
+            let framework = self.findEntry('framework', frameworkId);
+            if(!framework) {
+                if(self.framework && self.framework.id == -1) {
+                    self.framework.id = frameworkId;
+                    framework = self.framework;
+                } else return;
+            }
             self.framework = framework;
             $('.entry-wrapper[table=framework] .entry-name').text(self.framework.name || 'None');
 
@@ -126,13 +136,14 @@
             if(self.framework.id > 0) options.push(self.framework.id);
             for(let i = 0; i < options.length; i++) {
                 let fw = options[i], framework = self.frameworks[fw];
-                for(let dep in framework.dependencies) {
+                if(framework) for(let dep in framework.dependencies) {
                     if(options.indexOf(dep) < 0) options.push(dep);
                 }
             }
             $filters.children().first().nextAll().remove();
             options.forEach(function(option) {
-                el = '<option value="' + option + '">' + self.frameworks[option].name + '</option>';
+                let framework = self.frameworks[option], name = framework ? framework.name || 'Loading...' : 'Loading...';
+                el = '<option value="' + option + '">' + name + '</option>';
                 $filters.append(el);
             });
             $filters.val(self.framework.id);
@@ -149,10 +160,16 @@
         };
 
 
-        Relation.prototype.setLaw = function(law) {
+        Relation.prototype.setLaw = function(lawId) {
             let self = this;
-            if(!isNaN(law)) law = self.findEntry('law', law);
-            if(!law) return;
+            if(isNaN(lawId)) return;
+            let law = self.findEntry('law', lawId);
+            if(!law) {
+                if(self.law && self.law.id == -1) {
+                    self.law.id = lawId;
+                    law = self.law;
+                } else return;
+            }
             self.law = law;
             $('.entry-wrapper[table=law] .entry-name').text(self.law.name || 'None');
         };
