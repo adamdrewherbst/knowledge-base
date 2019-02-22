@@ -1,5 +1,5 @@
 Relation.prototype.visualize = function() {
-    let self = this, law = self.law;
+    let self = this, law = self.law, canvas = self.canvas;
     if(!law) return;
 
     law.initData('visual');
@@ -8,7 +8,7 @@ Relation.prototype.visualize = function() {
         let visual = node.collectData('visual');
         if(visual.shape) {
             for(let shape in visual.shape) {
-                Misc.eachIndex(visual.shape, shape, function(shape) {
+                Misc.eachKey(visual.shape, shape, function(shape) {
                     switch(shape) {
                         case 'line':
                             let x1 = null, y1 = null, x2 = null, y2 = null;

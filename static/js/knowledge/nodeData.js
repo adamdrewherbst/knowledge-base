@@ -96,20 +96,28 @@ And when a command is added during evaluation, it's fine because everything else
 
 
 Node.prototype.initData = function(type) {
-    let self = this, data = self.data;
-    data[type] = {};
-    switch(type) {
-        case 'concept':
-            self.setData('concept.' + self.concept, self.getConcept());
-            break;
-        case 'symbol':
-            if(self.name) self.setData('symbol.text', self.name);
-            break;
-        case 'value':
-            let value = self.getValue();
-            if(value) self.setData('value', value);
-            break;
-    }
+    let self = this, types = type ? [type] : ['concept', 'symbol', 'value', 'visual'];
+    types.forEach(function(type) {
+        switch(type) {
+            case 'concept':
+                self.setData('concept.' + self.concept, self.getConcept());
+                break;
+            case 'symbol':
+                if(self.name) self.setData('symbol.text', self.name);
+                else {
+                    let symbol = self.getConcept().symbol;
+                    if(symbol) self.setData('symbol.text', symbol);
+                }
+                break;
+            case 'value':
+                let value = self.getValue();
+                if(value) self.setData('value', value);
+                break;
+            case 'visual':
+                break;
+            default: break;
+        }
+    });
 };
 
 Node.prototype.updateDataDependencies = function() {
@@ -261,7 +269,8 @@ Dependency.subkey = function(key, subkey) {
     key = key || '';
     subkey = subkey || '';
     if(subkey.length < key.length) return false;
-    if(!key || subkey === key) return '';
+    if(!key) return subkey;
+    if(subkey === key) return '';
     if(subkey.indexOf(key) !== 0 || subkey[key.length] !== '.') return false;
     return subkey.substring(key.length+1);
 };
@@ -280,6 +289,11 @@ Dependency.concatKey = function(key1, key2) {
     return key;
 };
 
+Dependency.getParent = function(key) {
+    if(!key) return undefined;
+    return key.replace(/\.?[A-Za-z0-9]+$/, '');
+};
+
 Dependency.prototype.getId = function() {
     return this.id;
 };
@@ -295,6 +309,7 @@ Dependency.prototype.getKey = function(key, create) {
         waiting: {},
         trigger: {},
         active: false,
+        propagated: false,
         value: undefined
     };
     return node;
@@ -338,19 +353,16 @@ Dependency.prototype.active = function(key) {
 Dependency.prototype.activate = function(key, active) {
     active = (active === undefined ? true : active) || false;
 
-    let node = this.getKey(key);
-    if(!node) return;
-    if(node.active == active) return;
-    node.active = active;
-
-    //if(active && this.checkResolved(key)) return;
-
-    for(let depId in node.waiting) {
-        for(let depKey in node.waiting[depId]) {
-            let obj = node.waiting[depId][depKey];
-            obj.dep.activate(depKey, active);
+    this.each(key, function(k, node) {
+        if(node.active == active) return;
+        node.active = active;
+        for(let depId in node.waiting) {
+            for(let depKey in node.waiting[depId]) {
+                let obj = node.waiting[depId][depKey];
+                obj.dep.activate(depKey, active);
+            }
         }
-    }
+    });
 };
 
 Dependency.prototype.reset = function() {
@@ -375,29 +387,12 @@ Dependency.prototype.wait = function(dep, depKey, myKey, callback) {
         resolved: false
     });
     dep.addTrigger(this, depKey, myKey);
-    console.log(this.toString(myKey) + ' waiting on ' + dep.toString(depKey));
+    //console.log(this.toString(myKey) + ' waiting on ' + dep.toString(depKey));
 };
 
 Dependency.prototype.addTrigger = function(dep, key, depKey) {
     let node = this.getKey(key, true);
     Misc.setIndex(node.trigger, dep.getId(), depKey, dep);
-};
-
-Dependency.prototype.resolve = function(dep, depKey, myKey) {
-    if(!this.active(myKey)) return false;
-
-    let depId = dep.getId(), node = this.getKey(myKey),
-    obj = Misc.getIndex(node.waiting, depId, depKey);
-    if(!obj) return;
-
-    console.log(this.toString(myKey) + ' resolving ' + dep.toString(depKey) + ' to ' + dep.getValue(depKey));
-
-    let callback = obj.callback;
-    if(typeof callback === 'function') callback.call(this, dep, depKey, myKey);
-
-    Misc.setIndex(node.waiting, depId, depKey, 'resolved', true);
-
-    this.checkResolved(myKey);
 };
 
 Dependency.prototype.eachWaiting = function(key, callback) {
@@ -413,35 +408,76 @@ Dependency.prototype.eachWaiting = function(key, callback) {
     });
 };
 
-Dependency.prototype.resolved = function(key) {
-    return this.eachWaiting(key, function(obj) {
-        return obj.resolved ? true : false;
-    });
+Dependency.prototype.resolve = function(dep, depKey, myKey) {
+    if(!this.active(myKey)) return false;
+
+    let depId = dep.getId(), node = this.getKey(myKey),
+    obj = Misc.getIndex(node.waiting, depId, depKey);
+    if(!obj) return;
+
+    //console.log(this.toString(myKey) + ' resolving ' + dep.toString(depKey) + ' to ' + dep.getValue(depKey));
+
+    let callback = obj.callback;
+    if(typeof callback === 'function') callback.call(this, dep, depKey, myKey);
+
+    Misc.setIndex(node.waiting, depId, depKey, 'resolved', true);
+
+    this.checkResolved(myKey);
 };
 
 Dependency.prototype.checkResolved = function(key, recursive) {
-    if(!this.active(key)) return false;
-    let resolved = this.eachWaiting(key, function(obj, depKey) {
-        if(recursive) return obj.dep.checkResolved(depKey);
-        else return obj.resolved ? true : false;
+    let self = this;
+    if(recursive) console.log('checking ' + self.toString(key));
+    if(!self.active(key)) return false;
+    if(self.propagated(key)) return true;
+    let resolved = self.eachWaiting(key, function(obj, depKey) {
+        if(recursive) {
+            let depResolved = obj.dep.checkResolved(depKey, recursive);
+            console.log('  ' + self.id + ' checking ' + obj.dep.toString(depKey) + ' => ' + depResolved);
+            return depResolved;
+        } else return obj.resolved ? true : false;
     });
     if(resolved) {
-        this.fullyResolve(key);
-        this.propagate(key);
+        //pass on the resolved key's data to any commands waiting on it
+        if(!self.propagated(key)) { //may have been resolved during recursive checking above
+            self.fullyResolve(key);
+            self.propagate(key);
+        }
+        //traverse the parents of the resolved key and see if any of these are now resolved
+        let parent = self.getClosestParent(key);
+        if(typeof parent === 'string') self.checkResolved(parent, recursive);
         return true;
     } else return false;
+};
+
+Dependency.prototype.getClosestParent = function(key) {
+    let parent = Dependency.getParent(key);
+    if(!parent) return undefined;
+    while(!this.key.hasOwnProperty(parent) && parent.length > 0)
+        parent = Dependency.getParent(parent);
+    if(this.key.hasOwnProperty(parent)) return parent;
+    return undefined;
 };
 
 Dependency.prototype.fullyResolve = function(key) {};
 
 Dependency.prototype.propagate = function(key) {
     let node = this.getKey(key);
+    if(node.propagated) return false;
     for(let depId in node.trigger) {
         for(let depKey in node.trigger[depId]) {
             let dep = node.trigger[depId][depKey];
             dep.resolve(this, key, depKey);
         }
     }
+    node.propagated = true;
+    return true;
+};
+
+Dependency.prototype.propagated = function(key) {
+    let node = this.getKey(key);
+    if(node) return node.propagated || false;
+    return false;
 };
 
 Dependency.prototype.collectData = function(key, obj) {
@@ -581,6 +617,7 @@ NodeDataCommand.prototype.fullyResolve = function() {
             self.expression.each('', function(key, node) {
                 let myKey = Dependency.concatKey(self.editKey, key),
                     myValue = data.getValue(myKey);
+                if(myValue === undefined) myValue = '';
                 eval('myValue ' + self.operation + ' ' + node.value);
                 data.setValue(myKey, myValue);
             });
@@ -651,7 +688,8 @@ Expression.prototype.fullyResolve = function() {
     self.blocks.forEach(function(block) {
         if(block.type === 'reference') {
             block.dep.each(block.key, function(key, node) {
-                if(node.value) Misc.setIndex(expKeys, key, true);
+                if(typeof node.value === 'number' || typeof node.value === 'string')
+                    Misc.setIndex(expKeys, key, true);
             });
         }
     });

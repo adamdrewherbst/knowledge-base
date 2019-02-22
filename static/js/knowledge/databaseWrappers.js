@@ -60,7 +60,7 @@
             delete arguments[n-1];
 
             //get the requested sub-object
-            let sub = Misc.getKey(arguments);
+            let sub = Misc.getIndex(arguments);
             if(!sub || typeof sub !== 'object') return;
 
             //if this key has keys 0,1,2... then it is an array
@@ -315,8 +315,8 @@
             self.eachNode(function(node) {
                 node.updateDataDependencies();
             });
-            self.eachCommand(function(cmd) {
-                cmd.checkActive();
+            self.eachNode(function(node) {
+                node.getData().activate(type);
             });
             self.eachCommand(function(cmd) {
                 cmd.checkResolved('', true);
@@ -412,7 +412,7 @@
             this.value = new Value();
             this.conceptInfo = {};
             this.data = new NodeData(this);
-            this.commands = [];
+            this.commands = {};
             this.tentative = false;
             this.fromMap = {};
             this.evaluated = {};
