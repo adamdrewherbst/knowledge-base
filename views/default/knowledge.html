@@ -74,6 +74,7 @@
 
         <div id="symbolization">
             <div id="sybolization-controls">
+                <button id="resolve-data" type="button" class="btn btn-primary">Resolve</button>
                 <button id="symbolize-relation" type="button" class="btn btn-primary">Symbolize</button>
                 <button id="suggest-step" type="button" class="btn btn-primary">Suggest</button>
             </div>
@@ -411,8 +412,7 @@
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/interface.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/nodeData.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/evaluate.js')}}"></script>
-    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/symbolize.js')}}"></script>
-    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/visualize.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/represent.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/suggest.js')}}"></script>
 
     <script type="text/javascript">
@@ -556,15 +556,18 @@
             $('#reset-relation').click(function(e) {
                 relation.reset();
             });
+            $('#resolve-data').click(function(e) {
+                relation.law.initData();
+            });
             $('#visualize-relation').click(function(e) {
                 relation.visualize();
-            })
+            });
             $('#symbolize-relation').click(function(e) {
                 relation.symbolize();
-            })
+            });
             $('#suggest-step').click(function(e) {
                 relation.suggest();
-            })
+            });
         });
     </script>
     {{end page_js}}

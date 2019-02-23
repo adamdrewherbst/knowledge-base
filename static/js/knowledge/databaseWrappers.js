@@ -49,9 +49,20 @@
             }
         };
 
+        Misc.each = function(obj, callback, key) {
+            if(!obj || typeof obj !== 'object') return;
+            let stop = callback.call(obj, obj, key);
+            if(stop === true) return;
+            for(let k in obj) {
+                if(stop && typeof stop === 'object' && stop[k]) continue;
+                if(obj[k] && typeof obj[k] === 'object')
+                    Misc.each(obj[k], callback, k);
+            }
+        };
+
         //apply a callback function to a sub-object of an object, treating the sub-object
         //as an array according to its keys
-        Misc.eachKey = function() {
+        Misc.eachChild = function() {
 
             let n = arguments.length;
             if(n < 2) return;
@@ -60,21 +71,16 @@
             delete arguments[n-1];
 
             //get the requested sub-object
-            let sub = Misc.getIndex(arguments);
+            let args = [];
+            for(let i = 1; i < n-1; i++) args.push(arguments[i]);
+            let sub = Misc.getIndex(arguments[0], args);
             if(!sub || typeof sub !== 'object') return;
 
             //if this key has keys 0,1,2... then it is an array
             //and we must perform the callback on each element
-            let keys = Object.keys(sub), ordered = true;
-            for(let i = 0; i < keys.length && (ordered = keys[i] === i); i++);
-
-            if(ordered) {
-                for(let i = 0; i < keys.length; i++) {
-                    callback.call(this, sub[i]);
-                }
-            } else {
-                callback.call(this, sub);
-            }
+            Misc.asArray(sub).forEach(function(subsub) {
+                callback.call(this, subsub);
+            });
         };
 
         Misc.cleanArguments = function(args, clean) {
@@ -86,6 +92,15 @@
                 } else clean.push(args[i]);
             }
             return clean;
+        };
+
+        Misc.asArray = function(obj) {
+            let keys = Object.keys(obj), n = keys.length, ordered = true;
+            for(let i = 0; i < n && (ordered = keys[i] === i); i++);
+            let arr = [];
+            if(ordered) for(let i = 0; i < n; i++) arr.push(obj[i]);
+            else arr.push(obj);
+            return arr;
         };
 
 
@@ -454,17 +469,13 @@
         };
 
         Node.prototype.getConcepts = function() {
-            let concepts = {}, conceptData = this.collectData('concept');
-            for(let id in conceptData) {
-                concepts[id] = conceptData[id]._value;
-            }
-            return concepts;
+            return this.collectData('concept');
         };
 
         Node.prototype.getAllConcepts = function() {
             let concepts = {}, conceptData = this.collectData('concept');
             for(let id in conceptData) {
-                let concept = conceptData[id]._value;
+                let concept = conceptData[id];
                 let all = concept.getAllConcepts();
                 for(let cid in all) {
                     concepts[cid] = all[cid];

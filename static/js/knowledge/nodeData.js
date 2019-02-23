@@ -150,14 +150,14 @@ Node.prototype.updateDataDependencies = function() {
 
         let commands = []
         if(tgtRef.type === 'var') {
-            let command = new NodeDataCommand(null, null, op);
+            let command = new NodeDataCommand(null, null, op, null, tgtRef.recursive);
             command.wait(self.variables, tgtRef.var, function(ret) {
                 command.setTarget(ret.value.dep, Dependency.concatKey(ret.value.key, tgtRef.key));
             });
             commands.push(command);
         } else if(tgtRef.type === 'node') {
             tgtRef.nodes.forEach(function(node) {
-                commands.push(new NodeDataCommand(node.getData(), tgtRef.key, op));
+                commands.push(new NodeDataCommand(node.getData(), tgtRef.key, op, null, tgtRef.recursive));
             });
         }
 
@@ -171,13 +171,13 @@ Node.prototype.updateDataDependencies = function() {
                     if(ref.start > ind)
                         expression.addLiteralBlock(exp.substring(ind, ref.start));
                     if(ref.type === 'var') {
-                        let blockNum = expression.addReferenceBlock();
+                        let blockNum = expression.addReferenceBlock(null, null, ref.recursive);
                         expression.wait(self.variables, ref.var, '', function(vars, varKey) {
                             let value = vars.getValue(varKey);
                             expression.setReference(blockNum, value.dep, Dependency.concatKey(value.key, ref.key));
                         });
                     } else if(ref.type === 'node') {
-                        expression.addReferenceBlock(ref.nodes[0].getData(), ref.key);
+                        expression.addReferenceBlock(ref.nodes[0].getData(), ref.key, ref.recursive);
                     }
                     ind = ref.end;
                 });
@@ -191,13 +191,14 @@ Node.prototype.updateDataDependencies = function() {
 
 Node.prototype.parseReferences = function(str) {
     let self = this,
-        re = /(^|[^A-Za-z0-9'"])(\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)((?:\.[A-Za-z0-9]+)*)([^A-Za-z0-9'"]|$)/g,
+        re = /(^|[^A-Za-z0-9])(\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)((?:\.[A-Za-z0-9]+)*)((?::R)?)([^A-Za-z0-9]|$)/g,
         references = [];
     while((match = re.exec(str)) !== null) {
-        let ref = {key: match[3] || '', start: match.index, end: re.lastIndex}, data = match[2];
-        let bounded = match[1] === '{' && match[4] === '}';
-        if(match[1] && !bounded) ref.start++;
-        if(match[4] && !bounded) ref.end--;
+        let first = match[1], data = match[2], key = match[3], opts = match[4], last = match[5];
+        let ref = {key: key || '', start: match.index, end: re.lastIndex};
+        let bounded = first === '{' && last === '}';
+        if(first && !bounded) ref.start++;
+        if(last && !bounded) ref.end--;
         if(ref.key && ref.key[0] === '.') ref.key = ref.key.substring(1);
         if(data[0] === '$') {
             ref.type = 'var';
@@ -209,6 +210,12 @@ Node.prototype.parseReferences = function(str) {
             }
             ref.type = 'node';
             ref.nodes = self.getConnectedNodes(data);
+        }
+        for(let i = 0; i < opts.length; i++) {
+            switch(opts[i]) {
+                case 'R': opts.recursive = true; break;
+                default: break;
+            }
         }
         references.push(ref);
     }
@@ -486,6 +493,20 @@ Dependency.prototype.collectData = function(key, obj) {
         if(!subkey) Misc.setIndex(obj, '_value', node.value);
         else Misc.setIndex(obj, subkey.split('.'), '_value', node.value);
     });
+    Misc.each(obj, function(sub, key) {
+        if(key === '_value') return false;
+        let done = {};
+        for(let k in sub) {
+            let val = sub[k];
+            if(!val || typeof val !== 'object') continue;
+            let keys = Object.keys(val);
+            if(keys.length === 1 && keys[0] === '_value') {
+                sub[k] = val._value;
+                done[k] = true;
+            }
+        }
+        return done;
+    });
     return obj;
 };
 
@@ -539,6 +560,49 @@ NodeData.prototype.setValue = function(key, value) {
     }
 };
 
+NodeData.prototype.fullyResolve = function(key) {
+    let self = this;
+    switch(key) {
+        //combine all subscripts, superscripts, arguments, etc. into one MathML string
+        //as the value of the 'symbol' node
+        case 'symbol':
+            let symbol = self.collectData(key), types = ['text', 'over', 'sub', 'super', 'arg'], text = '';
+            if(!symbol.text) break;
+            types.forEach(function(type) {
+                if(!symbol.hasOwnProperty(type)) return;
+                let arr = Misc.asArray(symbol[type]), combined = '';
+                arr.forEach(function(str, ind) {
+                    if(!str) return;
+                    combined += str + ',';
+                    let last = ind === arr.length-1;
+                    if(last) combined = '<mrow>' + combined.substring(0, combined.length-1) + '</mrow>';
+                    str = '<mrow>' + str + '</mrow>';
+                    switch(type) {
+                        case 'text':
+                            text += str;
+                            break;
+                        case 'over':
+                            text = '<mover>' + text + str + '</mover>';
+                            break;
+                        case 'sub':
+                            text = '<msub>' + text + str + '</msub>';
+                            break;
+                        case 'super':
+                            text = '<msup>' + text + str + '</msup>';
+                            break;
+                        case 'arg':
+                            if(last)
+                                text = '<mrow>' + text + '<mfenced>' + combined + '</mfenced></mrow>';
+                            break;
+                        default: break;
+                    }
+                });
+            });
+            break;
+        default: break;
+    }
+};
+
 NodeData.prototype.toString = function(key) {
     let str = key ? key + ' of ' : '';
     if(this.node) str += this.node.getId();
@@ -546,11 +610,12 @@ NodeData.prototype.toString = function(key) {
 };
 
 
-function NodeDataCommand(dep, key, op, exp) {
+function NodeDataCommand(dep, key, op, exp, rec) {
     Dependency.call(this);
     this.node = null;
     this.operation = op;
     this.expression = exp;
+    this.recursive = rec || false;
     this.setTarget(dep, key);
 }
 NodeDataCommand.prototype = Object.create(Dependency.prototype);
@@ -615,12 +680,19 @@ NodeDataCommand.prototype.fullyResolve = function() {
             break;
         default:
             self.expression.each('', function(key, node) {
-                if(node.value === undefined) return;
+                if(!self.recursive && key !== '') return;
+
+                let nodeValue = node.value;
+                if(nodeValue === undefined) return;
+                else if(typeof nodeValue === 'string' && isNaN(nodeValue))
+                    nodeValue = "'" + nodeValue + "'";
+
                 let myKey = Dependency.concatKey(self.editKey, key),
                     myValue = data.getValue(myKey);
                 if(myValue === undefined) myValue = '';
                 else if(!isNaN(myValue)) myValue = parseFloat(myValue);
-                eval('myValue ' + self.operation + ' ' + node.value);
+
+                eval('myValue ' + self.operation + ' ' + nodeValue);
                 data.setValue(myKey, myValue);
             });
             self.setValue('', [data, self.editKey]);
@@ -664,8 +736,8 @@ Expression.prototype.addLiteralBlock = function(value) {
     this.blocks.push({type: 'literal', value: value});
 };
 
-Expression.prototype.addReferenceBlock = function(dep, key) {
-    this.blocks.push({type: 'reference', dep: dep, key: key});
+Expression.prototype.addReferenceBlock = function(dep, key, recursive) {
+    this.blocks.push({type: 'reference', dep: dep, key: key, recursive: recursive});
     if(dep) this.wait(dep, key);
     return this.blocks.length-1;
 };
@@ -688,7 +760,7 @@ Expression.prototype.fullyResolve = function() {
     let self = this, expKeys = {'': true};
     //first identify all keys that are in at least one reference
     self.blocks.forEach(function(block) {
-        if(block.type === 'reference') {
+        if(block.type === 'reference' && block.recursive) {
             block.dep.each(block.key, function(key, node) {
                 if(typeof node.value === 'number' || typeof node.value === 'string')
                     Misc.setIndex(expKeys, key, true);
@@ -700,10 +772,15 @@ Expression.prototype.fullyResolve = function() {
     for(let key in expKeys) {
         let match = self.blocks.every(function(block) {
             if(block.type !== 'reference') return true;
-            for(let prefix = Dependency.concatKey(block.key, key);
-                !((parent = block.dep.getKey(prefix)) && (typeof parent.value === 'number' || typeof parent.value === 'string'))
-                && prefix.length > block.key.length;
-                prefix = prefix.replace(/\.?[A-Za-z0-9]+$/, ''));
+            let parent = null;
+            if(block.recursive) {
+                for(let prefix = Dependency.concatKey(block.key, key);
+                    !((parent = block.dep.getKey(prefix)) && (typeof parent.value === 'number' || typeof parent.value === 'string'))
+                    && prefix.length > block.key.length;
+                    prefix = prefix.replace(/\.?[A-Za-z0-9]+$/, ''));
+            } else {
+                parent = block.dep.getKey(block.key);
+            }
             if(parent && (typeof parent.value === 'number' || typeof parent.value === 'string')) {
                 block.value = parent.value;
                 return true;
@@ -712,7 +789,9 @@ Expression.prototype.fullyResolve = function() {
         if(match) {
             let node = self.getKey(key, true), str = '';
             self.blocks.forEach(function(block) {
-                str += '' + block.value;
+                let val = block.value;
+                //if(isNaN(val)) val = "'" + val + "'";
+                str += '' + val;
             });
             node.value = eval(str);
         }
@@ -729,6 +808,7 @@ Expression.prototype.toString = function(key) {
                 if(block.dep instanceof Dependency) substr += block.dep.toString();
                 if(substr && block.key) substr += '.';
                 substr += block.key || '';
+                if(block.recursive) substr += ':R';
                 str += substr;
                 break;
             default: break;
