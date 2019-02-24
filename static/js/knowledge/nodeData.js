@@ -148,72 +148,78 @@ Node.prototype.updateDataDependencies = function() {
         let tgtRef = self.parseReferences(tgt)[0];
         if(!tgtRef || tgtRef.start > 0 || tgtRef.end < tgt.length) return;
 
-        let commands = []
         if(tgtRef.type === 'var') {
-            let command = new NodeDataCommand(null, null, op, null, tgtRef.recursive);
+            let expression = self.parseExpression(exp);
+            let command = new NodeDataCommand(null, null, op, expression, tgtRef.recursive);
             command.wait(self.variables, tgtRef.var, function(ret) {
                 command.setTarget(ret.value.dep, Dependency.concatKey(ret.value.key, tgtRef.key));
             });
-            commands.push(command);
         } else if(tgtRef.type === 'node') {
-            tgtRef.nodes.forEach(function(node) {
-                commands.push(new NodeDataCommand(node.getData(), tgtRef.key, op, null, tgtRef.recursive));
+            let expression = null;
+            if(!tgtRef.nodeAsContext) expression = self.parseExpression(exp);
+            self.getConnectedNodes(tgtRef.nodes, function(node) {
+                if(tgtRef.nodeAsContext) expression = node.parseExpression(exp);
+                let command = new NodeDataCommand(node.getData(), tgtRef.key, op, expression, tgtRef.recursive);
+                command.init();
             });
         }
-
-        let expression = null;
-        commands.forEach(function(command) {
-            if(!expression || tgtRef.nodeAsContext) {
-                let node = tgtRef.nodeAsContext ? command.target.node : self;
-                expression = new Expression();
-                let refs = node.parseReferences(exp), ind = 0;
-                refs.forEach(function(ref) {
-                    if(ref.start > ind)
-                        expression.addLiteralBlock(exp.substring(ind, ref.start));
-                    if(ref.type === 'var') {
-                        let blockNum = expression.addReferenceBlock(null, null, ref.recursive);
-                        expression.wait(self.variables, ref.var, '', function(vars, varKey) {
-                            let value = vars.getValue(varKey);
-                            expression.setReference(blockNum, value.dep, Dependency.concatKey(value.key, ref.key));
-                        });
-                    } else if(ref.type === 'node') {
-                        expression.addReferenceBlock(ref.nodes[0].getData(), ref.key, ref.recursive);
-                    }
-                    ind = ref.end;
-                });
-                if(ind < exp.length) expression.addLiteralBlock(exp.substring(ind));
-            }
-            command.expression = expression;
-            command.init();
-        });
     });
+};
+
+Node.prototype.parseExpression = function(str) {
+    let self = this, expression = new Expression();
+    let refs = self.parseReferences(str), ind = 0;
+    refs.forEach(function(ref) {
+        if(ref.start > ind)
+            expression.addLiteralBlock(str.substring(ind, ref.start));
+        if(ref.type === 'var') {
+            let blockNum = expression.addReferenceBlock(null, null, ref.recursive);
+            expression.wait(self.variables, ref.var, '', function(vars, varKey) {
+                let value = vars.getValue(varKey);
+                expression.setReference(blockNum, value.dep, Dependency.concatKey(value.key, ref.key));
+            });
+        } else if(ref.type === 'node') {
+            let refNode = self.getConnectedNodes(ref.nodes)[0];
+            expression.addReferenceBlock(refNode.getData(), ref.key, ref.recursive);
+        }
+        ind = ref.end;
+    });
+    if(ind < str.length) expression.addLiteralBlock(str.substring(ind));
+    return expression;
 };
 
 Node.prototype.parseReferences = function(str) {
     let self = this,
-        re = /(^|[^A-Za-z0-9])(\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)((?:\.[A-Za-z0-9]+)*)((?::R)?)([^A-Za-z0-9]|$)/g,
+        re = /(^|[^A-Za-z0-9])(\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)(:?)((?:\.[A-Za-z0-9]+)*)((?::R)?)([^A-Za-z0-9]|$)/g,
         references = [];
+
     while((match = re.exec(str)) !== null) {
-        let first = match[1], data = match[2], key = match[3], opts = match[4], last = match[5];
-        let ref = {key: key || '', start: match.index, end: re.lastIndex};
+        let first = match[1], data = match[2], context = match[3], key = match[4],
+            opts = match[5], last = match[6];
+
+        let ref = {
+            key: key || '',
+            start: match.index,
+            end: re.lastIndex,
+            nodeAsContext: context === ':'
+        };
+
         let bounded = first === '{' && last === '}';
         if(first && !bounded) ref.start++;
         if(last && !bounded) ref.end--;
         if(ref.key && ref.key[0] === '.') ref.key = ref.key.substring(1);
+
         if(data[0] === '$') {
             ref.type = 'var';
             ref.var = data.substring(1);
         } else {
-            if(data[data.length-1] === ':') {
-                ref.nodeAsContext = true;
-                data = data.substring(0, data.length-1);
-            }
             ref.type = 'node';
-            ref.nodes = self.getConnectedNodes(data);
+            ref.nodes = data;
         }
-        for(let i = 0; i < opts.length; i++) {
+
+        for(let i = 1; i < opts.length; i++) {
             switch(opts[i]) {
-                case 'R': opts.recursive = true; break;
+                case 'R': ref.recursive = true; break;
                 default: break;
             }
         }
@@ -229,6 +235,12 @@ Node.prototype.addCommand = function(command) {
 Node.prototype.resetCommands = function() {
     for(let id in this.commands) {
         this.commands[id].reset();
+    }
+};
+
+Node.prototype.printCommands = function() {
+    for(let id in this.commands) {
+        console.log(this.commands[id].toString());
     }
 };
 

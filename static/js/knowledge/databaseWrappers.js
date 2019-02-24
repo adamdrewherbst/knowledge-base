@@ -74,7 +74,7 @@
             let args = [];
             for(let i = 1; i < n-1; i++) args.push(arguments[i]);
             let sub = Misc.getIndex(arguments[0], args);
-            if(!sub || typeof sub !== 'object') return;
+            if(sub === undefined) return;
 
             //if this key has keys 0,1,2... then it is an array
             //and we must perform the callback on each element
@@ -96,6 +96,7 @@
 
         Misc.asArray = function(obj) {
             let keys = Object.keys(obj), n = keys.length, ordered = true;
+            if(n === 0) return [obj];
             for(let i = 0; i < n && (ordered = keys[i] === i); i++);
             let arr = [];
             if(ordered) for(let i = 0; i < n; i++) arr.push(obj[i]);
@@ -106,6 +107,7 @@
 
 
         function Entry() {
+            this.eventHandlers = {};
         }
 
         Entry.prototype.get = function(key) {
@@ -152,8 +154,22 @@
         Entry.prototype.postprocess = function() {
         };
 
+        Entry.prototype.on = function(event, handler) {
+            if(!this.eventHandlers[event]) this.eventHandlers[event] = [];
+            this.eventHandlers[event].push(handler);
+        };
+
+        Entry.prototype.trigger = function(event, data) {
+            let self = this;
+            if(!self.eventHandlers[event]) return;
+            self.eventHandlers[event].forEach(function(handler) {
+                if(typeof handler === 'function') handler.call(self, data);
+            });
+        };
+
 
         function Framework() {
+            Entry.prototype.constructor.call(this);
         }
 
         Framework.prototype = Object.create(Entry.prototype);
@@ -162,6 +178,7 @@
 
 
         function Concept() {
+            Entry.prototype.constructor.call(this);
         }
 
         Concept.prototype = Object.create(Entry.prototype);
@@ -222,6 +239,7 @@
 
 
         function Law() {
+            Entry.prototype.constructor.call(this);
             this.nodes = [];
             this.evaluateQueue = [];
             this.maps = {};
@@ -421,6 +439,7 @@
 
 
         function Node() {
+            Entry.prototype.constructor.call(this);
             this.children = {0: {}, 1: {}};
             this.triads = {};
             this.symbol = new Symbol();
@@ -537,6 +556,7 @@
                 let otherParent = type === 0 ? node.reference : node.head;
                 Misc.setIndex(this.triads, type, node.concept, otherParent, node);
             }
+            this.trigger('new-child');
         };
 
         Node.prototype.getChildren = function(type) {
@@ -627,24 +647,34 @@
 
         //use string shorthand to find connected nodes, eg. C.C means all my childrens' children
         //or H.R means my head's reference
-        Node.prototype.getConnectedNodes = function(str) {
-            let chain = str.split('.'), nodes = [this];
-            let symmetric = this.getConcept().symmetric;
-            chain.forEach(function(name) {
+        Node.prototype.getConnectedNodes = function(str, callback) {
+            let self = this, chain = str.split('.'), nodes = [self];
+            chain.forEach(function(name, ind) {
                 let arr = [];
                 nodes.forEach(function(node) {
                     switch(name[0]) {
                         case 'S': arr.push(node); break;
                         case 'A': arr.push(node.getHead()); break;
-                            //if(symmetric) arr.push(node.getReference()); break;
                         case 'B': arr.push(node.getReference()); break;
-                            //if(symmetric) arr.push(node.getHead()); break;
-                        case 'C': arr = arr.concat(node.getChildren(0)); break;
+                        case 'C': arr = arr.concat(node.getChildren(0));
+                            if(typeof callback === 'function') {
+                                let sub = str.substring((ind+1)*2);
+                                node.on('new-child', function(child) {
+                                    if(!sub) callback.call(self, child);
+                                    else child.getConnectedNodes(sub, callback);
+                                });
+                            }
+                            break;
                         default: break;
                     }
                 });
                 nodes = arr;
             });
+            if(typeof callback === 'function') {
+                nodes.forEach(function(node) {
+                    callback.call(self, node);
+                });
+            }
             return nodes;
         };
 
