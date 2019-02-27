@@ -313,6 +313,13 @@ Dependency.getParent = function(key) {
     return key.replace(/\.?[A-Za-z0-9]+$/, '');
 };
 
+Dependency.propagateValues = function() {
+    for(let id in Dependency.prototype.instance) {
+        let dep = Dependency.prototype.instance[id];
+        dep.propagateValues();
+    }
+};
+
 Dependency.prototype.getId = function() {
     return this.id;
 };
@@ -428,7 +435,8 @@ Dependency.prototype.eachWaiting = function(key, callback) {
 };
 
 Dependency.prototype.resolve = function(dep, depKey, myKey) {
-    if(!this.active(myKey)) return false;
+    let self = this;
+    if(!self.active(myKey)) return false;
 
     let depId = dep.getId(), node = this.getKey(myKey),
     obj = Misc.getIndex(node.waiting, depId, depKey);
@@ -441,7 +449,7 @@ Dependency.prototype.resolve = function(dep, depKey, myKey) {
 
     Misc.setIndex(node.waiting, depId, depKey, 'resolved', true);
 
-    this.checkResolved(myKey);
+    self.checkResolved(myKey);
 };
 
 Dependency.prototype.checkResolved = function(key, recursive) {
@@ -459,6 +467,7 @@ Dependency.prototype.checkResolved = function(key, recursive) {
     if(resolved) {
         //pass on the resolved key's data to any commands waiting on it
         if(!self.propagated(key)) { //may have been resolved during recursive checking above
+            console.log('resolving ' + self.toString(key));
             self.fullyResolve(key);
             self.propagate(key);
         }
@@ -479,6 +488,42 @@ Dependency.prototype.getClosestParent = function(key) {
 };
 
 Dependency.prototype.fullyResolve = function(key) {};
+
+Dependency.prototype.propagateValues = function() {
+    //sort the keys of this tree so that every child is in front of its parents
+    let self = this, keys = [];
+    for(let key in self.key) {
+        let insert = -1;
+        for(let i = 0; i < keys.length; i++) {
+            if(Dependency.subkey(keys[i], key)) {
+                keys.splice(i, 0, key);
+                insert = i;
+                break;
+            }
+        }
+        if(insert < 0) keys.push(key);
+    }
+    //traverse the list, propagating any key that has a defined value and is not waiting
+    keys.forEach(function(key) {
+        self.checkResolved(key);
+        /*let node = self.getKey(key);
+        if(!node.active || node.propagated) return;
+        let resolved = true;
+        for(let depId in node.waiting) for(let depKey in node.waiting[depId]) {
+            if(!node.waiting[depId][depKey].resolved) {
+                resolved = false;
+                break;
+            }
+        }
+        if(resolved) {
+            console.log('propagating ' + self.toString(key));
+            self.fullyResolve(key);
+            self.propagate(key);
+        } else {
+
+        }*/
+    });
+};
 
 Dependency.prototype.propagate = function(key) {
     let node = this.getKey(key);
@@ -610,6 +655,7 @@ NodeData.prototype.fullyResolve = function(key) {
                     }
                 });
             });
+            self.setValue('symbol', text);
             break;
         default: break;
     }
@@ -686,6 +732,10 @@ NodeDataCommand.prototype.fullyResolve = function() {
                 self.setValue('', [data, self.editKey]);
             }
             break;
+        case 'addval':
+            let key = data.addIndex(self.editKey);
+            data.setValue(key, expression.getValue());
+            break;
         case 'clear':
             data.clear(self.editKey);
             self.setValue('', [data, self.editKey]);
@@ -696,15 +746,17 @@ NodeDataCommand.prototype.fullyResolve = function() {
 
                 let nodeValue = node.value;
                 if(nodeValue === undefined) return;
-                else if(typeof nodeValue === 'string' && isNaN(nodeValue))
+                else if(typeof nodeValue === 'string')
                     nodeValue = "'" + nodeValue + "'";
 
                 let myKey = Dependency.concatKey(self.editKey, key),
                     myValue = data.getValue(myKey);
                 if(myValue === undefined) myValue = '';
-                else if(!isNaN(myValue)) myValue = parseFloat(myValue);
 
-                eval('myValue ' + self.operation + ' ' + nodeValue);
+                let code = 'myValue ' + self.operation + ' ' + nodeValue;
+                console.log('code for ' + self.toString());
+                console.log(code);
+                eval(code);
                 data.setValue(myKey, myValue);
             });
             self.setValue('', [data, self.editKey]);
@@ -802,9 +854,12 @@ Expression.prototype.fullyResolve = function() {
             let node = self.getKey(key, true), str = '';
             self.blocks.forEach(function(block) {
                 let val = block.value;
-                //if(isNaN(val)) val = "'" + val + "'";
+                if(block.type === 'reference' && typeof val === 'string')
+                    val = "'" + val + "'";
                 str += '' + val;
             });
+            console.log('code for ' + self.toString(key));
+            console.log(str);
             node.value = eval(str);
         }
     }

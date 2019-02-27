@@ -41,8 +41,9 @@
                 title.textContent = "Node Info";
                 description.innerHTML = self.getNodeString(node.id).replace(new RegExp("\n", 'g'), "<br>");
 
-                if(node.symbol && node.symbol.known)
-                    $('#symbolization-wrapper').html('<p><math display="block" scriptlevel="-3">' + node.symbol.toString() + '</math></p>');
+                let symbol = node.getData().getValue('symbol');
+                if(symbol)
+                    $('#symbolization-wrapper').html('<p><math display="block" scriptlevel="-3">' + symbol + '</math></p>');
             }
 
             // dragging a node invalidates the Diagram.layout, causing a layout during the drag

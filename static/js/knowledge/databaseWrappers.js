@@ -336,7 +336,7 @@
             return nodes;
         };
 
-        Law.prototype.initData = function(type) {
+        Law.prototype.resolveData = function(type) {
             let self = this;
             Dependency.setPropagating(type);
             self.eachNode(function(node) {
@@ -351,9 +351,10 @@
             self.eachNode(function(node) {
                 node.getData().activate(type);
             });
-            self.eachCommand(function(cmd) {
+            /*self.eachCommand(function(cmd) {
                 cmd.checkResolved('', true);
-            });
+            });//*/
+            Dependency.propagateValues();
         };
 
         Law.prototype.eachCommand = function(callback) {
@@ -408,17 +409,6 @@
             if(map.satisfied) map.append();
             else map.checkIntersections();
             return true;
-        };
-
-        Law.prototype.resolveData = function(type) {
-            let self = this;
-            //determine what nodes each node's data depends on
-            self.eachNode(function(node) {
-                node.initData(type);
-            });
-            self.eachNode(function(node) {
-                node.setupDataDependencies();
-            });
         };
 
         Law.prototype.reset = function() {
