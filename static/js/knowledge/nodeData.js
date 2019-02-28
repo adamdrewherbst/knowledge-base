@@ -103,15 +103,17 @@ Node.prototype.initData = function(type) {
                 self.setData('concept.' + self.concept, self.getConcept());
                 break;
             case 'symbol':
+                self.setData('symbol', '');
                 if(self.name) self.setData('symbol.text', self.name);
                 else {
-                    let symbol = self.getConcept().symbol;
-                    if(symbol) self.setData('symbol.text', symbol);
+                    let symbol = self.getDefaultSymbol();
+                    if(symbol != null) self.setData('symbol.text', symbol);
                 }
                 break;
             case 'value':
                 let value = self.getValue();
                 if(value) self.setData('value', value);
+                else self.setData('value', undefined);
                 break;
             case 'visual':
                 break;
@@ -284,9 +286,13 @@ Dependency.propagating = function(type) {
     return Dependency.prototype.propagateKey[type] ? true : false;
 };
 
+Dependency.cleanKey = function(key) {
+    return key == null ? '' : '' + key;
+};
+
 Dependency.subkey = function(key, subkey) {
-    key = key || '';
-    subkey = subkey || '';
+    key = Dependency.cleanKey(key);
+    subkey = Dependency.cleanKey(subkey);
     if(subkey.length < key.length) return false;
     if(!key) return subkey;
     if(subkey === key) return '';
@@ -295,6 +301,8 @@ Dependency.subkey = function(key, subkey) {
 };
 
 Dependency.isChild = function(subkey, key) {
+    subkey = Dependency.cleanKey(subkey);
+    key = Dependency.cleanKey(key);
     if(!key) return subkey.match(/^[A-Za-z0-9]+$/) ? true : false;
     let len = key.length;
     return subkey.indexOf(key) === 0 &&
@@ -302,13 +310,16 @@ Dependency.isChild = function(subkey, key) {
 };
 
 Dependency.concatKey = function(key1, key2) {
-    let key = key1 || '';
-    if(key1 && key2) key += '.';
-    key += key2 || '';
+    key1 = Dependency.cleanKey(key1);
+    key2 = Dependency.cleanKey(key2);
+    let key = key1;
+    if(key && key2) key += '.';
+    key += key2;
     return key;
 };
 
 Dependency.getParent = function(key) {
+    key = Dependency.cleanKey(key);
     if(!key) return undefined;
     return key.replace(/\.?[A-Za-z0-9]+$/, '');
 };
@@ -329,7 +340,7 @@ Dependency.prototype.getKeys = function() {
 };
 
 Dependency.prototype.getKey = function(key, create) {
-    key = key || '';
+    key = Dependency.cleanKey(key);
     let node = this.key[key];
     if(create && !node) node = this.key[key] = {
         waiting: {},
@@ -623,13 +634,13 @@ NodeData.prototype.fullyResolve = function(key) {
         //combine all subscripts, superscripts, arguments, etc. into one MathML string
         //as the value of the 'symbol' node
         case 'symbol':
-            let symbol = self.collectData(key), types = ['text', 'over', 'sub', 'super', 'arg'], text = '';
-            if(!symbol.text) break;
+            let symbol = self.collectData(key), types = ['text', 'over', 'subscript', 'superscript', 'arguments'], text = '';
             types.forEach(function(type) {
                 if(!symbol.hasOwnProperty(type)) return;
                 let arr = Misc.asArray(symbol[type]), combined = '';
                 arr.forEach(function(str, ind) {
-                    if(!str) return;
+                    if(str == null) str = '';
+                    if(type !== 'text' && !str) return;
                     combined += str + ',';
                     let last = ind === arr.length-1;
                     if(last) combined = '<mrow>' + combined.substring(0, combined.length-1) + '</mrow>';
@@ -641,13 +652,13 @@ NodeData.prototype.fullyResolve = function(key) {
                         case 'over':
                             text = '<mover>' + text + str + '</mover>';
                             break;
-                        case 'sub':
+                        case 'subscript':
                             text = '<msub>' + text + str + '</msub>';
                             break;
-                        case 'super':
+                        case 'superscript':
                             text = '<msup>' + text + str + '</msup>';
                             break;
-                        case 'arg':
+                        case 'arguments':
                             if(last)
                                 text = '<mrow>' + text + '<mfenced>' + combined + '</mfenced></mrow>';
                             break;

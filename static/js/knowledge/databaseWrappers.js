@@ -95,12 +95,12 @@
         };
 
         Misc.asArray = function(obj) {
-            let keys = Object.keys(obj), n = keys.length, ordered = true;
-            if(n === 0) return [obj];
-            for(let i = 0; i < n && (ordered = keys[i] === i); i++);
+            if(typeof obj !== 'object') return [obj];
             let arr = [];
-            if(ordered) for(let i = 0; i < n; i++) arr.push(obj[i]);
-            else arr.push(obj);
+            for(let i = 0; obj.hasOwnProperty(i); i++) {
+                arr.push(obj[i]);
+            }
+            if(arr.length == 0) arr.push(obj);
             return arr;
         };
 
@@ -483,6 +483,7 @@
 
         Node.prototype.getAllConcepts = function() {
             let concepts = {}, conceptData = this.collectData('concept');
+            if(!conceptData[this.concept]) conceptData[this.concept] = this.getConcept();
             for(let id in conceptData) {
                 let concept = conceptData[id];
                 let all = concept.getAllConcepts();
@@ -508,6 +509,22 @@
             if(typeof value == 'string') this.value.readValue(value);
             else if(typeof value == 'object') this.value.readValue(value.writeValue());
         }
+
+        Node.prototype.getDefaultSymbol = function(concept) {
+            let self = this;
+            if(!concept) concept = self.getConcept();
+            if(concept.symbol != null) {
+                let symbol = ''+concept.symbol;
+                if(symbol) return symbol;
+            }
+            for(let dep in concept.dependencies) {
+                let depConcept = self.findEntry('concept', dep);
+                if(!depConcept) return;
+                let symbol = self.getDefaultSymbol(depConcept);
+                if(symbol) return symbol;
+            }
+            return '';
+        };
 
         Node.prototype.getHead = function() {
             return this.findEntry(this.table, this.head);
