@@ -343,7 +343,7 @@
                 node.resetCommands();
             });*/
             self.eachNode(function(node) {
-                node.initData(type);
+                node.initData();
             });
             self.eachNode(function(node) {
                 node.compileCommands();
@@ -352,6 +352,9 @@
                 node.getData().activate(type);
             });
             Dependency.propagateValues();
+            self.eachNode(function(node) {
+                node.checkCommands();
+            });
         };
 
         Law.prototype.eachCommand = function(callback) {
@@ -417,12 +420,15 @@
                 delete self.maps[m];
             self.nextMapId = 0;
 
-            self.nodes.forEach(function(id) {
-                let node = self.findEntry('node', id);
+            for(let i = 0; i < self.nodes.length; i++) {
+                let node = self.findEntry('node', self.nodes[i]);
                 if(!node) return;
-                if(node.appended) node.remove();
+                if(node.appended) {
+                    node.remove();
+                    i--;
+                }
                 else node.reset();
-            });
+            }
             self.evaluateQueue = [];
         }
 
@@ -437,8 +443,6 @@
             this.data = new NodeData(this);
             this.commands = {};
             this.tentative = false;
-            this.fromMap = {};
-            this.evaluated = {};
             this.reset();
         }
 
@@ -557,13 +561,13 @@
                 let head = this.getHead(), reference = this.getReference();
                 if(head) head.addTriad(0, this, this.reference);
                 if(reference) reference.addTriad(1, this, this.head);
+                if(head) head.trigger('new-child', this);
             }
         };
 
         //type == 0 for children whose head is me, 1 for children whose reference is me
         Node.prototype.addChild = function(type, node) {
             Misc.setIndex(this.children, type, node.id, node);
-            this.trigger('new-child');
         };
 
         Node.prototype.addTriad = function(type, node, otherId) {
@@ -604,6 +608,7 @@
 
         Node.prototype.remove = function() {
             this.setHead(null);
+            this.setReference(null);
             if(this.relation) this.relation.removeEntry('node', this.id);
             let law = this.findEntry('law', this.law);
             if(law) law.removeNode(this.id);
@@ -613,6 +618,13 @@
             this.evaluated = {};
             this.matches = {};
             this.maps = {};
+            this.fromMap = {};
+            for(let cid in this.conceptInfo) {
+                delete this.conceptInfo[cid].evaluated;
+                for(let sub in this.conceptInfo[cid]) {
+                    if(sub !== 'compiled') delete this.conceptInfo[cid][sub];
+                }
+            }
         }
 
         Node.prototype.setDeepPredicate = function() {
@@ -759,11 +771,11 @@
                         let refMatch = refMatches[rid];
                         if(refMatch && refMatch.isDeepPredicate) continue;
 
-                        //finally see if this triad is a match
+                        //finally see if this triad is a match and lies fully in a predicate
                         let match = null;
                         if(headMatch) match = headMatch.getMatch(0, cid, rid);
                         else if(refMatch) match = refMatch.getMatch(1, cid, hid);
-                        if(match && self.setMatch(match)) newMatch = true;;
+                        if(match && match.isPredicate && self.setMatch(match)) newMatch = true;;
                     }
                 }
             }
@@ -833,7 +845,8 @@
         Node.prototype.printMatches = function() {
             for(let nodeId in this.matches) {
                 let node = this.findEntry('node', nodeId);
-                if(node) console.log(node.id + ': ' + node.toString());
+                if(node && node.concept != Concept.prototype.wildcardConcept)
+                    console.log(node.id + ': ' + node.toString());
             }
         }
 

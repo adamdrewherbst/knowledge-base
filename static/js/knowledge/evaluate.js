@@ -58,6 +58,9 @@
 
         Relation.prototype.reset = function() {
             this.law.reset();
+            $('#suggestion-wrapper').empty();
+            this.symbolize();
+            this.visualize();
         };
 
         Relation.prototype.getEvaluateTag = function() {
@@ -118,20 +121,19 @@
             for(let n in self.idMap) {
                 if(other.idMap.hasOwnProperty(n) && self.idMap[n] != other.idMap[n]) return false;
             }
-            map.idMap = Object.assign({}, self.idMap, other.idMap);
-
-            map.valueMap = Object.assign({}, self.valueMap, other.valueMap);
-            map.intersections = Object.assign({}, self.intersections, other.intersections);
-            delete map.intersections[self.id];
-            delete map.intersections[other.id];
 
             map.deepPredicates = [];
             for(let i = 0; i < 2; i++) {
                 let currentMap = i == 0 ? self : other;
                 currentMap.deepPredicates.forEach(function(n) {
                     if(map.deepPredicates.indexOf(n) < 0) map.deepPredicates.push(n);
+                    let node = self.relation.findEntry('node', currentMap.idMap[n]),
+                        predicate = self.relation.findEntry('node', n);
+                    map.addNode(node, predicate);
                 });
             }
+            delete map.intersections[self.id];
+            delete map.intersections[other.id];
 
             return map;
         };
@@ -156,9 +158,30 @@
                 });
             if(!disjoint) return false;
 
-            //and that the joint deep node set is part of a set that satisfies the law
             console.log('  have ' + JSON.stringify(self.deepPredicates) + ',' + JSON.stringify(other.deepPredicates)
                 + ' of ' + JSON.stringify(self.predicateLaw.predicateSets));
+
+            //make sure there's no existing map that would be a duplicate of this intersection
+            let predicates = {}, duplicates = {};
+            for(let i = 0; i < 2; i++) {
+                let currentMap = i == 0 ? self : other;
+                currentMap.deepPredicates.forEach(function(n) {
+                    let node = self.relation.findEntry('node', currentMap.idMap[n]);
+                    for(let m in node.maps[n]) duplicates[m] = true;
+                    predicates[n] = node;
+                });
+            }
+            for(let d in duplicates) {
+                for(let n in predicates) {
+                    if(!predicates[n].maps[n].hasOwnProperty(d)) delete duplicates[d];
+                }
+            }
+            if(Object.keys(duplicates).length > 0) {
+                console.log('  already covered by map ' + Object.keys(duplicates).toString());
+                return false;
+            }
+
+            //and that the joint deep node set is part of a set that satisfies the law
             let deepPredicates = self.deepPredicates.concat(other.deepPredicates), match = null;
             let cannotCombine = self.predicateLaw.predicateSets.every(function(mset) {
                 let isSubset = deepPredicates.every(function(n) {

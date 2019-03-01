@@ -165,7 +165,7 @@ Node.prototype.compileCommands = function(doCheck) {
                 let command = new NodeDataCommand(node.getData(), tgtRef.key, op, expression, tgtRef.recursive);
                 command.init();
                 if(doCheck) {
-                    command.checkResolved(true);
+                    command.checkResolved('', true);
                 }
             });
         }
@@ -239,8 +239,9 @@ Node.prototype.addCommand = function(command) {
 };
 
 Node.prototype.checkCommands = function() {
-    for(let id in this.commands) {
-        this.commands[id].checkResolved(true);
+    for(let cid in this.commands) {
+        let command = this.commands[cid];
+        command.checkResolved('', true);
     }
 };
 
@@ -440,6 +441,9 @@ Dependency.prototype.wait = function(dep, depKey, myKey, callback) {
 Dependency.prototype.addTrigger = function(dep, key, depKey) {
     let node = this.getKey(key, true);
     Misc.setIndex(node.trigger, dep.getId(), depKey, dep);
+    if(this.active(key) && this.propagated(key)) {
+        dep.resolve(this, key, depKey);
+    }
 };
 
 Dependency.prototype.eachWaiting = function(key, callback) {
@@ -475,20 +479,20 @@ Dependency.prototype.resolve = function(dep, depKey, myKey) {
 
 Dependency.prototype.checkResolved = function(key, recursive) {
     let self = this;
-    if(recursive) console.log('checking ' + self.toString(key));
+    //if(recursive) console.log('checking ' + self.toString(key));
     if(!self.active(key)) return false;
     if(self.propagated(key)) return true;
     let resolved = self.eachWaiting(key, function(obj, depKey) {
         if(recursive) {
             let depResolved = obj.dep.checkResolved(depKey, recursive);
-            console.log('  ' + self.id + ' checking ' + obj.dep.toString(depKey) + ' => ' + depResolved);
+            //console.log('  ' + self.id + ' checking ' + obj.dep.toString(depKey) + ' => ' + depResolved);
             return depResolved;
         } else return obj.resolved ? true : false;
     });
     if(resolved) {
         //pass on the resolved key's data to any commands waiting on it
         if(!self.propagated(key)) { //may have been resolved during recursive checking above
-            console.log('resolving ' + self.toString(key));
+            //console.log('resolving ' + self.toString(key));
             self.fullyResolve(key);
             self.propagate(key);
         }
@@ -527,22 +531,6 @@ Dependency.prototype.propagateValues = function() {
     //traverse the list, propagating any key that has a defined value and is not waiting
     keys.forEach(function(key) {
         self.checkResolved(key);
-        /*let node = self.getKey(key);
-        if(!node.active || node.propagated) return;
-        let resolved = true;
-        for(let depId in node.waiting) for(let depKey in node.waiting[depId]) {
-            if(!node.waiting[depId][depKey].resolved) {
-                resolved = false;
-                break;
-            }
-        }
-        if(resolved) {
-            console.log('propagating ' + self.toString(key));
-            self.fullyResolve(key);
-            self.propagate(key);
-        } else {
-
-        }*/
     });
 };
 
@@ -645,6 +633,7 @@ NodeData.prototype.fullyResolve = function(key) {
         //as the value of the 'symbol' node
         case 'symbol':
             let symbol = self.collectData(key), types = ['text', 'over', 'subscript', 'superscript', 'arguments'], text = '';
+            if(symbol._value) break;
             types.forEach(function(type) {
                 if(!symbol.hasOwnProperty(type)) return;
                 let arr = Misc.asArray(symbol[type]), combined = '';
@@ -703,6 +692,7 @@ NodeDataCommand.prototype.constructor = NodeDataCommand;
 NodeDataCommand.prototype.init = function() {
     //the data key being edited by this command can't be resolved until the command completes
     let self = this;
+    self.checkActive();
     self.wait(self.expression);
     if(self.target instanceof Dependency)
         self.target.wait(self, '', self.editKey);
@@ -777,8 +767,8 @@ NodeDataCommand.prototype.fullyResolve = function() {
                 }
 
                 let code = 'myValue ' + self.operation + ' ' + nodeValue;
-                console.log('code for ' + self.toString());
-                console.log(code);
+                //console.log('code for ' + self.toString());
+                //console.log(code);
                 eval(code);
                 data.setValue(myKey, myValue);
             });
@@ -878,8 +868,8 @@ Expression.prototype.fullyResolve = function() {
                     val = "'" + val + "'";
                 str += '' + val;
             });
-            console.log('code for ' + self.toString(key));
-            console.log(str);
+            //console.log('code for ' + self.toString(key));
+            //console.log(str);
             node.value = eval(str);
         }
     }
