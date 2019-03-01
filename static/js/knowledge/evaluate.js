@@ -239,11 +239,11 @@
 
             //if the head and reference of this node haven't been appended yet, do that first
             if(head) {
-                newHead = self.appendHelper(head);
+                newHead = self.appendNode(head);
                 if(newHead == null) return null;
             }
             if(reference) {
-                newReference = self.appendHelper(reference);
+                newReference = self.appendNode(reference);
                 if(newReference == null) return null;
             }
 
@@ -272,22 +272,16 @@
                 'head': newHead ? parseInt(newHead) : null,
                 'reference': newReference ? parseInt(newReference) : null,
                 'value': node.value,
-                'tentative': tentative,
                 'appended': true,
             }), newId = newNode.getId();
 
             newNode.addFromMap(self);
+            newNode.setTentative(self);
             relation.stats.evaluate.nodesAppended++;
 
             self.idMap[nodeId] = newId;
             self.idMap[newId] = nodeId;
 
-            if(!tentative) {
-                self.drawNode(newId, {
-                    template: 'appended',
-                    drawLinks: true
-                });
-            }
             return newNode;
         };
 

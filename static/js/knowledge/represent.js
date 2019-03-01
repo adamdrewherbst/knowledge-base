@@ -1,22 +1,27 @@
 Relation.prototype.symbolize = function() {
-    let self = this
+    let self = this;
+
+    self.law.resolveData('symbol');
+
     $('#symbolization-wrapper').empty();
+
     self.law.deepNodes.forEach(function(id) {
         let node = self.findEntry('node', id);
         if(!node) return;
         let symbol = node.getData().getValue('symbol');
         if(!symbol) return;
-        let element = '<p><math scriptlevel="-3">' + text + '</math></p>';
+        let element = '<p><math scriptlevel="-3">' + symbol + '</math></p>';
         $('#symbolization-wrapper').append(element);
     });
 };
 
 Relation.prototype.visualize = function() {
-    let self = this, law = self.law, canvas = self.canvas;
-    if(!law) return;
+    let self = this, canvas = self.canvas;
+
+    self.law.resolveData('visual');
 
     let canvasEl = canvas.canvas;
-    canvasEl.height = 600;
+    canvasEl.height = Math.max(canvasEl.height, 600);
     let width  = canvasEl.width, height = canvasEl.height;
     canvas.setTransform(1, 0, 0, -1, width/2, height/2);
     canvas.clearRect(-width/2, -height/2, width/2, height/2);
@@ -28,7 +33,7 @@ Relation.prototype.visualize = function() {
     canvas.stroke();
     canvas.setLineDash([]);
 
-    law.eachNode(function(node) {
+    self.law.eachNode(function(node) {
         let visual = node.collectData('visual');
         if(visual.shape) {
             for(let shapeName in visual.shape) {

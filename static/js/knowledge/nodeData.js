@@ -98,6 +98,7 @@ And when a command is added during evaluation, it's fine because everything else
 Node.prototype.initData = function(type) {
     let self = this, types = type ? [type] : ['concept', 'symbol', 'value', 'visual'];
     types.forEach(function(type) {
+        if(self.getData().getValue(type) !== undefined) return;
         switch(type) {
             case 'concept':
                 self.setData('concept.' + self.concept, self.getConcept());
@@ -122,7 +123,7 @@ Node.prototype.initData = function(type) {
     });
 };
 
-Node.prototype.updateDataDependencies = function() {
+Node.prototype.compileCommands = function(doCheck) {
     let self = this;
 
     //any commands that already exist on this node should be activated
@@ -163,6 +164,9 @@ Node.prototype.updateDataDependencies = function() {
                 if(tgtRef.nodeAsContext) expression = node.parseExpression(exp);
                 let command = new NodeDataCommand(node.getData(), tgtRef.key, op, expression, tgtRef.recursive);
                 command.init();
+                if(doCheck) {
+                    command.checkResolved(true);
+                }
             });
         }
     });
@@ -232,6 +236,12 @@ Node.prototype.parseReferences = function(str) {
 
 Node.prototype.addCommand = function(command) {
     this.commands[command.getId()] = command;
+};
+
+Node.prototype.checkCommands = function() {
+    for(let id in this.commands) {
+        this.commands[id].checkResolved(true);
+    }
 };
 
 Node.prototype.resetCommands = function() {
@@ -693,7 +703,6 @@ NodeDataCommand.prototype.constructor = NodeDataCommand;
 NodeDataCommand.prototype.init = function() {
     //the data key being edited by this command can't be resolved until the command completes
     let self = this;
-    self.expression.init();
     self.wait(self.expression);
     if(self.target instanceof Dependency)
         self.target.wait(self, '', self.editKey);
@@ -762,7 +771,10 @@ NodeDataCommand.prototype.fullyResolve = function() {
 
                 let myKey = Dependency.concatKey(self.editKey, key),
                     myValue = data.getValue(myKey);
-                if(myValue === undefined) myValue = '';
+                if(myValue === undefined) {
+                    if(typeof nodeValue === 'number') myValue = 0;
+                    else myValue = '';
+                }
 
                 let code = 'myValue ' + self.operation + ' ' + nodeValue;
                 console.log('code for ' + self.toString());
@@ -822,9 +834,6 @@ Expression.prototype.setReference = function(blockNum, dep, key) {
     block.dep = dep;
     block.key = key;
     if(dep) this.wait(dep, key);
-};
-
-Expression.prototype.init = function() {
 };
 
 Expression.prototype.fullyResolve = function() {

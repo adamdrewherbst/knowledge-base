@@ -21,9 +21,10 @@ Relation.prototype.suggest = function() {
     let self = this;
 
     self.evaluate({ tentative: true });
-    self.symbolize();
+    self.law.resolveData('symbol');
 
     $('#suggestion-wrapper').empty();
+
     for(let mapId in self.law.maps) {
         let map = self.law.maps[mapId];
         if(!map.tentative || !map.satisfied) continue;
@@ -35,10 +36,10 @@ Relation.prototype.suggest = function() {
             let node = self.findEntry('node', map.idMap[n]);
             if(!node) continue;
             console.log('adding symbol for node ' + n);
-            symbols.push('<math scriptlevel="-1">' + node.symbol.toString() + '</math>');
+            symbols.push('<math scriptlevel="-1">' + node.getData().getValue('symbol') + '</math>');
         }
 
-        let $entry = $('<div class="suggestion"></div>');
+        let $entry = $('<div class="suggestion" map-id="' + mapId + '"></div>');
         $entry.append('<span class="suggestion-name">' + law.name + '</span>');
         $entry.append('<span class="suggestion-symbol">' + symbols.join(',  ') + '</span>')
 

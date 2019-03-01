@@ -339,21 +339,18 @@
         Law.prototype.resolveData = function(type) {
             let self = this;
             Dependency.setPropagating(type);
-            self.eachNode(function(node) {
+            /*self.eachNode(function(node) {
                 node.resetCommands();
-            });
+            });*/
             self.eachNode(function(node) {
                 node.initData(type);
             });
             self.eachNode(function(node) {
-                node.updateDataDependencies();
+                node.compileCommands();
             });
             self.eachNode(function(node) {
                 node.getData().activate(type);
             });
-            /*self.eachCommand(function(cmd) {
-                cmd.checkResolved('', true);
-            });//*/
             Dependency.propagateValues();
         };
 
@@ -369,7 +366,9 @@
         /* make a list of nodes where each is behind both of its parents */
         Law.prototype.evaluate = function() {
             let self = this, opts = self.relation.options.evaluate;
-            self.initData('concept');
+            self.eachNode(function(node) {
+                node.initData('concept');
+            });
             self.evaluateQueue = [];
             self.deepNodes.forEach(function(id) {
                 let node = self.findEntry('node', id);
@@ -553,17 +552,22 @@
             this[name] = id;
             let newParent = this.findEntry('node', this[name]);
             if(newParent) newParent.addChild(type, this);
+
+            if(this.head !== undefined && this.reference !== undefined) {
+                let head = this.getHead(), reference = this.getReference();
+                if(head) head.addTriad(0, this, this.reference);
+                if(reference) reference.addTriad(1, this, this.head);
+            }
         };
 
         //type == 0 for children whose head is me, 1 for children whose reference is me
         Node.prototype.addChild = function(type, node) {
             Misc.setIndex(this.children, type, node.id, node);
-            //also store triads of [me - child - other parent] for use in updateMatches()
-            if(node.head !== undefined && node.reference !== undefined) {
-                let otherParent = type === 0 ? node.reference : node.head;
-                Misc.setIndex(this.triads, type, node.concept, otherParent, node);
-            }
             this.trigger('new-child');
+        };
+
+        Node.prototype.addTriad = function(type, node, otherId) {
+            Misc.setIndex(this.triads, type, node.concept, otherId, node);
         };
 
         Node.prototype.getChildren = function(type) {
@@ -650,6 +654,14 @@
                 if(parent && parent.fromMap[map.id] === map)
                     parent.setTentative(map);
             }
+
+            if(!self.tentative) {
+                self.relation.drawNode(self.id, {
+                    template: 'appended',
+                    drawLinks: true
+                });
+                self.compileCommands(true);
+            }
         };
 
         //use string shorthand to find connected nodes, eg. C.C means all my childrens' children
@@ -713,9 +725,10 @@
             let self = this, concepts = self.getAllConcepts(),
                 newMatch = false;
 
+            let wildcard = Concept.prototype.wildcardConcept, wildcardConcept = self.relation.findEntry('concept', wildcard);
+
             //first check if I match a top-level node from any predicate description
-            let wildcard = Concept.prototype.wildcardConcept;
-            concepts[wildcard] = self.relation.findEntry('concept', wildcard);
+            concepts[wildcard] = wildcardConcept;
             for(let cid in concepts) {
                 if(Misc.getIndex(self.conceptInfo, cid, 'evaluated')) continue;
                 Misc.setIndex(self.conceptInfo, cid, 'evaluated', true);
@@ -727,10 +740,10 @@
             //then check existing partial matches on my parents, and add me to them if appropriate
             //check each triad of: head match - self concept - reference match
             //but only where at least one of the 3 is new since last time
+            let head = self.getHead(), headMatches = head ? head.matches : {0: null},
+                ref = self.getReference(), refMatches = ref ? ref.matches : {0: null};
             for(let cid in concepts) {
-                let concept = concepts[cid],
-                    head = self.getHead(), headMatches = head ? head.matches : {0: null},
-                    ref = self.getReference(), refMatches = ref ? ref.matches : {0: null};
+                let concept = concepts[cid];
                 for(let hid in headMatches) {
 
                     //if the node my head matched was already deep, we can't go any deeper
