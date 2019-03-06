@@ -92,6 +92,12 @@ We need to make sure no dependency is accidentally resolved before it is linked 
 When we initialize data, we have to set all links before allowing anything to resolve.
 And when a command is added during evaluation, it's fine because everything else is already set...
 
+
+A direction only has a rotation and scale as its transform.  A vector additionally has an origin,
+which by default comes from its head.  But for position, the origin comes from the reference.
+The command S.visual.transform.origin:R = A.visual.transform.origin:R must be replaced by:
+    S.visual.transform.origin:R = B.visual.transform.origin:R
+    A.visual.transform.origin:R = S.visual.
 */
 
 
@@ -104,12 +110,19 @@ Node.prototype.initData = function(type) {
                 self.setData('concept.' + self.concept, self.getConcept());
                 break;
             case 'symbol':
-                self.setData('symbol', '');
-                if(self.name) self.setData('symbol.text', self.name);
+                let symbol = '';
+                if(self.name) symbol = self.name;
                 else {
-                    let symbol = self.getDefaultSymbol();
-                    if(symbol != null) self.setData('symbol.text', symbol);
+                    let s = self.getDefaultSymbol();
+                    if(s != null) symbol = s;
                 }
+                if(symbol) {
+                    if(!isNaN(symbol)) symbol = '<mn>' + symbol + '</mn>';
+                    else if(symbol.length == 1) symbol = '<mi>' + symbol + '</mi>';
+                    else if(symbol.length > 1) symbol = '<mtext>' + symbol + '</mtext>';
+                }
+                self.setData('symbol.text', symbol);
+                self.setData('symbol', '');
                 break;
             case 'value':
                 let value = self.getValue();
@@ -194,19 +207,33 @@ Node.prototype.parseExpression = function(str) {
     return expression;
 };
 
-Node.prototype.parseReferences = function(str) {
-    let self = this,
-        re = /(^|[^A-Za-z0-9])(\$[A-Za-z0-9]+|[A-Z](?:\.[A-Z])*)(:?)((?:\.[A-Za-z0-9]+)*)((?::R)?)([^A-Za-z0-9]|$)/g,
-        references = [];
+function refRegex() {
+    let firstChar = '(^|[^A-Za-z0-9])',
+        alphaNum = '[A-Za-z][A-Za-z0-9]*',
+        nodeAbbr = "[A-Z](?:\\(!?" + alphaNum + "\\))?",
+        nodeChain = nodeAbbr + '(?:\\.' + nodeAbbr + ')*',
+        prefix = '(\\$' + alphaNum + '|' + nodeChain + ')',
+        prefixFlags = '(:?)',
+        keyChain = '((?:\\.' + alphaNum + ')*)',
+        keyChainFlags = '((?::R)?)',
+        lastChar = '([^A-Za-z0-9]|$)'
 
-    while((match = re.exec(str)) !== null) {
+    let regexStr = firstChar + prefix + prefixFlags + keyChain + keyChainFlags + lastChar;
+    let regex = new RegExp(regexStr, 'g');
+    return regex;
+}
+
+Node.prototype.parseReferences = function(str) {
+    let self = this, regex = refRegex(), references = [];
+
+    while((match = regex.exec(str)) !== null) {
         let first = match[1], data = match[2], context = match[3], key = match[4],
             opts = match[5], last = match[6];
 
         let ref = {
             key: key || '',
             start: match.index,
-            end: re.lastIndex,
+            end: regex.lastIndex,
             nodeAsContext: context === ':'
         };
 
@@ -220,7 +247,18 @@ Node.prototype.parseReferences = function(str) {
             ref.var = data.substring(1);
         } else {
             ref.type = 'node';
-            ref.nodes = data;
+            ref.nodes = [];
+            data.split('.').forEach(function(nodeStr) {
+                let match = nodeStr.match(/^([A-Z])(?:\((!?)([A-Za-z][A-Za-z0-9]+)\))?$/);
+                let name = match[1], exclude = match[2], concept = match[3];
+                let nodeObj = {name: name, concept: null, exclude: false};
+                if(concept) {
+                    let cid = self.findId('concept', concept);
+                    if(cid) nodeObj.concept = cid;
+                    if(exclude === '!') nodeObj.exclude = true;
+                }
+                ref.nodes.push(nodeObj);
+            });
         }
 
         for(let i = 1; i < opts.length; i++) {
@@ -268,6 +306,12 @@ Node.prototype.setData = function(key, value) {
 
 Node.prototype.collectData = function(key) {
     return this.getData().collectData(key);
+};
+
+Node.prototype.printData = function(key) {
+    this.getData().each(key, function(k, node) {
+        console.log(k + ': ' + node.value);
+    });
 };
 
 
@@ -341,6 +385,30 @@ Dependency.propagateValues = function() {
         dep.propagateValues();
     }
 };
+
+Dependency.clearCommands = function() {
+    for(let id in Dependency.prototype.instance) {
+        let dep = Dependency.prototype.instance[id];
+        if(!(dep instanceof NodeData)) {
+            dep.each('', function(key, node) {
+                for(let depId in node.waiting) delete node.waiting[depId];
+                for(let depId in node.trigger) delete node.trigger[depId];
+            });
+            console.log('deleting dep ' + id);
+            delete Dependency.prototype.instance[id];
+        }
+    }
+    let nextId = Dependency.prototype.nextId;
+    while(!Dependency.prototype.instance.hasOwnProperty(nextId)) nextId--;
+    Dependency.prototype.nextId = nextId+1;
+};
+
+function dep(id) {
+    return Dependency.prototype.instance[id];
+}
+function node(id) {
+    return relation.nodes[id];
+}
 
 Dependency.prototype.getId = function() {
     return this.id;
@@ -590,8 +658,8 @@ Dependency.prototype.addIndex = function(key) {
 };
 
 Dependency.prototype.clear = function(key) {
-    this.eachChild(key, function(k, node) {
-        if(k !== key) delete this.key[k];
+    this.each(key, function(k, node) {
+        delete this.key[k];
     });
 };
 
@@ -679,6 +747,7 @@ NodeData.prototype.toString = function(key) {
 
 
 function NodeDataCommand(dep, key, op, exp, rec) {
+    let self = this;
     Dependency.call(this);
     this.node = null;
     this.operation = op;
@@ -692,10 +761,10 @@ NodeDataCommand.prototype.constructor = NodeDataCommand;
 NodeDataCommand.prototype.init = function() {
     //the data key being edited by this command can't be resolved until the command completes
     let self = this;
-    self.checkActive();
     self.wait(self.expression);
     if(self.target instanceof Dependency)
         self.target.wait(self, '', self.editKey);
+    self.checkActive();
 };
 
 NodeDataCommand.prototype.setTarget = function(dep, key) {
@@ -781,7 +850,7 @@ NodeDataCommand.prototype.toString = function(key) {
     let str = key ? key + ' of ' : '';
     if(this.target instanceof Dependency && this.target.node) str += this.target.node.getId();
     if(str && this.editKey) str += '.';
-    str += this.editKey + ' ' + this.operation;
+    str += this.editKey + (this.recursive ? ':R' : '') + ' ' + this.operation;
     if(this.expression instanceof Expression) str += ' ' + this.expression.toString();
     return str + ' [' + this.id + ']';
 }

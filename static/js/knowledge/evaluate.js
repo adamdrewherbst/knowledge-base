@@ -58,9 +58,11 @@
 
         Relation.prototype.reset = function() {
             this.law.reset();
+            Dependency.clearCommands();
             $('#suggestion-wrapper').empty();
-            this.symbolize();
-            this.visualize();
+            $('#symbolization-wrapper').empty();
+            //this.symbolize();
+            //this.visualize();
         };
 
         Relation.prototype.getEvaluateTag = function() {

@@ -7,13 +7,13 @@
         <!--<link rel="stylesheet" href="/welcome/static/GoJS-master/assets/css/bootstrap.min.css">-->
         <link rel="stylesheet" href="/welcome/static/GoJS-master/assets/css/highlight.css">
         <link rel="stylesheet" href="/welcome/static/GoJS-master/assets/css/jquery-ui.min.css">
+
+        <script type="text/javascript" async
+          src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=MML_CHTML">
+        </script>
     </head>
 
     <body>
-
-        <!-- form: create/modify concepts -->
-        <!--<h2>Create a new concept</h2>
-        {{=LOAD('default', 'concept.load', ajax=True)}}-->
 
         <!-- controls -->
         <div id="controls">
@@ -54,7 +54,6 @@
                 <div id="relation-controls">
                     <button id="save-relation" type="button" class="btn btn-primary">Save Relation</button>
                     <button id="evaluate-relation" type="button" class="btn btn-primary">Evaluate</button>
-                    <button id="reset-relation" type="button" class="btn btn-primary">Reset</button>
                     <label id="evaluate-msg"></label>
                 </div>
             </div>
@@ -74,6 +73,7 @@
 
         <div id="symbolization">
             <div id="sybolization-controls">
+                <button id="reset-relation" type="button" class="btn btn-primary">Reset</button>
                 <button id="resolve-data" type="button" class="btn btn-primary">Resolve</button>
                 <button id="symbolize-relation" type="button" class="btn btn-primary">Symbolize</button>
                 <button id="suggest-step" type="button" class="btn btn-primary">Suggest</button>

@@ -128,6 +128,7 @@
         };
 
         Entry.prototype.findId = function(table, opts) {
+            if(typeof opts === 'string') opts = {name: opts};
             let entries = this.relation.getTable(table);
             for(let id in entries) {
                 let entry = entries[id], match = true;
@@ -419,6 +420,7 @@
             for(let m in self.maps)
                 delete self.maps[m];
             self.nextMapId = 0;
+            self.evaluateQueue = [];
 
             for(let i = 0; i < self.nodes.length; i++) {
                 let node = self.findEntry('node', self.nodes[i]);
@@ -429,7 +431,7 @@
                 }
                 else node.reset();
             }
-            self.evaluateQueue = [];
+            self.calculateDeepNodes();
         }
 
 
@@ -443,6 +445,9 @@
             this.data = new NodeData(this);
             this.commands = {};
             this.tentative = false;
+            this.drawn = false;
+            this.visualized = false;
+            this.visualContext = {};
             this.reset();
         }
 
@@ -620,11 +625,12 @@
             this.maps = {};
             this.fromMap = {};
             for(let cid in this.conceptInfo) {
-                delete this.conceptInfo[cid].evaluated;
-                for(let sub in this.conceptInfo[cid]) {
-                    if(sub !== 'compiled') delete this.conceptInfo[cid][sub];
-                }
+                delete this.conceptInfo[cid];
             }
+            this.data.clear();
+            for(let id in this.commands) delete this.commands[id];
+            for(let evt in this.eventHandlers) delete this.eventHandlers[evt];
+            this.visualized = false;
         }
 
         Node.prototype.setDeepPredicate = function() {
@@ -678,9 +684,18 @@
 
         //use string shorthand to find connected nodes, eg. C.C means all my childrens' children
         //or H.R means my head's reference
-        Node.prototype.getConnectedNodes = function(str, callback) {
-            let self = this, chain = str.split('.'), nodes = [self];
-            chain.forEach(function(name, ind) {
+        Node.prototype.getConnectedNodes = function(chain, callback) {
+            if(typeof chain === 'string') chain = chain.split('.');
+            let self = this, nodes = [self];
+            chain.forEach(function(el, ind) {
+                let name = null, concept = null, exclude = false;
+                if(typeof el === 'string') name = el;
+                else if(typeof el === 'object') {
+                    name = el.name;
+                    concept = el.concept;
+                    exclude = el.exclude;
+                }
+                if(!name) return;
                 let arr = [];
                 nodes.forEach(function(node) {
                     switch(name[0]) {
@@ -689,15 +704,19 @@
                         case 'B': arr.push(node.getReference()); break;
                         case 'C': arr = arr.concat(node.getChildren(0));
                             if(typeof callback === 'function') {
-                                let sub = str.substring((ind+1)*2);
+                                let sub = chain.slice(ind+1);
                                 node.on('new-child', function(child) {
-                                    if(!sub) callback.call(self, child);
+                                    if(concept && (child.concept == concept) === exclude) return;
+                                    if(sub.length === 0) callback.call(self, child);
                                     else child.getConnectedNodes(sub, callback);
                                 });
                             }
                             break;
                         default: break;
                     }
+                });
+                if(concept) arr = arr.filter(function(node) {
+                    return (node.concept == concept) === !exclude;
                 });
                 nodes = arr;
             });
@@ -1176,7 +1195,14 @@
 
         Relation.prototype.removeEntry = function(table, id) {
             let self = this, entries = self.getTable(table);
-            if(entries && entries.hasOwnProperty(id)) delete entries[id];
+            if(entries && entries.hasOwnProperty(id)) {
+                delete entries[id];
+                if(id == self.nextId[table]+1) {
+                    let newId = id+1;
+                    while(newId < 0 && !entries.hasOwnProperty(newId)) newId++;
+                    self.nextId[table] = newId-1;
+                }
+            }
             switch(table) {
                 case 'framework': break;
                 case 'concept': break;

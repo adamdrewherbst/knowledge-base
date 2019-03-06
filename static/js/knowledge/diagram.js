@@ -414,7 +414,8 @@
 
         Relation.prototype.drawNode = function(nodeId, options) {
 
-            let self = this, node = self.nodes[nodeId];
+            let self = this, node = self.findEntry('node', nodeId);
+            if(!node || node.drawn) return;
 
             if(!options) options = {};
             let template = {};
@@ -423,7 +424,8 @@
                     template = self.nodeTemplates[options.template];
             }
             let drawLinks = options.drawLinks ? true : false;
-            delete options.template, options.drawLinks;
+            delete options.template;
+            delete options.drawLinks;
 
             let nodeData = Object.assign({}, node, options, template);
             nodeData.value = node.value.writeValue();
@@ -438,9 +440,10 @@
                     y = Math.max(parseFloat(headLoc[1]), parseFloat(refLoc[1])) + 75;
                 nodeData.loc = '' + x + ' ' + y;
             }
-            self.diagram.model.addNodeData(nodeData);
 
+            self.diagram.model.addNodeData(nodeData);
             if(drawLinks) self.drawLinks(nodeId);
+            node.drawn = true;
         };
 
 
