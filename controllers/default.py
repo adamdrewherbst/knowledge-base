@@ -88,6 +88,9 @@ def getEntry(table, data):
             'symmetric': entry.symmetric or False, 'value': entry.value, 'inherits': entry.inherits or False};
         for dep in db(db.concept_dependency.concept == entry.id).iterselect():
             ret['dependencies'][dep.dependency] = True
+        row = db(db.concept_node.concept == entry.id).select().first()
+        if row is not None:
+            ret['node'] = row.node
     elif table == 'law':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
             'hashtags': entry.hashtags, 'nodes': [], 'predicates': {}};
@@ -100,6 +103,9 @@ def getEntry(table, data):
     elif table == 'node':
         ret = {'id': entry.id, 'law': entry.law, 'concept': entry.concept, 'head': entry.head, \
             'reference': entry.reference, 'name': entry.name, 'value': entry.node_values};
+        row = db(db.concept_node.node == entry.id).select().first()
+        if row is not None:
+            ret['concept'] = row.concept
     return ret
 
 

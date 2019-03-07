@@ -118,20 +118,23 @@
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
                                 if(!(part instanceof go.Node)) return;
-                                let currentConcept = self.findEntry('concept', part.data.concept);
-                                self.selectEntry('concept', function(concept) {
-                                    if(concept && self.concepts.hasOwnProperty(concept))
-                                        self.setNodeData(part.data.id, 'concept', concept);
-                                },
-                                {
-                                    tab: 'create',
-                                    fields: {
-                                        framework: currentConcept.framework,
-                                        law_specific: true,
-                                        law: self.law.id,
-                                        dependencies: [{dependencies: currentConcept.id}]
-                                    }
-                                });
+                                let node = self.findEntry('node', part.data.id);
+                                if(!(node instanceof Node)) return;
+                                let currentConcept = node.getConcept(),
+                                    callback = function(concept) {
+                                        if(concept && concept != currentConcept.id)
+                                            self.setNodeData(part.data.id, 'concept', concept);
+                                    };
+                                if(currentConcept.node == node.id) {
+                                    self.editEntry('concept', currentConcept, callback);
+                                } else {
+                                    self.duplicateEntry('concept', currentConcept, callback, {
+                                        fields: {
+                                            node: node.id,
+                                            dependencies: [{dependencies: currentConcept.id}]
+                                        }
+                                    });
+                                }
                             },
                             function(o) {
                                 let part = o.part.adornedPart;
@@ -564,33 +567,4 @@
             self.law.eachNode(function(node) {
                 node.postprocess();
             });
-        };
-
-
-        Relation.prototype.selectEntry = function(table, callback, opts) {
-            let self = this;
-            let options = Object.assign({
-                tab: 'search',
-                framework: self.framework.id,
-                fields: {}
-            }, opts);
-            let $modal = $('#' + table + '-select'), $form = $modal.find('#' + table + '-create-form');
-            $modal.find('#' + table + '-' + options.tab + '-tab').show().tab('show');
-            $modal.find('.framework-filter').val(options.framework);
-            self.showSearchResults(table, '');
-            $modal.data('callback', callback);
-            $form.find('input,select').each(function(i, el) {
-                let $el = $(el), name = $el.attr('name');
-                if(name == 'table') return;
-                let value = options.fields[name] || (name == 'framework' ? '-1' : '');
-                let $multiple = $el.parents('.multiple-wrapper');
-                if($el.is('input[type=checkbox]')) $el.attr('checked', value ? true : false);
-                else if($multiple.length > 0) {
-                    $multiple.find('.multiple-item').first().nextAll('.multiple-item').remove();
-                    if(typeof value == 'object') value.forEach(function(row) {
-                        self.addMultipleField($multiple, row);
-                    });
-                } else $el.val(value);
-            });
-            $modal.modal('show');
         };

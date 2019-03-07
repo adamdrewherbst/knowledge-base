@@ -1,18 +1,24 @@
-<div id="{{=table}}-select" class="modal entry-modal" tabindex="-1" role="dialog">
+<div id="{{=table}}-modal" class="modal entry-modal" tabindex="-1" role="dialog">
 <div class="modal-dialog" role="document">
 <div class="modal-content">
 <div class="modal-body">
     <ul class="nav nav-tabs" id="{{=table}}-select-tabs" role="tablist">
-        <li class="nav-item">
-            <a class="nav-link active" id="{{=table}}-search-tab" data-toggle="tab" href="#{{=table}}-search-tab-content"
+        <li class="nav-item entry-tab">
+            <a class="nav-link" id="{{=table}}-search-tab" data-toggle="tab" href="#{{=table}}-search-tab-content"
               role="tab" aria-controls="{{=table}}-search-tab-content" aria-selected="true">
                 Search {{=table}}s
             </a>
         </li>
-        <li class="nav-item">
+        <li class="nav-item entry-tab">
             <a class="nav-link" id="{{=table}}-create-tab" data-toggle="tab" href="#{{=table}}-create-tab-content"
               role="tab" aria-controls="{{=table}}-create-tab-content" aria-selected="false">
                 New {{=table}}
+            </a>
+        </li>
+        <li class="nav-item entry-tab">
+            <a class="nav-link" id="{{=table}}-edit-tab" data-toggle="tab" href="#{{=table}}-edit-tab-content"
+              role="tab" aria-controls="{{=table}}-edit-tab-content" aria-selected="false">
+                Edit {{=table}}
             </a>
         </li>
     </ul>
@@ -35,6 +41,13 @@
             {{ =LOAD('default', 'create_edit.load', ajax=False, vars={'table': table, 'type': 'create'}) }}
             <div class="tab-footer">
                 <button type="button" class="modal-save btn btn-primary" data-dismiss="modal">Save</button>
+                <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="{{=table}}-edit-tab-content" role="tabpanel" aria-labelledby="{{=table}}-edit-tab">
+            {{ =LOAD('default', 'create_edit.load', ajax=False, vars={'table': table, 'type': 'edit'}) }}
+            <div class="tab-footer">
+                <button type="button" class="modal-save btn btn-primary" data-dismiss="modal">Save Changes</button>
                 <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
             </div>
         </div>

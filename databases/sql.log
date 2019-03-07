@@ -353,3 +353,11 @@ timestamp: 2019-02-13T18:17:54.901184
 ALTER TABLE concept ADD commands VARCHAR(512);
 success!
 success!
+timestamp: 2019-03-07T01:48:16.662931
+CREATE TABLE concept_node(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT   UNIQUE, INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    node INT   UNIQUE, INDEX node__idx (node), FOREIGN KEY (node) REFERENCES node (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!

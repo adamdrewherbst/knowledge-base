@@ -206,48 +206,120 @@
         };
 
 
-        Relation.prototype.newEntry = function(table, callback) {
-            let self = this, $modal = $('#' + table + '-select');
-            $modal.find('#' + table + '-search-tab').hide();
-            $modal.find('#' + table + '-create-tab').tab('show');
-            $modal.find('.framework-filter').val(self.framework.id);
-            $modal.data('callback', callback);
-            $modal.modal('show');
+        Relation.prototype.selectEntry = function(table, opts) {
+            let self = this;
+            if(!opts) opts = {};
+            opts.tab = opts.tab || 'search';
+            opts.enabledTabs = ['create', 'search'];
+            self.showEntryModal(table, opts);
         };
 
 
-        Relation.prototype.editEntry = function(table, id, callback) {
-            let self = this, entries = self.getTable(table);
-            if(!entries.hasOwnProperty(id)) return;
-            let entry = entries[id];
-            let $modal = $('#' + table + '-edit'), $form = $modal.find('#' + table + '-edit-form');
-            $form.find('[name="id"]').val(id);
-            $form.find('[name="name"]').val(entry.name);
-            $form.find('[name="description"]').val(entry.description);
-            $modal.find('.framework-filter').val(entry.framework);
-            if(table == 'concept') {
-                $form.find('[name="law_specific"]').attr('checked', false); //entry.law > 0);
-                $form.find('[name="law"]').val(self.law.id);
-                $form.find('[name="symbol"]').val(entry.symbol);
-                $form.find('[name="commands"]').val(entry.commands.join("\n"));
-                //$form.find('[name="value"]').val(entry.value);
-                //$form.find('[name="symmetric"]').attr('checked', entry.symmetric);
-                $form.find('[name="head"]').val(entry.head);
-                $form.find('[name="reference"]').val(entry.reference);
+        Relation.prototype.newEntry = function(table, opts) {
+            let self = this;
+            if(!opts) opts = {};
+            opts.tab = 'create';
+            opts.enabledTabs = ['create'];
+            self.showEntryModal(table, opts);
+        };
+
+
+        Relation.prototype.editEntry = function(table, entry, opts) {
+            let self = this;
+            if(!opts) opts = {};
+            opts.entry = entry;
+            opts.tab = 'edit';
+            opts.enabledTabs = ['edit'];
+            self.showEntryModal(table, opts);
+        };
+
+
+        Relation.prototype.duplicateEntry = function(table, entry, opts) {
+            let self = this;
+            if(!opts) opts = {};
+            opts.entry = entry;
+            opts.tab = 'create';
+            opts.enabledTabs = opts.enabledTabs || ['create'];
+            self.showEntryModal(table, opts);
+        };
+
+
+        Relation.prototype.showEntryModal = function(table, opts) {
+            let self = this, $modal = $('#' + table + '-modal');
+
+            if(!opts) opts = {};
+
+            if(opts.enabledTabs) {
+                $modal.find('.entry-tab').hide();
+                opts.enabledTabs.forEach(function(tab) {
+                    $tab = $modal.find('#' + table + '-' + tab + '-tab');
+                    $tab.parent().show();
+                    if(opts.tab === tab)
+                        $tab.tab('show');
+                });
+                if(opts.enabledTabs.indexOf('search') >= 0)
+                    self.showSearchResults(table, '');
             }
-            if(table == 'framework' || table == 'concept') {
-                let $wrapper = $form.find('.multiple-wrapper');
-                $wrapper.find('.multiple-item').first().nextAll('.multiple-item').remove();
-                let depCount = 0;
-                for(let dep in entry.dependencies) {
-                    self.addMultipleField($wrapper, {dependencies: dep});
-                    depCount++;
+
+            $modal.find('.framework-filter').val(self.framework.id);
+            $modal.find('.entry-form').each(function() {
+                let $form = $(this), type = $form.attr('id').split('-')[1];
+                if(opts.enabledTabs && opts.enabledTabs.indexOf(type) < 0) return;
+
+                let entry = opts.entry;
+                if(entry && typeof entry !== 'object') {
+                    entry = self.findEntry(table, opts.entry);
                 }
-                if(depCount == 0) self.addMultipleField($wrapper);
-            }
-            $modal.data('callback', callback);
-            $modal.modal('show');
-        }
+                if(entry instanceof Entry) {
+                    $form.find('[name="id"]').val(entry.id);
+                    $form.find('[name="name"]').val(entry.name);
+                    $form.find('[name="description"]').val(entry.description);
+                    $form.find('.framework-filter').val(entry.framework);
+                    if(table == 'concept') {
+                        $form.find('[name="node"]').val(entry.node || '');
+                        $form.find('[name="symbol"]').val(entry.symbol);
+                        $form.find('[name="commands"]').val(entry.commands.join("\n"));
+                        $form.find('[name="head"]').val(entry.head);
+                        $form.find('[name="reference"]').val(entry.reference);
+                    }
+                    if(table == 'framework' || table == 'concept') {
+                        let $wrapper = $form.find('.multiple-wrapper');
+                        $wrapper.find('.multiple-item').first().nextAll('.multiple-item').remove();
+                        let depCount = 0;
+                        for(let dep in entry.dependencies) {
+                            self.addMultipleField($wrapper, {dependencies: dep});
+                            depCount++;
+                        }
+                        if(depCount == 0) self.addMultipleField($wrapper);
+                    }
+                } else {
+                    $form.trigger('reset');
+                    $form.find('.framework-filter').val(self.framework.id);
+                }
+
+                $form.find('[name="table"]').val(table);
+
+                if(typeof opts.fields === 'object') {
+                    for(let name in opts.fields) {
+                        let value = opts.fields[name], $el = $form.find('[name="' + name + '"]');
+                        if($el.length < 1) continue;
+
+                        let $multiple = $el.parents('.multiple-wrapper');
+
+                        if($el.is('input[type=checkbox]')) $el.attr('checked', value ? true : false);
+                        else if($multiple.length > 0 && Array.isArray(value)) {
+                            $multiple.find('.multiple-item').first().nextAll('.multiple-item').remove();
+                            value.forEach(function(row) {
+                                self.addMultipleField($multiple, row);
+                            });
+                        } else $el.val(value);
+                    }
+                }
+            });
+
+            $modal.data('callback', opts.callback);
+            $modal.show();
+        };
 
 
         Relation.prototype.addMultipleField = function($element, values) {
