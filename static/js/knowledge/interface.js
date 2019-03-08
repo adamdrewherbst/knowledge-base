@@ -140,7 +140,9 @@
                     if(options.indexOf(dep) < 0) options.push(dep);
                 }
             }
-            $filters.children().first().nextAll().remove();
+            $filters.each(function() {
+                $(this).children().first().nextAll().remove();
+            });
             options.forEach(function(option) {
                 let framework = self.frameworks[option], name = framework ? framework.name || 'Loading...' : 'Loading...';
                 el = '<option value="' + option + '">' + name + '</option>';
@@ -209,6 +211,7 @@
         Relation.prototype.selectEntry = function(table, opts) {
             let self = this;
             if(!opts) opts = {};
+            if(typeof opts === 'function') opts = { callback: opts };
             opts.tab = opts.tab || 'search';
             opts.enabledTabs = ['create', 'search'];
             self.showEntryModal(table, opts);
@@ -218,6 +221,7 @@
         Relation.prototype.newEntry = function(table, opts) {
             let self = this;
             if(!opts) opts = {};
+            if(typeof opts === 'function') opts = { callback: opts };
             opts.tab = 'create';
             opts.enabledTabs = ['create'];
             self.showEntryModal(table, opts);
@@ -227,6 +231,7 @@
         Relation.prototype.editEntry = function(table, entry, opts) {
             let self = this;
             if(!opts) opts = {};
+            if(typeof opts === 'function') opts = { callback: opts };
             opts.entry = entry;
             opts.tab = 'edit';
             opts.enabledTabs = ['edit'];
@@ -237,6 +242,7 @@
         Relation.prototype.duplicateEntry = function(table, entry, opts) {
             let self = this;
             if(!opts) opts = {};
+            if(typeof opts === 'function') opts = { callback: opts };
             opts.entry = entry;
             opts.tab = 'create';
             opts.enabledTabs = opts.enabledTabs || ['create'];
@@ -248,6 +254,7 @@
             let self = this, $modal = $('#' + table + '-modal');
 
             if(!opts) opts = {};
+            if(typeof opts === 'function') opts = { callback: opts };
 
             if(opts.enabledTabs) {
                 $modal.find('.entry-tab').hide();
@@ -318,7 +325,7 @@
             });
 
             $modal.data('callback', opts.callback);
-            $modal.show();
+            $modal.modal('show');
         };
 
 

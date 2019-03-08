@@ -124,6 +124,9 @@
         }
 
 
+        .entry-modal {
+            /*overflow: scroll;*/
+        }
         .entry-modal .modal-dialog {
             width: 70%;
         }
@@ -495,10 +498,8 @@
             $filters.change(function(e) {
                 let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal');
                 if($modal.length > 0) {
-                    let table = $modal.attr('id').split('-')[0];
                     $modal.find('.framework-filter').val(framework);
-                    let type = $modal.attr('id').split('-')[1];
-                    if(type == 'select') self.showSearchResults(table, '');
+                    self.showSearchResults(table, '');
                 } else if($this.attr('id') == 'palette-concept-filter') {
                     self.filterPalette(framework);
                 }

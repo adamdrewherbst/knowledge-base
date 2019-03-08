@@ -189,6 +189,8 @@ def saveEntry():
         entry = db[table][entryId]
         if entry:
             print('UPDATING: {vars}').format(vars=request_vars)
+            if table == 'node' and request_vars['concept'] != entry.concept:
+                db(db.concept.concept_node.node == entryId).delete()
             entry.update_record(**request_vars)
         else:
             ret['error'] = 'No record with id ' + str(entryId)
@@ -196,15 +198,18 @@ def saveEntry():
     else:
         entryId = db[table].insert(**request_vars)
 
-    if entryId and depTable:
-        if 'id' in request_vars:
-            db(db[depTable][table] == request_vars['id']).delete()
-        for dep,load in deps.items():
-            if not dep:
-                break;
-            db[depTable].insert(**{table: entryId, 'dependency': dep})
-            if load and table == 'framework':
-                ret['entries'].update(getFramework(dep))
+    if entryId:
+        if depTable:
+            if 'id' in request_vars:
+                db(db[depTable][table] == request_vars['id']).delete()
+            for dep,load in deps.items():
+                if not dep:
+                    break;
+                db[depTable].insert(**{table: entryId, 'dependency': dep})
+                if load and table == 'framework':
+                    ret['entries'].update(getFramework(dep))
+        if table == 'concept' and 'node' in request_vars and db.node[request_vars['node']] is not None:
+            db.concept_node.insert(concept = entryId, node = request_vars['node'])
 
     ret['id'] = entryId
     ret['entries'].update({table: {entryId: getEntry(table, entryId)}})

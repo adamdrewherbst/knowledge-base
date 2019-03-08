@@ -18,6 +18,7 @@
         <input type="checkbox" name="law_specific">
         <input type="hidden" name="law" value="">
     </div>
+    <input type="hidden" name="node" value="">
     {{ pass }}
 
     <div class="entry-name form-group">

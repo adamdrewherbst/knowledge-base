@@ -128,7 +128,9 @@
                                 if(currentConcept.node == node.id) {
                                     self.editEntry('concept', currentConcept, callback);
                                 } else {
-                                    self.duplicateEntry('concept', currentConcept, callback, {
+                                    self.duplicateEntry('concept', currentConcept, {
+                                        callback: callback,
+                                        enabledTabs: ['create', 'search'],
                                         fields: {
                                             node: node.id,
                                             dependencies: [{dependencies: currentConcept.id}]

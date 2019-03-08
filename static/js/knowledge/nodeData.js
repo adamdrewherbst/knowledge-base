@@ -514,26 +514,13 @@ Dependency.prototype.addTrigger = function(dep, key, depKey) {
     }
 };
 
-Dependency.prototype.eachWaiting = function(key, callback) {
-    let self = this;
-    return self.each(key, function(k, node) {
-        for(let depId in node.waiting) {
-            for(let depKey in node.waiting[depId]) {
-                let obj = node.waiting[depId][depKey];
-                if(callback.call(self, obj, depKey, depId) === false) return false;
-            }
-        }
-        return true;
-    });
-};
-
 Dependency.prototype.resolve = function(dep, depKey, myKey) {
     let self = this;
-    if(!self.active(myKey)) return false;
+    if(!self.active(myKey) || self.propagated(myKey)) return false;
 
     let depId = dep.getId(), node = this.getKey(myKey),
-    obj = Misc.getIndex(node.waiting, depId, depKey);
-    if(!obj) return;
+        obj = Misc.getIndex(node.waiting, depId, depKey);
+    if(node.known || !obj || obj.resolved) return true;
 
     //console.log(this.toString(myKey) + ' resolving ' + dep.toString(depKey) + ' to ' + dep.getValue(depKey));
 
@@ -543,30 +530,39 @@ Dependency.prototype.resolve = function(dep, depKey, myKey) {
     Misc.setIndex(node.waiting, depId, depKey, 'resolved', true);
 
     self.checkResolved(myKey);
+    return true;
 };
 
-Dependency.prototype.checkResolved = function(key, recursive) {
+Dependency.prototype.resolved = function(key, doProbe) {
     let self = this;
-    //if(recursive) console.log('checking ' + self.toString(key));
-    if(!self.active(key)) return false;
-    if(self.propagated(key)) return true;
-    let resolved = self.eachWaiting(key, function(obj, depKey) {
-        if(recursive) {
-            let depResolved = obj.dep.checkResolved(depKey, recursive);
-            //console.log('  ' + self.id + ' checking ' + obj.dep.toString(depKey) + ' => ' + depResolved);
-            return depResolved;
-        } else return obj.resolved ? true : false;
-    });
-    if(resolved) {
-        //pass on the resolved key's data to any commands waiting on it
-        if(!self.propagated(key)) { //may have been resolved during recursive checking above
-            //console.log('resolving ' + self.toString(key));
-            self.fullyResolve(key);
-            self.propagate(key);
+    let resolved = self.each(key, function(k, node) {
+        if(node.known) return true;
+        let isWaiting = false;
+        for(let depId in node.waiting) {
+            for(let depKey in node.waiting[depId]) {
+                let obj = node.waiting[depId][depKey], depResolved = obj.resolved;
+                if(!depResolved && doProbe) {
+                    depResolved = obj.dep.resolved(depKey, true);
+                }
+                isWaiting = isWaiting || !depResolved;
+                if(isWaiting) break;
+            }
+            if(isWaiting) break;
         }
+        return !isWaiting;
+    });
+    return resolved;
+};
+
+Dependency.prototype.checkResolved = function(key, doProbe) {
+    let self = this;
+    if(self.active(key) && !self.propagated(key) && self.resolved(key, doProbe)) {
+        //pass on the resolved key's data to any commands waiting on it
+        self.fullyResolve(key);
+        self.propagate(key);
         //traverse the parents of the resolved key and see if any of these are now resolved
         let parent = self.getClosestParent(key);
-        if(typeof parent === 'string') self.checkResolved(parent, recursive);
+        if(typeof parent === 'string') self.checkResolved(parent, doProbe);
         return true;
     } else return false;
 };
@@ -619,6 +615,16 @@ Dependency.prototype.propagated = function(key) {
     let node = this.getKey(key);
     if(node) return node.propagated || false;
     return false;
+};
+
+Dependency.prototype.setKnown = function(key, known, recursive) {
+    let self = this, allKnown = true;
+    self.each(key, function(k, node) {
+        if(recursive || k === key || (!key && !k)) {
+            node.known = known;
+        }
+    });
+    if(known) self.checkResolved(key);
 };
 
 Dependency.prototype.collectData = function(key, obj) {
@@ -788,6 +794,19 @@ NodeDataCommand.prototype.checkActive = function() {
     if(Dependency.propagating(key)) this.activate();
 };
 
+NodeDataCommand.prototype.checkKnown = function() {
+    let self = this;
+    if(!(self.target instanceof NodeData)) return false;
+    if(self.isAssignment()) {
+        self.target.setKnown(self.editKey, true, self.recursive);
+        return true;
+    } else return false;
+};
+
+NodeDataCommand.prototype.isAssignment = function() {
+    return this.operator === '=';
+};
+
 NodeDataCommand.prototype.fullyResolve = function() {
 
     /*
@@ -842,6 +861,14 @@ NodeDataCommand.prototype.fullyResolve = function() {
                 data.setValue(myKey, myValue);
             });
             self.setValue('', [data, self.editKey]);
+            self.checkKnown();
+
+            //if this command assigns a value rather than editing it, we should consider it final,
+            //therefore inactivate all other assignment commands on this data key
+            //--this should save us some circular dependencies that would never resolve
+            if(self.operation === '=') {
+
+            }
             break;
     }
 };
