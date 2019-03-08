@@ -122,24 +122,13 @@
             return this.id;
         };
 
-        Entry.prototype.findEntry = function(table, id) {
-            if(this.relation) return this.relation.findEntry(table, id);
+        Entry.prototype.findEntry = function(table, data) {
+            if(this.relation) return this.relation.findEntry(table, data);
             return null;
         };
 
         Entry.prototype.findId = function(table, opts) {
-            if(typeof opts === 'string') opts = {name: opts};
-            let entries = this.relation.getTable(table);
-            for(let id in entries) {
-                let entry = entries[id], match = true;
-                for(let key in opts) {
-                    if(entry[key] != opts[key]) {
-                        match = false;
-                        break;
-                    }
-                }
-                if(match) return id;
-            }
+            if(this.relation) return this.relation.findId(table, data);
             return null;
         };
 
@@ -193,7 +182,8 @@
 
         Concept.prototype.instanceOf = function(parent) {
             let self = this;
-            if(typeof parent == 'string') parent = self.findId(self.table, {name: parent});
+            if(typeof parent == 'string') parent = self.findId(self.table, parent);
+            else if(parent instanceof Concept) parent = parent.id;
             if(parent === self.wildcardConcept) return true;
             if(self.id == parent) return true;
             if(self.dependencies[parent]) return true;
@@ -1179,10 +1169,33 @@
         };
 
 
-        Relation.prototype.findEntry = function(table, id) {
+        Relation.prototype.findEntry = function(table, data) {
             let self = this, entries = self.getTable(table);
-            if(entries && entries.hasOwnProperty(id)) return entries[id];
+            if(!entries) return null;
+            if(!isNaN(data)) return entries[data] || null;
+            if(typeof data === 'string') data = {name: data};
+            if(typeof data === 'object') {
+                for(let id in entries) {
+                    let entry = entries[id], match = true;
+                    switch(table) {
+                        case 'concept': if(entry.node) continue;
+                            break;
+                    }
+                    for(let key in data) {
+                        if(entry[key] != data[key]) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if(match) return entries[id];
+                }
+            }
             return null;
+        };
+
+        Relation.prototype.findId = function(table, data) {
+            let self = this, entry = self.findEntry(table, data);
+            return entry instanceof Entry ? entry.id : null;
         };
 
 

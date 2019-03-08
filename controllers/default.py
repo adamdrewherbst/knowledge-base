@@ -179,16 +179,23 @@ def saveEntry():
         deps = request_vars['dependencies']
         del request_vars['dependencies']
 
-    if table == 'concept' and 'law_specific' in request_vars:
-        if 'law_specific' is not 'on':
-            request_vars['law'] = None
-        del request_vars['law_specific']
+    conceptNode = None
+    if table == 'concept':
+        if 'law_specific' in request_vars:
+            if 'law_specific' is not 'on':
+                request_vars['law'] = None
+            del request_vars['law_specific']
+        if 'node' in request_vars:
+            conceptNode = request_vars['node']
+            del request_vars['node']
 
-    if 'id' in request_vars:
+    if 'id' in request_vars and request_vars['id'] is not '':
         entryId = request_vars['id']
         entry = db[table][entryId]
         if entry:
             print('UPDATING: {vars}').format(vars=request_vars)
+            #if we are changing the concept of a node and it previously had its own private concept,
+            #that concept is now unused and should be deleted
             if table == 'node' and request_vars['concept'] != entry.concept:
                 db(db.concept.concept_node.node == entryId).delete()
             entry.update_record(**request_vars)
@@ -208,8 +215,8 @@ def saveEntry():
                 db[depTable].insert(**{table: entryId, 'dependency': dep})
                 if load and table == 'framework':
                     ret['entries'].update(getFramework(dep))
-        if table == 'concept' and 'node' in request_vars and db.node[request_vars['node']] is not None:
-            db.concept_node.insert(concept = entryId, node = request_vars['node'])
+        if table == 'concept' and conceptNode is not None:
+            db.concept_node.insert(concept = entryId, node = conceptNode)
 
     ret['id'] = entryId
     ret['entries'].update({table: {entryId: getEntry(table, entryId)}})

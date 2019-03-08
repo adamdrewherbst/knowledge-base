@@ -126,14 +126,17 @@
                                             self.setNodeData(part.data.id, 'concept', concept);
                                     };
                                 if(currentConcept.node == node.id) {
-                                    self.editEntry('concept', currentConcept, callback);
+                                    self.editEntry('concept', currentConcept, {
+                                        callback: callback,
+                                        enabledTabs: ['edit', 'search'],
+                                    });
                                 } else {
                                     self.duplicateEntry('concept', currentConcept, {
                                         callback: callback,
                                         enabledTabs: ['create', 'search'],
                                         fields: {
+                                            id: '',
                                             node: node.id,
-                                            dependencies: [{dependencies: currentConcept.id}]
                                         }
                                     });
                                 }

@@ -223,7 +223,6 @@
             if(!opts) opts = {};
             if(typeof opts === 'function') opts = { callback: opts };
             opts.tab = 'create';
-            opts.enabledTabs = ['create'];
             self.showEntryModal(table, opts);
         };
 
@@ -234,7 +233,6 @@
             if(typeof opts === 'function') opts = { callback: opts };
             opts.entry = entry;
             opts.tab = 'edit';
-            opts.enabledTabs = ['edit'];
             self.showEntryModal(table, opts);
         };
 
@@ -245,7 +243,6 @@
             if(typeof opts === 'function') opts = { callback: opts };
             opts.entry = entry;
             opts.tab = 'create';
-            opts.enabledTabs = opts.enabledTabs || ['create'];
             self.showEntryModal(table, opts);
         };
 
@@ -256,17 +253,17 @@
             if(!opts) opts = {};
             if(typeof opts === 'function') opts = { callback: opts };
 
-            if(opts.enabledTabs) {
-                $modal.find('.entry-tab').hide();
-                opts.enabledTabs.forEach(function(tab) {
-                    $tab = $modal.find('#' + table + '-' + tab + '-tab');
-                    $tab.parent().show();
-                    if(opts.tab === tab)
-                        $tab.tab('show');
-                });
-                if(opts.enabledTabs.indexOf('search') >= 0)
-                    self.showSearchResults(table, '');
-            }
+            let showSearch = false;
+            $modal.find('.entry-tab').hide();
+            $modal.find('.entry-tab').each(function() {
+                let $this = $(this), $link = $this.children('.nav-link'),
+                    tabName = $link.attr('id').split('-')[1];
+                if((Array.isArray(opts.enabledTabs) && opts.enabledTabs.indexOf(tabName) > 0) || opts.tab === tabName) {
+                    $this.show();
+                    if(opts.tab === tabName) $link.tab('show');
+                    if(tabName === 'search') showSearch = true;
+                }
+            });
 
             $modal.find('.framework-filter').val(self.framework.id);
             $modal.find('.entry-form').each(function() {
@@ -281,7 +278,7 @@
                     $form.find('[name="id"]').val(entry.id);
                     $form.find('[name="name"]').val(entry.name);
                     $form.find('[name="description"]').val(entry.description);
-                    $form.find('.framework-filter').val(entry.framework);
+                    $modal.find('.framework-filter').val(entry.framework);
                     if(table == 'concept') {
                         $form.find('[name="node"]').val(entry.node || '');
                         $form.find('[name="symbol"]').val(entry.symbol);
@@ -323,6 +320,8 @@
                     }
                 }
             });
+
+            if(showSearch) self.showSearchResults(table, '');
 
             $modal.data('callback', opts.callback);
             $modal.modal('show');

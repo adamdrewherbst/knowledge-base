@@ -449,7 +449,9 @@
                     if(callback) callback.call(self, id);
 
                 } else if($button.hasClass('modal-save')) {
-                    let $form = $this.find('form.entry-form'), arr = $form.serializeArray(), obj = {};
+                    let $tab = $button.parents('.tab-pane'), $form = $tab.find('form.entry-form'),
+                    arr = $form.serializeArray(), obj = {};
+
                     for(let i = 0; i < arr.length; i++) obj[arr[i]['name']] = arr[i]['value'];
 
                     //convert any multiple fields to proper format
@@ -496,7 +498,8 @@
 
             let $filters = $('.framework-filter');
             $filters.change(function(e) {
-                let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal');
+                let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal'),
+                    table = $modal.attr('id').split('-')[0];
                 if($modal.length > 0) {
                     $modal.find('.framework-filter').val(framework);
                     self.showSearchResults(table, '');
