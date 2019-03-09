@@ -83,12 +83,12 @@ def getEntry(table, data):
             ret['dependencies'][framework.id] = True
     elif table == 'concept':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
-            'law': entry.law, 'head': entry.head, 'reference': entry.reference, \
-            'symbol': entry.symbol, 'commands': entry.commands, 'dependencies': {},\
+            'law_specific': entry.law_specific, 'node_specific': entry.node_specific, 'head': entry.head, \
+            'reference': entry.reference, 'symbol': entry.symbol, 'commands': entry.commands, 'dependencies': {},\
             'symmetric': entry.symmetric or False, 'value': entry.value, 'inherits': entry.inherits or False};
         for dep in db(db.concept_dependency.concept == entry.id).iterselect():
             ret['dependencies'][dep.dependency] = True
-        row = db(db.concept_node.concept == entry.id).select().first()
+        row = db(db.concept_context.concept == entry.id).select().first()
         if row is not None:
             ret['node'] = row.node
     elif table == 'law':
@@ -103,9 +103,6 @@ def getEntry(table, data):
     elif table == 'node':
         ret = {'id': entry.id, 'law': entry.law, 'concept': entry.concept, 'head': entry.head, \
             'reference': entry.reference, 'name': entry.name, 'value': entry.node_values};
-        row = db(db.concept_node.node == entry.id).select().first()
-        if row is not None:
-            ret['concept'] = row.concept
     return ret
 
 
@@ -179,25 +176,11 @@ def saveEntry():
         deps = request_vars['dependencies']
         del request_vars['dependencies']
 
-    conceptNode = None
-    if table == 'concept':
-        if 'law_specific' in request_vars:
-            if 'law_specific' is not 'on':
-                request_vars['law'] = None
-            del request_vars['law_specific']
-        if 'node' in request_vars:
-            conceptNode = request_vars['node']
-            del request_vars['node']
-
     if 'id' in request_vars and request_vars['id'] is not '':
         entryId = request_vars['id']
         entry = db[table][entryId]
         if entry:
             print('UPDATING: {vars}').format(vars=request_vars)
-            #if we are changing the concept of a node and it previously had its own private concept,
-            #that concept is now unused and should be deleted
-            if table == 'node' and request_vars['concept'] != entry.concept:
-                db(db.concept.concept_node.node == entryId).delete()
             entry.update_record(**request_vars)
         else:
             ret['error'] = 'No record with id ' + str(entryId)
@@ -215,8 +198,6 @@ def saveEntry():
                 db[depTable].insert(**{table: entryId, 'dependency': dep})
                 if load and table == 'framework':
                     ret['entries'].update(getFramework(dep))
-        if table == 'concept' and conceptNode is not None:
-            db.concept_node.insert(concept = entryId, node = conceptNode)
 
     ret['id'] = entryId
     ret['entries'].update({table: {entryId: getEntry(table, entryId)}})
@@ -232,6 +213,7 @@ def saveRelation():
     print('{timestamp} -- saving law').format(timestamp=datetime.utcnow().isoformat())
     print('BODY: {body}').format(body=body)
 
+    #parse the request parameters
     request_vars = json.loads(body)
 
     lawId = int(request_vars['id'])
@@ -248,6 +230,8 @@ def saveRelation():
         oldId = lawId
         lawId = db.law.insert(name = 'New Law', framework = frameworkId)
 
+    #insert or update all nodes of this law, keeping a map from passed to stored ID's since
+    #newly added nodes had a temporary negative ID number until now
     idMap = {None: None}
     allNodes = {}
     for node in nodes:
@@ -257,16 +241,31 @@ def saveRelation():
         nodeId = db.node.update_or_insert(db.node.id == node['id'],
             law=lawId, concept=node['concept'], node_values=node['value'],
             name=nodeName, head=None, reference=None)
+
+        #if my concept is specific to me, make sure it has a context entry
+        concept = db(db.concept.id == node['concept']).select().first()
+        if concept and concept.node_specific:
+            context = db(db.concept_context.concept == concept.id).select().first()
+            if context:
+                context.update_record(node = nodeId)
+            else:
+                db.concept_context.insert(concept = concept.id, node = nodeId)
+
+        #mark this node to be kept - all unmarked nodes linked to this law are no longer used
         if nodeId is None:
             nodeId = node['id']
         else:
             row = db.node[nodeId]
             print('Created node: {row}').format(row=row)
+
+        #nodes that were already stored will not change ID, but new nodes will change from a temporary
+        #negative ID number to a valid ID in the table
         idMap[node['id']] = nodeId
         allNodes[nodeId] = True
 
     print('Keeping nodes: {allNodes}').format(allNodes=allNodes)
 
+    #delete all nodes that are no longer in this law
     deletedNodes = {}
     for node in db(db.node.law == lawId).iterselect():
         db(db.predicate.node == node.id).delete()
@@ -276,11 +275,20 @@ def saveRelation():
 
     print('Deleted nodes: {deletedNodes}').format(deletedNodes=deletedNodes)
 
+    #delete all node-specific concepts that are no longer used by their node
+    for concept in db(db.concept.node_specific == True).iterselect():
+        node = db(db.node.concept == concept.id).select().first()
+        if node is None:
+            concept.delete_record()
+
+    #now that all nodes are in the table, link each to its head and reference
     for node in nodes:
         newId = idMap[node['id']]
         db(db.node.id == newId).update(head = idMap[node['head']], reference = idMap[node['reference']])
         entries['node'][newId] = getEntry('node', newId)
         entries['node'][newId]['oldId'] = node['id']
+
+    #mark all deep predicate nodes of this law by their group number
     for predicate in predicates:
         newId = idMap[predicate['node']]
         group = predicate['predicate_group']

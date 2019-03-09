@@ -125,7 +125,7 @@
                                         if(concept && concept != currentConcept.id)
                                             self.setNodeData(part.data.id, 'concept', concept);
                                     };
-                                if(currentConcept.node == node.id) {
+                                if(currentConcept.node_specific) {
                                     self.editEntry('concept', currentConcept, {
                                         callback: callback,
                                         enabledTabs: ['edit', 'search'],
@@ -136,7 +136,7 @@
                                         enabledTabs: ['create', 'search'],
                                         fields: {
                                             id: '',
-                                            node: node.id,
+                                            node_specific: true,
                                         }
                                     });
                                 }

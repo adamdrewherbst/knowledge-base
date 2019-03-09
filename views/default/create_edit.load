@@ -16,9 +16,8 @@
     <div class="concept-law-specific form-group">
         <label for="law_specific">Specific to this law</label>
         <input type="checkbox" name="law_specific">
-        <input type="hidden" name="law" value="">
     </div>
-    <input type="hidden" name="node" value="">
+    <input type="hidden" name="node_specific" value="">
     {{ pass }}
 
     <div class="entry-name form-group">

@@ -361,3 +361,29 @@ CREATE TABLE concept_node(
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
 success!
+timestamp: 2019-03-09T18:56:26.618162
+ALTER TABLE concept ADD node_specific CHAR(1);
+success!
+timestamp: 2019-03-09T18:56:26.828039
+ALTER TABLE concept ADD law_specific CHAR(1);
+success!
+timestamp: 2019-03-09T18:56:26.913746
+ALTER TABLE concept DROP COLUMN law;
+timestamp: 2019-03-09T19:00:41.822534
+ALTER TABLE concept DROP COLUMN law;
+timestamp: 2019-03-09T19:01:33.454719
+ALTER TABLE concept DROP COLUMN law;
+success!
+timestamp: 2019-03-09T19:01:33.667863
+ALTER TABLE predicate ADD concept INT  , ADD INDEX concept__idx (concept), ADD FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE;
+success!
+success!
+timestamp: 2019-03-09T19:01:34.156126
+CREATE TABLE concept_context(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT   UNIQUE, INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    law INT  , INDEX law__idx (law), FOREIGN KEY (law) REFERENCES law (id) ON DELETE CASCADE,
+    node INT   UNIQUE, INDEX node__idx (node), FOREIGN KEY (node) REFERENCES node (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!

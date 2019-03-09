@@ -1178,7 +1178,7 @@
                 for(let id in entries) {
                     let entry = entries[id], match = true;
                     switch(table) {
-                        case 'concept': if(entry.node) continue;
+                        case 'concept': if(entry.node_specific) continue;
                             break;
                     }
                     for(let key in data) {

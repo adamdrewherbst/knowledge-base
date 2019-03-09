@@ -280,7 +280,8 @@
                     $form.find('[name="description"]').val(entry.description);
                     $modal.find('.framework-filter').val(entry.framework);
                     if(table == 'concept') {
-                        $form.find('[name="node"]').val(entry.node || '');
+                        $form.find('[name=law_specific]').val(entry.law_specific || '');
+                        $form.find('[name="node_specific"]').val(entry.node_specific || '');
                         $form.find('[name="symbol"]').val(entry.symbol);
                         $form.find('[name="commands"]').val(entry.commands.join("\n"));
                         $form.find('[name="head"]').val(entry.head);
