@@ -33,7 +33,7 @@ Relation.prototype.visualize = function() {
     canvas.stroke();
     canvas.setLineDash([]);
 
-    self.law.deepNodes.forEach(function(id) {
+    self.law.nodes.forEach(function(id) {
         let node = self.findEntry('node', id);
         node.visualize();
     });
@@ -41,11 +41,11 @@ Relation.prototype.visualize = function() {
 
 Node.prototype.visualize = function() {
     let self = this;
-    if(self.visualized) return self.visualContext;
+    /*if(self.visualized) return self.visualContext;
     let head = self.getHead(), ref = self.getReference(),
         headContext = {}, refContext = {};
     if(head) headContext = head.visualize();
-    if(ref) refContext = ref.visualize();
+    if(ref) refContext = ref.visualize();*/
 
     let visual = self.collectData('visual');
     let globalOpts = ['origin', 'rotation', 'scale'];

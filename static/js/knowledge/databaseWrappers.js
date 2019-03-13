@@ -127,7 +127,7 @@
             return null;
         };
 
-        Entry.prototype.findId = function(table, opts) {
+        Entry.prototype.findId = function(table, data) {
             if(this.relation) return this.relation.findId(table, data);
             return null;
         };
@@ -290,6 +290,11 @@
 
         Law.prototype.addNode = function(data) {
             let self = this, relation = self.relation;
+            if(!data.reference) {
+                let head = self.findEntry('node', data.head), root = null;
+                if(head) root = head.getRoot();
+                if(root) data.reference = root.id;
+            }
             let node = relation.createEntry('node', data, true);
             self.nodes.push(node.getId());
             if(!node.tentative) node.addToEvaluateQueue();
@@ -382,7 +387,7 @@
         }
 
         Law.prototype.addToEvaluateQueue = function(node) {
-            this.evaluateQueue.push(node);
+            if(!node.tentative) this.evaluateQueue.push(node);
         };
 
         Law.prototype.addMap = function(map) {
@@ -433,6 +438,7 @@
             this.value = new Value();
             this.conceptInfo = {};
             this.data = new NodeData(this);
+            this.variables = new Dependency(this);
             this.commands = {};
             this.tentative = false;
             this.drawn = false;
@@ -484,6 +490,7 @@
             if(!conceptData[this.concept]) conceptData[this.concept] = this.getConcept();
             for(let id in conceptData) {
                 let concept = conceptData[id];
+                if(!(concept instanceof Concept)) continue;
                 let all = concept.getAllConcepts();
                 for(let cid in all) {
                     concepts[cid] = all[cid];
@@ -558,6 +565,22 @@
                 if(reference) reference.addTriad(1, this, this.head);
                 if(head) head.trigger('new-child', this);
             }
+        };
+
+        Node.prototype.getRoot = function(nodesChecked) {
+            let self = this;
+            if(typeof nodesChecked === 'object' && nodesChecked[self.id]) return null;
+            if(!nodesChecked) nodesChecked = {};
+            nodesChecked[self.id] = true;
+            if(self.head == null && self.reference == null && self.getConcept().name === 'ROOT')
+                return self;
+            let head = self.getHead(), ref = self.getReference(), root = null;
+            if(head) root = head.getRoot(nodesChecked);
+            if(ref && !root) root = ref.getRoot(nodesChecked);
+            if(!root) self.getChildren().every(function(child) {
+                return !(root = child.getRoot(nodesChecked));
+            });
+            return root;
         };
 
         //type == 0 for children whose head is me, 1 for children whose reference is me
@@ -743,10 +766,13 @@
         based on my concept and what my parents have already matched
         */
         Node.prototype.updateMatches = function() {
-            let self = this, concepts = self.getAllConcepts(),
-                newMatch = false;
+            let self = this;
+            if(self.tentative) return;
 
-            let wildcard = Concept.prototype.wildcardConcept, wildcardConcept = self.relation.findEntry('concept', wildcard);
+            let concepts = self.getAllConcepts(),
+                wildcard = Concept.prototype.wildcardConcept,
+                wildcardConcept = self.relation.findEntry('concept', wildcard),
+                newMatch = false;
 
             //first check if I match a top-level node from any predicate description
             concepts[wildcard] = wildcardConcept;

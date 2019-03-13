@@ -258,7 +258,7 @@
             $modal.find('.entry-tab').each(function() {
                 let $this = $(this), $link = $this.children('.nav-link'),
                     tabName = $link.attr('id').split('-')[1];
-                if((Array.isArray(opts.enabledTabs) && opts.enabledTabs.indexOf(tabName) > 0) || opts.tab === tabName) {
+                if((Array.isArray(opts.enabledTabs) && opts.enabledTabs.indexOf(tabName) >= 0) || opts.tab === tabName) {
                     $this.show();
                     if(opts.tab === tabName) $link.tab('show');
                     if(tabName === 'search') showSearch = true;

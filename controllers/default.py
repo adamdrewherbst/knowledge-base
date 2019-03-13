@@ -78,8 +78,8 @@ def getEntry(table, data):
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'dependencies': {}}
         for dep in db(db.framework_dependency.framework == entry.id).iterselect():
             ret['dependencies'][dep.dependency] = True
-        #include the visualization and symbolization frameworks by default
-        for framework in db((db.framework.name == 'Visualization') | (db.framework.name == 'Symbolization')).iterselect():
+        #include the general frameworks by default
+        for framework in db((db.framework.name == 'General')).iterselect():
             ret['dependencies'][framework.id] = True
     elif table == 'concept':
         ret = {'id': entry.id, 'name': entry.name, 'description': entry.description, 'framework': entry.framework, \
@@ -124,9 +124,10 @@ def getFramework(frameworkId):
     if frameworkId > 0:
         frameworks.append(frameworkId)
     else:
-        #include the visualization and symbolization frameworks by default
-        for framework in db((db.framework.name == 'Visualization') | (db.framework.name == 'Symbolization')).iterselect():
+        #include the general frameworks by default
+        for framework in db((db.framework.name == 'General')).iterselect():
             frameworks.append(framework.id)
+        pass
 
     loaded = {}
     while frameworks:
@@ -194,7 +195,10 @@ def saveEntry():
                 db(db[depTable][table] == request_vars['id']).delete()
             for dep,load in deps.items():
                 if not dep:
-                    break;
+                    continue
+                depRecord = db[depTable][dep]
+                if table == 'framework' and depRecord and depRecord.name == 'General':
+                    continue
                 db[depTable].insert(**{table: entryId, 'dependency': dep})
                 if load and table == 'framework':
                     ret['entries'].update(getFramework(dep))

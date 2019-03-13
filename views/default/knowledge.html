@@ -497,9 +497,9 @@
 
             let $filters = $('.framework-filter');
             $filters.change(function(e) {
-                let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal'),
-                    table = $modal.attr('id').split('-')[0];
+                let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal');
                 if($modal.length > 0) {
+                    let table = $modal.attr('id').split('-')[0];
                     $modal.find('.framework-filter').val(framework);
                     self.showSearchResults(table, '');
                 } else if($this.attr('id') == 'palette-concept-filter') {

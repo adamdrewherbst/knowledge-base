@@ -146,6 +146,7 @@ Node.prototype.compileCommands = function(doCheck) {
     }
 
     //only compile commands from concepts that have not yet been compiled on this node
+    self.initData('concept');
     let concepts = self.getAllConcepts(), commandStrings = [];
     for(let id in concepts) {
         if(Misc.getIndex(self.conceptInfo, id, 'compiled')) delete concepts[id];
@@ -166,16 +167,17 @@ Node.prototype.compileCommands = function(doCheck) {
 
         if(tgtRef.type === 'var') {
             let expression = self.parseExpression(exp);
-            let command = new NodeDataCommand(null, null, op, expression, tgtRef.recursive);
-            command.wait(self.variables, tgtRef.var, function(ret) {
-                command.setTarget(ret.value.dep, Dependency.concatKey(ret.value.key, tgtRef.key));
+            let command = new NodeDataCommand(null, null, op, expression, tgtRef.recursive, tgtRef.variable);
+            command.wait(self.variables, tgtRef.var, '', function(vars, varName) {
+                let value = vars.getValue(varName);
+                command.setTarget(value.dep, Dependency.concatKey(value.key, tgtRef.key));
             });
         } else if(tgtRef.type === 'node') {
             let expression = null;
             if(!tgtRef.nodeAsContext) expression = self.parseExpression(exp);
             self.getConnectedNodes(tgtRef.nodes, function(node) {
                 if(tgtRef.nodeAsContext) expression = node.parseExpression(exp);
-                let command = new NodeDataCommand(node.getData(), tgtRef.key, op, expression, tgtRef.recursive);
+                let command = new NodeDataCommand(node.getData(), tgtRef.key, op, expression, tgtRef.recursive, tgtRef.variable);
                 command.init();
                 if(doCheck) {
                     command.checkResolved('', true);
@@ -193,8 +195,8 @@ Node.prototype.parseExpression = function(str) {
             expression.addLiteralBlock(str.substring(ind, ref.start));
         if(ref.type === 'var') {
             let blockNum = expression.addReferenceBlock(null, null, ref.recursive);
-            expression.wait(self.variables, ref.var, '', function(vars, varKey) {
-                let value = vars.getValue(varKey);
+            expression.wait(self.variables, ref.var, '', function(vars, varName) {
+                let value = vars.getValue(varName);
                 expression.setReference(blockNum, value.dep, Dependency.concatKey(value.key, ref.key));
             });
         } else if(ref.type === 'node') {
@@ -210,12 +212,12 @@ Node.prototype.parseExpression = function(str) {
 function refRegex() {
     let firstChar = '(^|[^A-Za-z0-9])',
         alphaNum = '[A-Za-z][A-Za-z0-9]*',
-        nodeAbbr = "[A-Z](?:\\(!?" + alphaNum + "\\))?",
+        nodeAbbr = "(?:A|B|C|S)(?:\\(!?" + alphaNum + "\\))?",
         nodeChain = nodeAbbr + '(?:\\.' + nodeAbbr + ')*',
         prefix = '(\\$' + alphaNum + '|' + nodeChain + ')',
         prefixFlags = '(:?)',
         keyChain = '((?:\\.' + alphaNum + ')*)',
-        keyChainFlags = '((?::R)?)',
+        keyChainFlags = '((?::R)?)((?:>' + alphaNum + ')?)',
         lastChar = '([^A-Za-z0-9]|$)'
 
     let regexStr = firstChar + prefix + prefixFlags + keyChain + keyChainFlags + lastChar;
@@ -228,13 +230,14 @@ Node.prototype.parseReferences = function(str) {
 
     while((match = regex.exec(str)) !== null) {
         let first = match[1], data = match[2], context = match[3], key = match[4],
-            opts = match[5], last = match[6];
+            opts = match[5], variable = match[6], last = match[7];
 
         let ref = {
             key: key || '',
             start: match.index,
             end: regex.lastIndex,
-            nodeAsContext: context === ':'
+            nodeAsContext: context === ':',
+            variable: variable
         };
 
         let bounded = first === '{' && last === '}';
@@ -249,7 +252,7 @@ Node.prototype.parseReferences = function(str) {
             ref.type = 'node';
             ref.nodes = [];
             data.split('.').forEach(function(nodeStr) {
-                let match = nodeStr.match(/^([A-Z])(?:\((!?)([A-Za-z][A-Za-z0-9]+)\))?$/);
+                let match = nodeStr.match(/^(A|B|C|S)(?:\((!?)([A-Za-z][A-Za-z0-9]+)\))?$/);
                 let name = match[1], exclude = match[2], concept = match[3];
                 let nodeObj = {name: name, concept: null, exclude: false};
                 if(concept) {
@@ -314,6 +317,14 @@ Node.prototype.printData = function(key) {
     });
 };
 
+Node.prototype.setVariable = function(key, value) {
+    this.variables.setValue(key, value);
+};
+
+Node.prototype.getVariable = function(key) {
+    return this.variables.getValue(key);
+};
+
 
 function Dependency() {
     this.id = Dependency.prototype.nextId++;
@@ -338,6 +349,7 @@ Dependency.setPropagating = function(type) {
 
 Dependency.propagating = function(type) {
     if(Dependency.prototype.propagateKey['']) return true;
+    if(type === 'concept') return true;
     return Dependency.prototype.propagateKey[type] ? true : false;
 };
 
@@ -752,13 +764,14 @@ NodeData.prototype.toString = function(key) {
 };
 
 
-function NodeDataCommand(dep, key, op, exp, rec) {
+function NodeDataCommand(dep, key, op, exp, rec, vari) {
     let self = this;
     Dependency.call(this);
     this.node = null;
     this.operation = op;
     this.expression = exp;
     this.recursive = rec || false;
+    this.variable = vari || null;
     this.setTarget(dep, key);
 }
 NodeDataCommand.prototype = Object.create(Dependency.prototype);
@@ -871,6 +884,9 @@ NodeDataCommand.prototype.fullyResolve = function() {
             }
             break;
     }
+    if(self.variable && data.node instanceof Node) {
+        data.node.setVariable(self.variable, data);
+    }
 };
 
 NodeDataCommand.prototype.toString = function(key) {
@@ -885,7 +901,6 @@ NodeDataCommand.prototype.toString = function(key) {
 
 function Expression() {
     Dependency.call(this);
-    this.references = [];
     this.blocks = [];
 }
 Expression.prototype = Object.create(Dependency.prototype);
@@ -932,7 +947,7 @@ Expression.prototype.fullyResolve = function() {
     self.blocks.forEach(function(block) {
         if(block.type === 'reference' && block.recursive) {
             block.dep.each(block.key, function(key, node) {
-                if(typeof node.value === 'number' || typeof node.value === 'string')
+                if(node.value != null)
                     Misc.setIndex(expKeys, key, true);
             });
         }
@@ -945,28 +960,32 @@ Expression.prototype.fullyResolve = function() {
             let parent = null;
             if(block.recursive) {
                 for(let prefix = Dependency.concatKey(block.key, key);
-                    !((parent = block.dep.getKey(prefix)) && (typeof parent.value === 'number' || typeof parent.value === 'string'))
+                    !((parent = block.dep.getKey(prefix)) && (parent.value != null))
                     && prefix.length > block.key.length;
                     prefix = prefix.replace(/\.?[A-Za-z0-9]+$/, ''));
             } else {
                 parent = block.dep.getKey(block.key);
             }
-            if(parent && (typeof parent.value === 'number' || typeof parent.value === 'string')) {
+            if(parent && (parent.value != null)) {
                 block.value = parent.value;
                 return true;
             } else return false;
         });
         if(match) {
-            let node = self.getKey(key, true), str = '';
-            self.blocks.forEach(function(block) {
+            let node = self.getKey(key, true), code = '';
+            self.blocks.every(function(block) {
                 let val = block.value;
-                if(block.type === 'reference' && typeof val === 'string')
+                if(self.blocks.length === 1 && typeof val === 'object') {
+                    code = val;
+                    return false;
+                } else if(block.type === 'reference' && typeof val === 'string') {
                     val = "'" + val + "'";
-                str += '' + val;
+                }
+                code += '' + val;
             });
             //console.log('code for ' + self.toString(key));
-            //console.log(str);
-            node.value = eval(str);
+            //console.log(code);
+            node.value = typeof code === 'string' ? eval(code) : code;
         }
     }
 };

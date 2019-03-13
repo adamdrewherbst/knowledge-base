@@ -437,16 +437,19 @@
 
             let nodeData = Object.assign({}, node, options, template);
             nodeData.value = node.value.writeValue();
-            if(!nodeData.hasOwnProperty('loc') && nodeData.head && self.nodes.hasOwnProperty(nodeData.head)) {
-                let head = self.diagram.model.findNodeDataForKey(nodeData.head), headLoc = head.loc.split(' '), refLoc = null;
-                if(nodeData.reference) {
-                    let reference = self.diagram.model.findNodeDataForKey(nodeData.reference);
-                    let refLoc = reference.loc.split(' ');
+            if(!nodeData.hasOwnProperty('loc')) {
+                let x = 0, y = 0;
+                for(let i = 0; i < 2; i++) {
+                    let parent = i == 0 ? nodeData.head : nodeData.reference;
+                    if(!parent) continue;
+                    let parentData = self.diagram.model.findNodeDataForKey(parent);
+                    if(parentData && parentData.loc) {
+                        let parentLoc = parentData.loc.split(' ');
+                        if(!isNaN(parentLoc[0])) x += parseFloat(parentLoc[0]);
+                        if(!isNaN(parentLoc[1])) y = Math.max(y, parseFloat(parentLoc[1]));
+                    }
                 }
-                if(!refLoc) refLoc = headLoc;
-                let x = (parseFloat(headLoc[0]) + parseFloat(refLoc[0])) / 2,
-                    y = Math.max(parseFloat(headLoc[1]), parseFloat(refLoc[1])) + 75;
-                nodeData.loc = '' + x + ' ' + y;
+                nodeData.loc = '' + (x/2) + ' ' + (y+75);
             }
 
             self.diagram.model.addNodeData(nodeData);

@@ -287,7 +287,8 @@
                 });
             }
             if(childMatch) {
-                childMatch.addFromMap(self);
+                if(Object.keys(childMatch.fromMap).length > 0)
+                    childMatch.addFromMap(self);
                 return childMatch;
             }
 
