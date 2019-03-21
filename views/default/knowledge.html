@@ -427,6 +427,8 @@
             self.initDiagram();
             self.useFramework(7, 9);
 
+            relation.regex = refRegex();
+
             let $hideButton = null;
             $('.entry-modal button[data-dismiss=modal]').click(function(e) {
                 $hideButton = $(this);

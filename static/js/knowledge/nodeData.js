@@ -168,8 +168,8 @@ Node.prototype.compileCommands = function(doCheck) {
         if(tgtRef.type === 'var') {
             let expression = self.parseExpression(exp);
             let command = new NodeDataCommand(null, null, op, expression, tgtRef.recursive, tgtRef.variable);
-            command.wait(self.variables, tgtRef.var, '', function(vars, varName) {
-                let value = vars.getValue(varName);
+            command.wait(self.variables, tgtRef.var, '', function() {
+                let value = self.variables.getValue(tgtRef.var);
                 command.setTarget(value.dep, Dependency.concatKey(value.key, tgtRef.key));
             });
         } else if(tgtRef.type === 'node') {
@@ -210,34 +210,38 @@ Node.prototype.parseExpression = function(str) {
 };
 
 function refRegex() {
-    let firstChar = '(^|[^A-Za-z0-9])',
-        alphaNum = '[A-Za-z][A-Za-z0-9]*',
-        nodeAbbr = "(?:A|B|C|S)(?:\\(!?" + alphaNum + "\\))?",
-        nodeChain = nodeAbbr + '(?:\\.' + nodeAbbr + ')*',
-        prefix = '(\\$' + alphaNum + '|' + nodeChain + ')',
-        prefixFlags = '(:?)',
-        keyChain = '((?:\\.' + alphaNum + ')*)',
-        keyChainFlags = '((?::R)?)((?:>' + alphaNum + ')?)',
-        lastChar = '([^A-Za-z0-9]|$)'
 
-    let regexStr = firstChar + prefix + prefixFlags + keyChain + keyChainFlags + lastChar;
-    let regex = new RegExp(regexStr, 'g');
-    return regex;
+    let alphaNum = '[A-Za-z][A-Za-z0-9]*',
+        nodeId = '(?:A|B|C|S)(?:\\(!?' + alphaNum + '\\))?',
+        nodeIdCapture = '(A|B|C|S)(?:\\((!?)(' + alphaNum + ')\\))?',
+        nodeChain = nodeId + '(?:\\.' + nodeId + ')*';
+
+    let mainStr = '(^|[^A-Za-z0-9])'                        //first character
+        + '(\\$' + alphaNum + '|' + nodeChain + ')(:?)'     //data identifier
+        + '((?:\\.[A-Za-z0-9]+)*)'                          //key chain
+        + '((?::R)?)((?:>' + alphaNum + ')?)'               //data flags
+        + '([^A-Za-z0-9]|$)';                               //last character
+
+    return {
+        main: new RegExp(mainStr, 'g'),
+        node: new RegExp(nodeIdCapture)
+    };
 }
 
 Node.prototype.parseReferences = function(str) {
-    let self = this, regex = refRegex(), references = [];
+    let self = this, regex = relation.regex, references = [];
 
-    while((match = regex.exec(str)) !== null) {
+    regex.main.lastIndex = 0;
+    while((match = regex.main.exec(str)) !== null) {
         let first = match[1], data = match[2], context = match[3], key = match[4],
             opts = match[5], variable = match[6], last = match[7];
 
         let ref = {
             key: key || '',
             start: match.index,
-            end: regex.lastIndex,
+            end: regex.main.lastIndex,
             nodeAsContext: context === ':',
-            variable: variable
+            variable: variable.substring(1)
         };
 
         let bounded = first === '{' && last === '}';
@@ -252,7 +256,7 @@ Node.prototype.parseReferences = function(str) {
             ref.type = 'node';
             ref.nodes = [];
             data.split('.').forEach(function(nodeStr) {
-                let match = nodeStr.match(/^(A|B|C|S)(?:\((!?)([A-Za-z][A-Za-z0-9]+)\))?$/);
+                let match = nodeStr.match(regex.node);
                 let name = match[1], exclude = match[2], concept = match[3];
                 let nodeObj = {name: name, concept: null, exclude: false};
                 if(concept) {
@@ -313,7 +317,10 @@ Node.prototype.collectData = function(key) {
 
 Node.prototype.printData = function(key) {
     this.getData().each(key, function(k, node) {
-        console.log(k + ': ' + node.value);
+        let str = '' + k + ': ' + node.value;
+        if(node.active) str += '\tactive';
+        if(node.propagated) str += '\tpropagated';
+        console.log(str);
     });
 };
 
@@ -764,6 +771,17 @@ NodeData.prototype.toString = function(key) {
 };
 
 
+function NodeVariables() {
+    Dependency.call(this);
+}
+NodeVariables.prototype = Object.create(Dependency.prototype);
+NodeVariables.prototype.constructor = NodeVariables;
+
+NodeVariables.prototype.active = function(key) {
+    return true;
+};
+
+
 function NodeDataCommand(dep, key, op, exp, rec, vari) {
     let self = this;
     Dependency.call(this);
@@ -787,10 +805,17 @@ NodeDataCommand.prototype.init = function() {
 };
 
 NodeDataCommand.prototype.setTarget = function(dep, key) {
-    this.target = dep;
-    if(key !== undefined) this.editKey = key;
-    if(this.target instanceof NodeData) {
-        this.setNode(this.target.node);
+    let self = this;
+    self.target = dep;
+    if(key !== undefined) self.editKey = key;
+    if(self.target instanceof NodeData) {
+        self.setNode(self.target.node);
+        if(self.variable) {
+            let vars = self.node.variables;
+            vars.wait(self, '', self.variable, function() {
+                vars.setValue(self.variable, {dep: self.target, key: self.editKey});
+            });
+        }
     }
     this.checkActive();
 };
@@ -818,6 +843,12 @@ NodeDataCommand.prototype.checkKnown = function() {
 
 NodeDataCommand.prototype.isAssignment = function() {
     return this.operator === '=';
+};
+
+NodeDataCommand.prototype.resolve = function(dep, depKey, myKey) {
+    let self = this;
+    if(dep instanceof NodeVariables)
+    Dependency.prototype.resolve.call(self, dep, depKey, myKey);
 };
 
 NodeDataCommand.prototype.fullyResolve = function() {
@@ -883,9 +914,6 @@ NodeDataCommand.prototype.fullyResolve = function() {
 
             }
             break;
-    }
-    if(self.variable && data.node instanceof Node) {
-        data.node.setVariable(self.variable, data);
     }
 };
 
@@ -982,6 +1010,7 @@ Expression.prototype.fullyResolve = function() {
                     val = "'" + val + "'";
                 }
                 code += '' + val;
+                return true;
             });
             //console.log('code for ' + self.toString(key));
             //console.log(code);

@@ -96,11 +96,11 @@
 
         Misc.asArray = function(obj) {
             if(typeof obj !== 'object') return [obj];
-            let arr = [];
-            for(let i = 0; obj.hasOwnProperty(i); i++) {
+            let arr = [], i = 0;
+            for(; obj.hasOwnProperty(i); i++) {
                 arr.push(obj[i]);
             }
-            if(arr.length == 0) arr.push(obj);
+            if(arr.length == 0 || Object.keys(obj).length > i) arr.push(obj);
             return arr;
         };
 
@@ -438,7 +438,7 @@
             this.value = new Value();
             this.conceptInfo = {};
             this.data = new NodeData(this);
-            this.variables = new Dependency(this);
+            this.variables = new NodeVariables(this);
             this.commands = {};
             this.tentative = false;
             this.drawn = false;
