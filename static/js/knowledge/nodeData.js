@@ -167,18 +167,14 @@ Node.prototype.compileCommands = function(doCheck) {
 
         if(tgtRef.type === 'var') {
             let expression = self.parseExpression(exp);
-            let command = new NodeDataCommand(null, null, op, expression, tgtRef.recursive, tgtRef.variable);
-            command.wait(self.variables, tgtRef.var, '', function() {
-                let value = self.variables.getValue(tgtRef.var);
-                command.setTarget(value.dep, Dependency.concatKey(value.key, tgtRef.key));
-            });
+            let command = new NodeDataCommand(null, tgtRef.key, op, expression, tgtRef.recursive, tgtRef.variable);
+            command.wait(self.variables, tgtRef.var);
         } else if(tgtRef.type === 'node') {
             let expression = null;
             if(!tgtRef.nodeAsContext) expression = self.parseExpression(exp);
             self.getConnectedNodes(tgtRef.nodes, function(node) {
                 if(tgtRef.nodeAsContext) expression = node.parseExpression(exp);
                 let command = new NodeDataCommand(node.getData(), tgtRef.key, op, expression, tgtRef.recursive, tgtRef.variable);
-                command.init();
                 if(doCheck) {
                     command.checkResolved('', true);
                 }
@@ -486,15 +482,19 @@ Dependency.prototype.active = function(key) {
 };
 
 Dependency.prototype.activate = function(key, active) {
+    let self = this;
     active = (active === undefined ? true : active) || false;
 
-    this.each(key, function(k, node) {
+    self.each(key, function(k, node) {
         if(node.active == active) return;
         node.active = active;
         for(let depId in node.waiting) {
             for(let depKey in node.waiting[depId]) {
                 let obj = node.waiting[depId][depKey];
                 obj.dep.activate(depKey, active);
+                if(active && obj.dep.propagated(depKey)) {
+                    self.resolve(obj.dep, depKey, k);
+                }
             }
         }
     });
@@ -519,7 +519,7 @@ Dependency.prototype.wait = function(dep, depKey, myKey, callback) {
     Misc.setIndex(node.waiting, dep.getId(), depKey, {
         dep: dep,
         callback: callback,
-        resolved: false
+        resolved: false,
     });
     dep.addTrigger(this, depKey, myKey);
     //console.log(this.toString(myKey) + ' waiting on ' + dep.toString(depKey));
@@ -795,15 +795,6 @@ function NodeDataCommand(dep, key, op, exp, rec, vari) {
 NodeDataCommand.prototype = Object.create(Dependency.prototype);
 NodeDataCommand.prototype.constructor = NodeDataCommand;
 
-NodeDataCommand.prototype.init = function() {
-    //the data key being edited by this command can't be resolved until the command completes
-    let self = this;
-    self.wait(self.expression);
-    if(self.target instanceof Dependency)
-        self.target.wait(self, '', self.editKey);
-    self.checkActive();
-};
-
 NodeDataCommand.prototype.setTarget = function(dep, key) {
     let self = this;
     self.target = dep;
@@ -816,8 +807,11 @@ NodeDataCommand.prototype.setTarget = function(dep, key) {
                 vars.setValue(self.variable, {dep: self.target, key: self.editKey});
             });
         }
+        self.wait(self.expression);
+        if(self.target instanceof Dependency)
+            self.target.wait(self, '', self.editKey);
+        this.checkActive();
     }
-    this.checkActive();
 };
 
 NodeDataCommand.prototype.setNode = function(node) {
@@ -847,7 +841,10 @@ NodeDataCommand.prototype.isAssignment = function() {
 
 NodeDataCommand.prototype.resolve = function(dep, depKey, myKey) {
     let self = this;
-    if(dep instanceof NodeVariables)
+    if(dep instanceof NodeVariables) {
+        let value = dep.getValue(depKey);
+        self.setTarget(value.dep, Dependency.concatKey(value.key, self.editKey));
+    }
     Dependency.prototype.resolve.call(self, dep, depKey, myKey);
 };
 
