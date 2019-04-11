@@ -197,7 +197,11 @@ Node.prototype.parseExpression = function(str) {
             });
         } else if(ref.type === 'node') {
             let refNode = self.getConnectedNodes(ref.nodes)[0];
-            expression.addReferenceBlock(refNode.getData(), ref.key, ref.recursive);
+            if(refNode) {
+                expression.addReferenceBlock(refNode.getData(), ref.key, ref.recursive);
+            } else {
+
+            }
         }
         ind = ref.end;
     });

@@ -419,16 +419,40 @@
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/suggest.js')}}"></script>
 
     <script type="text/javascript">
+
+        //Create a global instance of the Relation class. This is our main variable: it will store the state of the page
+        //and run functions in response to user input to load, save, and evaluate problems & laws, define concepts, etc.
         var relation;
+
         $(document).ready(function() {
             relation = new Relation();
             let self = relation;
 
+            //create the canvas where we can create and edit trees.  This includes the palette of concepts to choose from
+            //on the left side, and the diagram for editing the law on the right.
             self.initDiagram();
+
+            //temporarily hard-coding which framework & law to load so I don't have to select it each time
             self.useFramework(7, 9);
 
+            //a regular expression finds patterns in text; refRegex is defined in nodeData.js and is used
+            //to parse a concept's representation rules
             relation.regex = refRegex();
 
+            /*  EVENT HANDLERS
+                The rest of this code adds event handlers to buttons in the interface; when the button is clicked,
+                the event handler will run to perform the desired action
+            */
+
+            /* Modals
+            A 'modal' is a popup dialog supplied by the Bootstrap plugin, documented here:
+                https://getbootstrap.com/docs/4.0/components/modal/
+
+            The modals in this site are used to create, edit, and select frameworks, concepts, and laws.  Nodes within laws
+            are not managed through modals, rather they are manipulated directly in the diagram canvas.
+                The way modals are built, to perform actions based on modals, we have to wait until they are closed by the
+            user and then
+            */
             let $hideButton = null;
             $('.entry-modal button[data-dismiss=modal]').click(function(e) {
                 $hideButton = $(this);

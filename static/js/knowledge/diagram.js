@@ -1,3 +1,8 @@
+/*
+
+*/
+
+
         Relation.prototype.initDiagram = function() {
             let self = this;
             self.diagram = $$(go.Diagram, "graph-canvas",  // must name or refer to the DIV HTML element
@@ -70,13 +75,13 @@
                 {
                     fill: null,  // not seen, by default; set to a translucent gray by showSmallPorts, defined below
                     stroke: null,
-                    desiredSize: new go.Size(7, 7),
+                    desiredSize: new go.Size(12, 12),
                     alignment: spot,  // align the port on the main Shape
                     alignmentFocus: spot,  // just inside the Shape
                     portId: name,  // declare this object to be a "port"
                     fromSpot: spot, toSpot: spot,  // declare where links may connect at this port
                     fromLinkable: output, toLinkable: input,  // declare whether the user may draw links to/from here
-                    cursor: "pointer"  // show a different cursor to indicate potential link point
+                    cursor: "pointer",  // show a different cursor to indicate potential link point
                 };
                 if(fromMax !== undefined) options.fromMaxLinks = fromMax;
                 if(toMax !== undefined) options.toMaxLinks = toMax;
@@ -242,10 +247,13 @@
                         let text = '';
                         if(typeof data.name == 'string' && data.name.length > 0) {
                             text = data.name;
-                        } else if(data.concept && self.concepts.hasOwnProperty(data.concept)) {
-                            text = self.concepts[data.concept].name;
                         }
-                        text += ' [' + data.id + ']';
+                        if(data.concept && self.concepts.hasOwnProperty(data.concept)) {
+                            let conceptName = self.concepts[data.concept].name;
+                            if(text) conceptName = ' [' + conceptName + ']';
+                            text += conceptName;
+                        }
+                        //text += ' [' + data.id + ']';
                         return text;
                     }))
                 ),
@@ -258,6 +266,20 @@
                     contextMenu: partContextMenu
                 }
             );
+
+            self.diagram.linkTemplate =
+                $$(go.Link,
+                  $$(go.Shape,
+                    new go.Binding("stroke", "color"),
+                    new go.Binding("strokeWidth", "width"),
+                    new go.Binding("strokeDashArray", "", function(data, link) {
+                        console.log('calculating dash');
+                        console.log(data);
+                        console.log(link);
+                        if(data.fromPort === 'T') return [4, 4];
+                        else return null;
+                    })
+                ));
 
             // initialize the Palette that is on the left side of the page
             self.palette = $$(go.Palette, "concept-palette",  // must name or refer to the DIV HTML element
