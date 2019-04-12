@@ -1,7 +1,23 @@
+{{#
+#
+#   This is the modal (popup dialog, as supplied by the Bootstrap plugin), that allows the user to created, edit, and select
+#   entries (frameworks, concepts, or laws).  This is a template which is included in the main page layout (knowledge.html)
+#   - it is included 3 times, once for each type of entry.  Each of the 3 modals is initially hidden, popping up when triggered
+#   by a user action.
+#
+#   The 'table' parameter (referenced as {{=table}} below) is passed in when the template is included, and specifies the database
+#   table: framework, concept, or law.  The fields in the form to create/edit an entry (create_edit.load, included below) vary
+#   depending on the table.
+#
+#}}
+
 <div id="{{=table}}-modal" class="modal entry-modal" tabindex="-1" role="dialog">
 <div class="modal-dialog" role="document">
 <div class="modal-content">
 <div class="modal-body">
+
+    {{#  Each modal has 3 tabs, for selecting, creating, and editing an entry.  These are the tabs you click to switch between them }}
+
     <ul class="nav nav-tabs" id="{{=table}}-modal-tabs" role="tablist">
         <li class="nav-item entry-tab">
             <a class="nav-link" id="{{=table}}-search-tab" data-toggle="tab" href="#{{=table}}-search-tab-content"
@@ -22,30 +38,52 @@
             </a>
         </li>
     </ul>
+
+    {{#  And here is the content of each tab }}
+
     <div class="tab-content" id="{{=table}}-modal-content">
+
         <div class="tab-pane fade active in" id="{{=table}}-search-tab-content" role="tabpanel" aria-labelledby="{{=table}}-search-tab">
+
+            {{# allow user to search for entries within a certain framework }}
             {{ if table is 'law' or table is 'concept': }}
             <select class="framework-filter">
                 <option value="-1">-- Select --</option>
             </select>
             {{ pass }}
+
+            {{# user can enter text to search for entries }}
             <input type="text" id="{{=table}}-search-field" class="search-field" placeholder="Enter name or key words">
+
+            {{# search results will be displayed in this div }}
             <div id="{{=table}}-results" class="search-results"></div>
+
+            {{# when user clicks on an entry, this hidden input will be set to its ID
+              # then when the modal is closed, we know this is the ID the user selected }}
             <input type="hidden" id="{{=table}}-selected-id">
+
+            {{# buttons to select the highlighted entry, or cancel - both cause the modal to be closed }}
             <div class="tab-footer">
                 <button type="button" class="modal-select btn btn-primary" data-dismiss="modal">Select</button>
                 <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
             </div>
         </div>
+
         <div class="tab-pane fade" id="{{=table}}-create-tab-content" role="tabpanel" aria-labelledby="{{=table}}-create-tab">
+
+            {{# create_edit.load has the form for creating/editing an entry -- that file is in the same directory as this one }}
             {{ =LOAD('default', 'create_edit.load', ajax=False, vars={'table': table, 'type': 'create'}) }}
+
             <div class="tab-footer">
                 <button type="button" class="modal-save btn btn-primary" data-dismiss="modal">Save</button>
                 <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
             </div>
         </div>
+
         <div class="tab-pane fade" id="{{=table}}-edit-tab-content" role="tabpanel" aria-labelledby="{{=table}}-edit-tab">
+
             {{ =LOAD('default', 'create_edit.load', ajax=False, vars={'table': table, 'type': 'edit'}) }}
+
             <div class="tab-footer">
                 <button type="button" class="modal-save btn btn-primary" data-dismiss="modal">Save Changes</button>
                 <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -53,21 +91,6 @@
         </div>
     </div>
 </div>
-</div>
-</div>
-</div>
-
-
-<div id="{{=table}}-edit" class="modal entry-modal" tabindex="-1" role="dialog">
-<div class="modal-dialog" role="document">
-<div class="modal-content">
-    <div class="modal-body">
-        {{ =LOAD('default', 'create_edit.load', ajax=False, vars={'table': table, 'type': 'edit'}) }}
-    </div>
-    <div class="modal-footer">
-        <button type="button" class="modal-save btn btn-primary" data-dismiss="modal">Save Changes</button>
-        <button type="button" class="modal-cancel btn btn-secondary" data-dismiss="modal">Cancel</button>
-    </div>
 </div>
 </div>
 </div>

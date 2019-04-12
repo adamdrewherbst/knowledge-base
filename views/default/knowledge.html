@@ -1,12 +1,32 @@
+{{#
+#
+#   This is the main file of the website.  It specifies the structure of the page in the HTML section,
+#   the layout and styling in the CSS section (block_page_css), and the user interaction in the
+#   JavaScript section (block_page_js).
+#
+#   The site uses a few plugins:
+#       Bootstrap
+#       GoJS
+#       MathJax
+#
+#   It also uses jQuery, which is a very common JavaScript plugin which is pre-installed with web2py.
+#   jQuery makes common operations on elements in the web page much simpler in code, such as:
+#       selecting, adding, and editing elements on the page
+#       sending requests to the server - in this case, to load and save frameworks, concepts, and laws
+#   Wherever you see $(...) in the JavaScript, that is the jQuery selector function, which selects elements
+#   based on the given criteria and turns them into
+#
+#}}
+
+
 <html>
 
     <head>
         <link rel="stylesheet" href="{{=URL('static','css/bootstrap.min.css')}}"/>
         <link rel="stylesheet" href="{{=URL('static','css/web2py-bootstrap3.css')}}"/>
-        <link rel="stylesheet" href="/welcome/static/GoJS-master/assets/css/main.css">
-        <!--<link rel="stylesheet" href="/welcome/static/GoJS-master/assets/css/bootstrap.min.css">-->
-        <link rel="stylesheet" href="/welcome/static/GoJS-master/assets/css/highlight.css">
-        <link rel="stylesheet" href="/welcome/static/GoJS-master/assets/css/jquery-ui.min.css">
+        <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/main.css')}}">
+        <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/highlight.css')}}">
+        <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/jquery-ui.min.css')}}">
 
         <script type="text/javascript" async
           src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=MML_CHTML">
@@ -428,7 +448,7 @@
             relation = new Relation();
             let self = relation;
 
-            //create the canvas where we can create and edit trees.  This includes the palette of concepts to choose from
+            //create the canvas where we can create and edit laws.  This includes the palette of concepts to choose from
             //on the left side, and the diagram for editing the law on the right.
             self.initDiagram();
 
@@ -448,18 +468,29 @@
             A 'modal' is a popup dialog supplied by the Bootstrap plugin, documented here:
                 https://getbootstrap.com/docs/4.0/components/modal/
 
-            The modals in this site are used to create, edit, and select frameworks, concepts, and laws.  Nodes within laws
-            are not managed through modals, rather they are manipulated directly in the diagram canvas.
-                The way modals are built, to perform actions based on modals, we have to wait until they are closed by the
-            user and then
+            The modals in this site are used to create, edit, and select frameworks, concepts, and laws (collectively called
+            'entries' since each one has an entry in the database).  Nodes within laws are not managed through modals, rather
+            they are manipulated directly in the diagram canvas.
+
+            The layout of the modals is specified in /views/default/entry.load
+
+                These modals are set up so that the action is performed when they are closed - for example, the user hits the
+            'Select' or 'Save Changes' button, the modal is closed, and the selection or save is simultaneously done (that turned
+            out to be the easiest way based on the Modal functionality supplied by Bootstrap).  So, we add event handlers
+            to the 'hide' event.
             */
+
             let $hideButton = null;
+            //first we need to know which button the user clicked to close the modal
+            // - if it was 'Cancel', we won't perform the action
             $('.entry-modal button[data-dismiss=modal]').click(function(e) {
                 $hideButton = $(this);
             });
             $('.entry-modal').on('show.bs.modal', function(e) {
                 $hideButton = null;
             });
+
+            //set up each modal to perform its action upon close
             $('.entry-modal').on('hide.bs.modal', function(e) {
 
                 let $this = $(this), $button = $hideButton || $(document.activeElement), callback = $this.data('callback');

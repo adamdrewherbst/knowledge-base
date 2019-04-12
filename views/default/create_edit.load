@@ -1,24 +1,60 @@
+{{#
+#
+#   This is the form for creating or editing an entry (framework, law, or concept).  It is included in
+#   entry.load which is the popup dialog containing this form.
+#
+#   'table' and 'type' (referenced below as {{=table}} and {{=type}}) are parameters passed in by the including
+#   file.  'table' is either 'framework', 'concept', or 'law'; and 'type' is either 'create' or 'edit'.  The
+#   fields in the form will vary depending on the table or type.
+#
+#}}
+
+
 <form id="{{=table}}-{{=type}}-form" class="entry-form" action="javascript:void(0)">
+
+    {{# store which table we are editing - this gets passed to the server when saving, so it knows which
+      # database table to modify }}
 
     <input type="hidden" name="table" value="{{=table}}">
 
+    {{# similarly, if we are editing an entry and not creating, send its ID to the server so it knows
+      # which record to update - this input gets populated in interface.js => showEntryModal }}
+
     {{ if type == 'edit': }}
+
     <input type="hidden" name="id" id="{{=table}}-edit-id" value="">
+
     {{ pass }}
 
+
+    {{# the remaining fields are the information about the entry }}
+
+
+    {{# a concept or law belongs to a specific framework }}
+
     {{ if table is 'law' or table is 'concept': }}
+
     <select id="{{=table}}-{{=type}}-framework" class="framework-filter" name="framework">
         <option value="-1">-- Select --</option>
     </select>
+
     {{ pass }}
 
+
+    {{# a concept may be restricted to a single law or even node - this hasn't really been used yet }}
+
     {{ if table is 'concept': }}
+
     <div class="concept-law-specific form-group">
         <label for="law_specific">Specific to this law</label>
         <input type="checkbox" name="law_specific">
     </div>
     <input type="hidden" name="node_specific" value="">
+
     {{ pass }}
+
+
+    {{# Name and Description are common to all entries in the 3 tables }}
 
     <div class="entry-name form-group">
         <label for="{{=table}}-{{=type}}-name">Name</label>
@@ -29,40 +65,54 @@
         <textarea name="description" id="{{=table}}-{{=type}}-description" placeholder="Description..." rows="3"></textarea>
     </div>
 
+
+    {{# a framework may include other frameworks as dependencies; for example, Newtonian Mechanics includes Mathematics }}
+
     {{ if table == 'framework': }}
+
+    {{# A 'multiple item' is a row with one or more fields and an Add button to add more rows.
+      # They are implemented in interface.js => showEntryModal and addMultipleField
+      # In this case, we need one because a framework can include multiple other frameworks as dependencies
+      #}}
+
     <div class="multiple-wrapper form-group">
         <label for="dependencies">Required Frameworks</label>
+
+        {{# the multiple-template div is a dummy template that is duplicated whenever the user clicks Add to add a new row }}
+
         <div class="framework-{{=type}}-dep multiple-item multiple-template">
             <select name="dependencies" class="multiple-required" select-table="framework">
                 <option value="">-- Select --</option>
             </select>
             <button type="button" class="multiple-remove btn btn-primary">Remove</button>
         </div>
+
         <button type="button" class="multiple-add btn btn-secondary">Add</button>
     </div>
 
+
     {{ elif table == 'concept': }}
+
+    {{# A concept can have a default symbol, eg. F for force }}
+
     <div class="concept-symbol form-group">
         <label for="symbol">Symbol</label>
         <textarea name="symbol" placeholder="Enter symbol here..." rows="1"></textarea>
     </div>
+
+    {{# A concept can also have rules, or commands, that determine how it will be represented, both visually and
+      # symbolically.  For example, the 'vector' concept has a command that places an arrow over its symbol.
+      # These format of these commands is described in much greater detail, and implemented, in nodeData.js }}
+
     <div class="concept-commands form-group">
         <label for="commands">Commands</label>
         <textarea name="commands" placeholder="Enter data commands here..." rows="5"></textarea>
     </div>
 
-    <!--<div class="concept-value form-group">
-        <label for="value">Value</label>
-        <textarea name="value" placeholder="Enter value commands here..." rows="3"></textarea>
-    </div>
-    <div class="concept-symmetric form-group">
-        <label for="symmetric">Symmetric</label>
-        <input type="checkbox" name="symmetric">
-    </div>
-    <div class="concept-inherits form-group">
-        <label for="inherits">Inherits</label>
-        <input type="checkbox" name="inherits">
-    </div>-->
+    {{# A concept can specify what two concepts it relates.  For example, 'force' is between two bodies,
+      # so both Head Concept and Reference Concept are set to 'body'.  Meanwhile, 'component' is a property of a
+      # vector relative to a direction, so Head Concept is 'vector' and Reference Concept is 'direction'.
+      # This is mostly for automatic validation of laws, ie. to ensure the user built the tree in a valid way }}
 
     <div class="concept-head form-group">
         <label for="head">Head Concept</label>
@@ -76,6 +126,10 @@
             <option value="">-- Select --</option>
         </select>
     </div>
+
+    {{# A concept can be an instance of one or more concepts.  For example, 'force' is a 'vector',
+      # while 'vector sum' is both a 'vector' and a 'sum' }}
+
     <div class="concept-parents multiple-wrapper form-group">
         <label for="dependencies">Parent Concepts</label>
         <div class="concept-{{=type}}-parent multiple-item multiple-template">
@@ -86,6 +140,7 @@
         </div>
         <button type="button" class="multiple-add btn btn-secondary">Add</button>
     </div>
+
     {{ pass }}
 
 </form>
