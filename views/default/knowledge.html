@@ -446,14 +446,13 @@
 
         $(document).ready(function() {
             relation = new Relation();
-            let self = relation;
 
             //create the canvas where we can create and edit laws.  This includes the palette of concepts to choose from
             //on the left side, and the diagram for editing the law on the right.
-            self.initDiagram();
+            relation.initDiagram();
 
             //temporarily hard-coding which framework & law to load so I don't have to select it each time
-            self.useFramework(7, 9);
+            relation.useFramework(7, 9);
 
             //a regular expression finds patterns in text; refRegex is defined in nodeData.js and is used
             //to parse a concept's representation rules
@@ -477,7 +476,7 @@
                 These modals are set up so that the action is performed when they are closed - for example, the user hits the
             'Select' or 'Save Changes' button, the modal is closed, and the selection or save is simultaneously done (that turned
             out to be the easiest way based on the Modal functionality supplied by Bootstrap).  So, we add event handlers
-            to the 'hide' event.
+            to the 'hide' event which Bootstrap always fires when a modal is closed.
             */
 
             let $hideButton = null;
@@ -490,115 +489,94 @@
                 $hideButton = null;
             });
 
-            //set up each modal to perform its action upon close
+            //then we perform the corresponding action for the given modal/button combination
             $('.entry-modal').on('hide.bs.modal', function(e) {
-
-                let $this = $(this), $button = $hideButton || $(document.activeElement), callback = $this.data('callback');
-                let prefix = $this.attr('id'), prefixArr = prefix.split('-'), table = prefixArr[0], type = prefixArr[1];
-                console.log('modal ' + $this.attr('id') + ' hidden');
-
-                if($button.hasClass('modal-cancel')) {
-                    return;
-
-                } else if($button.hasClass('modal-select')) {
-                    let id = $('#' + table + '-selected-id').val();
-                    if(!id) return;
-                    if(callback) callback.call(self, id);
-
-                } else if($button.hasClass('modal-save')) {
-                    let $tab = $button.parents('.tab-pane'), $form = $tab.find('form.entry-form'),
-                    arr = $form.serializeArray(), obj = {};
-
-                    for(let i = 0; i < arr.length; i++) obj[arr[i]['name']] = arr[i]['value'];
-
-                    //convert any multiple fields to proper format
-                    $form.find('.multiple-template').each(function() {
-                        let $this = $(this), $fields = $this.find('[name]');
-                        $fields.each(function() {
-                            let name = $(this).attr('name');
-                            obj[name] = {};
-                            for(let key in obj) if(key.startsWith(name + '_')) {
-                                obj[name][obj[key]] = true;
-                                delete obj[key];
-                            }
-                        });
-                    });
-
-                    if(table == 'framework') {
-                        for(let dep in obj.dependencies) {
-                            let framework = self.findEntry('framework', dep);
-                            //when saving a framework, flag dependency frameworks that need to be loaded
-                            //so the server can send them
-                            obj.dependencies[dep] = framework && !framework.loaded;
-                        }
-                    } else if(table == 'concept') {
-                        obj.commands = (obj.commands || '').replace(/\n/g, '<DELIM>');
-                    }
-
-                    console.log('saving entry');
-                    console.info(obj);
-                    $.ajax({
-                        url: Relation.prototype.saveEntryURL,
-                        type: 'post',
-                        dataType: 'json',
-                        data: JSON.stringify(obj),
-                        success: function(data) {
-                            if(data.hasOwnProperty('id') && !isNaN(data.id)) {
-                                self.storeEntries(data);
-                                if(callback) callback.call(self, data.id);
-                            }
-                        }
-                    });
-                }
+                relation.onModalHide($(this), $hideButton); //defined in /static/js/knowledge/interface.js
             });
+
+            // although there is always a single framework in use, it may have dependencies, so we actually are
+            // using the entire dependent set of frameworks.  So, to view concepts or laws from only one of those
+            // frameworks, we have framework filter dropdown menus.  When such a filter is changed, we have to redisplay
+            // the list of concepts/laws the user is looking at to only show those from the selected framework.
 
             let $filters = $('.framework-filter');
             $filters.change(function(e) {
                 let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal');
+
+                // if the filter is inside a modal, it means we are currently selecting a concept or law
+                // so update the search results displayed in that modal
+
                 if($modal.length > 0) {
                     let table = $modal.attr('id').split('-')[0];
                     $modal.find('.framework-filter').val(framework);
-                    self.showSearchResults(table, '');
+                    relation.showSearchResults(table, '');
+
+                // the only other place that has a filter is the concept palette used for adding nodes to law trees
+
                 } else if($this.attr('id') == 'palette-concept-filter') {
-                    self.filterPalette(framework);
+                    relation.filterPalette(framework);
                 }
             });
 
+            // There is always a single framework and a single law within that framework in use (if any)
+            // The .entry-wrapper divs contain the controls for selecting a different framework/law or editing
+            // the record of the one currently in use
+
             $('.entry-wrapper').each(function() {
                 let $this = $(this), table = $this.attr('table');
+
                 $this.find('.entry-set-button').click(function(e) {
-                    self.selectEntry(table, function(id) {
-                        if(table == 'framework') self.useFramework(id);
-                        else if(table == 'law') self.useLaw(id);
-                        let entry = self.findEntry(table, id);
+
+                    // when the 'Select Framework' or 'Select Law' button is clicked,
+                    // pop up the corresponding modal to load a different framework/law
+
+                    relation.selectEntry(table, function(id) { //defined in interface.js
+                        if(table == 'framework') relation.useFramework(id); //defined in interface.js
+                        else if(table == 'law') relation.useLaw(id); //defined in interface.js
+                        let entry = relation.findEntry(table, id);
                         $this.find('.entry-name').text(entry.name || 'None');
                         $this.find('.entry-info').show();
                     });
                 });
                 $this.find('.entry-edit-button').click(function(e) {
-                    let id = table == 'framework' ? self.framework.id : table == 'law' ? self.law.id : null;
+
+                    // when the 'Edit Framework' or 'Edit Law' button is clicked, pop up the
+                    // corresponding modal to edit the record currently in use
+
+                    let id = table == 'framework' ? relation.framework.id : table == 'law' ? relation.law.id : null;
                     if(!id) return;
-                    self.editEntry(table, id);
+                    relation.editEntry(table, id);
                 });
             });
 
-            $('#concept-create-button').click(function(e) {
-                self.newEntry('concept');
-            });
+            // inside the modals to select a new record is a search field to narrow down the list
+            // when the user changes the text in the search field, update the list of results accordingly
 
             $('.search-field').on('keydown change', function(e) {
                 let $this = $(this), text = $this.val().toLowerCase(), table = $this.attr('id').split('-')[0];
-                self.showSearchResults(table, text);
+                relation.showSearchResults(table, text);
             });
+
+            // multiple fields refers to fields in the database that have multiple items - for example,
+            // a concept can be an instance of multiple other concepts.  On the forms, these are displayed as
+            // one row (eg. a dropdown to select the parent concept) with an Add button next to it to
 
             $('.multiple-wrapper').each(function() {
                 let $this = $(this);
-                self.addMultipleField($this);
+                relation.addMultipleField($this);
                 $this.find('.multiple-add').click(function(e) {
-                    self.addMultipleField($this);
+                    relation.addMultipleField($this);
                 });
             });
 
+            // pop up the dialog to create a new concept in the current framework
+            $('#concept-create-button').click(function(e) {
+                relation.newEntry('concept');
+            });
+
+            // add, select, and remove predicate sets from the current law
+            // for more on these, see /models/db.py
+            // you can right-click on a node and add it to the current predicate (see diagram.js)
 
             $('#set-predicate').change(function(e) {
                 relation.setPredicate($(this).val());
@@ -607,6 +585,7 @@
                 relation.removePredicate();
             });
 
+            // save the
             $('#save-relation').click(function(e) {
                 relation.save();
             });
