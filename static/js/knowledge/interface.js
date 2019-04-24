@@ -309,6 +309,8 @@
             where the user can enter search text to find the desired entry.  The 'New' tab is also
             available, where they can create a new entry in that table.
 
+            For an explanation of 'opts', see 'showEntryModal' below
+
             called from knowledge.html upon clicking 'Select Framework' or 'Select Law'
         */
         Relation.prototype.selectEntry = function(table, opts) {
@@ -321,6 +323,13 @@
         };
 
 
+        /*
+            newEntry: pops up the modal to create a new entry in the given table.
+            Currently only called from knowledge.html when the user clicks the 'New Concept' button by the
+            concept palette, but could be used for any table.
+
+            For an explanation of 'opts', see 'showEntryModal' below
+        */
         Relation.prototype.newEntry = function(table, opts) {
             let self = this;
             if(!opts) opts = {};
@@ -330,6 +339,16 @@
         };
 
 
+        /*
+            editEntry: pops up the modal to edit the given entry in the given table.
+            'entry' can be an ID number, the name of the entry, or the actual entry record.
+            Currently called from knowledge.html when the user clicks the 'Edit' button
+            next to the current framework or current law.  Also from diagram.js when the user
+            right-clicks a concept in the concept palette, or a node in the diagram, and
+            chooses 'Edit Concept' from the context menu.
+
+            For an explanation of 'opts', see 'showEntryModal' below
+        */
         Relation.prototype.editEntry = function(table, entry, opts) {
             let self = this;
             if(!opts) opts = {};
@@ -340,6 +359,13 @@
         };
 
 
+        /*
+            duplicateEntry: pop up the modal to create a new entry for the given table, but
+            with the form fields auto-filled with the information of the given 'entry' which
+            can be an ID, name, or entry record.
+
+            For an explanation of 'opts', see 'showEntryModal' below
+        */
         Relation.prototype.duplicateEntry = function(table, entry, opts) {
             let self = this;
             if(!opts) opts = {};
@@ -350,33 +376,65 @@
         };
 
 
+        /*
+            showEntryModal: pop up the modal for the given table with the specified options in 'opts'.
+            opts is an object whose keys can include:
+                'callback': set to the function that should be called when the modal is closed via any button.
+                'enabledTabs': an array including one or more of: 'create', to allow the user to create a new record
+                    via the 'New' tab; 'edit', allowing them to edit a record; and 'search' to allow them to find and
+                    select a record.  For example, ['create', 'search']
+                'tab': the default tab that should be shown when the modal is popped up.
+                'entry': an ID, name, or full record of an entry whose information should be populated in the form.
+                    If editing, this information goes in the 'edit' form, if duplicating it goes in the 'create' form.
+                'fields': an object of field-value pairs to be populated in the form, if a full entry is not given.
+                    For example, {name: 'Bob', description: 'a cat'}
+
+            opts can also just be a function, in which case that function will be treated as the 'callback'.
+
+            Used by the above functions to allow the user to create/edit/duplicate/select entries from the page.
+        */
         Relation.prototype.showEntryModal = function(table, opts) {
             let self = this, $modal = $('#' + table + '-modal');
-
             if(!opts) opts = {};
+
+            // if opts is just a function, treat that as the callback when the modal is closed
             if(typeof opts === 'function') opts = { callback: opts };
 
+            // figure out which tabs are to be available to the user and which is shown by default
             let showSearch = false;
+            // first hide all tabs
             $modal.find('.entry-tab').hide();
+            // then loop through all the tabs in the modal
             $modal.find('.entry-tab').each(function() {
+                // the structure of the tabs in the modal is defined in /views/default/entry.load
                 let $this = $(this), $link = $this.children('.nav-link'),
                     tabName = $link.attr('id').split('-')[1];
+                // enable the tab if the options have specified that it is available
                 if((Array.isArray(opts.enabledTabs) && opts.enabledTabs.indexOf(tabName) >= 0) || opts.tab === tabName) {
                     $this.show();
                     if(opts.tab === tabName) $link.tab('show');
+                    // if the search tab is to be shown first, we will start by showing the list of all records from this table
                     if(tabName === 'search') showSearch = true;
                 }
             });
 
+
+            // by default, set the framework filter of each tab to the current framework
             $modal.find('.framework-filter').val(self.framework.id);
+
+            // if either the 'create' or 'edit' form is being shown, and there is an 'entry' or 'fields'
+            // option specified, pre-populate the form with the given entry record or specific fields
             $modal.find('.entry-form').each(function() {
                 let $form = $(this), type = $form.attr('id').split('-')[1];
+                // ignore forms whose tabs are being hidden
                 if(opts.enabledTabs && opts.enabledTabs.indexOf(type) < 0) return;
 
                 let entry = opts.entry;
+                // if an entry was given as an ID or name, retrieve its actual record
                 if(entry && typeof entry !== 'object') {
                     entry = self.findEntry(table, opts.entry);
                 }
+                // pre-populate the form with the entry's information
                 if(entry instanceof Entry) {
                     $form.find('[name="id"]').val(entry.id);
                     $form.find('[name="name"]').val(entry.name);
@@ -400,51 +458,83 @@
                         }
                         if(depCount == 0) self.addMultipleField($wrapper);
                     }
+                // if no entry was provided, clear the form
                 } else {
                     $form.trigger('reset');
                     $form.find('.framework-filter').val(self.framework.id);
                 }
 
+                // the 'table' input in the form is not part of the entry, but lets the server know which
+                // database table to update
                 $form.find('[name="table"]').val(table);
 
+                // if specific field-value pairs were given instead of an entry, populate those
                 if(typeof opts.fields === 'object') {
                     for(let name in opts.fields) {
-                        let value = opts.fields[name], $el = $form.find('[name="' + name + '"]');
+                        // get the value provided for the field
+                        let value = opts.fields[name];
+                        // find the corresponding element in the form
+                        let $el = $form.find('[name="' + name + '"]');
                         if($el.length < 1) continue;
 
                         let $multiple = $el.parents('.multiple-wrapper');
 
+                        // populate the field in the form depending on what type of field it is
+
                         if($el.is('input[type=checkbox]')) $el.attr('checked', value ? true : false);
+                        // for a list-type field, the value should be an array, and for each element in the array
+                        // we add a row to the list
                         else if($multiple.length > 0 && Array.isArray(value)) {
                             $multiple.find('.multiple-item').first().nextAll('.multiple-item').remove();
                             value.forEach(function(row) {
-                                self.addMultipleField($multiple, row);
+                                self.addMultipleField($multiple, row); //defined below in this file
                             });
                         } else $el.val(value);
                     }
                 }
             });
 
+            // see above - if we are starting on the 'search' tab, show all records from this table,
+            // and let the user enter search text to narrow down the list
             if(showSearch) self.showSearchResults(table, '');
 
+            // store the callback function (if any) in the modal object so we can retrieve and call it when the modal is closed
             $modal.data('callback', opts.callback);
+
+            // pop up the modal
             $modal.modal('show');
         };
 
 
+        /*
+            onModalHide: called from knowledge.html whenever a modal is hidden.  This happens when the user clicks 'Select'
+            to select an entry, or 'Save Changes' to save a new entry or edit an existing one, or if they click 'Cancel'.
+            In knowledge.html the last-clicked button is kept track of, and that is passed to this function as '$hideButton'
+            so we know which button was used to close the modal, and therefore what action to take.
+        */
         Relation.prototype.onModalHide = function($modal, $hideButton) {
-            let $this = $(this), $button = $hideButton || $(document.activeElement), callback = $this.data('callback');
-            let prefix = $this.attr('id'), prefixArr = prefix.split('-'), table = prefixArr[0], type = prefixArr[1];
-            console.log('modal ' + $this.attr('id') + ' hidden');
+            let self = this;
 
+            // if no button click was registered then we can just assume the active element is the button that was clicked
+            let $button = $hideButton || $(document.activeElement);
+            // the custom callback function, if any, was stored in this modal in 'showEntryModal' above - now it is to be called
+            let callback = $modal.data('callback');
+            // each modal has an 'id' of the form {table}-modal
+            let prefix = $modal.attr('id'), prefixArr = prefix.split('-'), table = prefixArr[0], type = prefixArr[1];
+            console.log('modal ' + $modal.attr('id') + ' hidden');
+
+            // if the modal was hidden via the 'Cancel' button, we don't have to do anything
             if($button.hasClass('modal-cancel')) {
                 return;
 
+            // if 'Select', we just chose an entry, so perform the specified callback with the ID of that entry
             } else if($button.hasClass('modal-select')) {
                 let id = $('#' + table + '-selected-id').val();
                 if(!id) return;
                 if(callback) callback.call(self, id);
 
+            // if 'Save', that means the user just filled out the 'create' or 'edit' form, so we take what they entered,
+            // convert it to the format that will be saved in the database by the server, and pass it to the server
             } else if($button.hasClass('modal-save')) {
                 let $tab = $button.parents('.tab-pane'), $form = $tab.find('form.entry-form'),
                 arr = $form.serializeArray(), obj = {};
@@ -453,11 +543,17 @@
 
                 //convert any multiple fields to proper format
                 $form.find('.multiple-template').each(function() {
+                    // the .multiple-template is the hidden dummy row that gets copied each time the user adds a row;
+                    // the template's field names are given an incremented numeric suffix in each added row.
                     let $this = $(this), $fields = $this.find('[name]');
+                    // loop through each field in the template that has a 'name' attribute
                     $fields.each(function() {
                         let name = $(this).attr('name');
                         obj[name] = {};
+                        // now find each field in the form that has the same name but with a suffix
                         for(let key in obj) if(key.startsWith(name + '_')) {
+                            // lump all the suffixed fields with the template field so the server knows they are
+                            // a single list item
                             obj[name][obj[key]] = true;
                             delete obj[key];
                         }
@@ -467,24 +563,29 @@
                 if(table == 'framework') {
                     for(let dep in obj.dependencies) {
                         let framework = self.findEntry('framework', dep);
-                        //when saving a framework, flag dependency frameworks that need to be loaded
-                        //so the server can send them
-                        obj.dependencies[dep] = framework && !framework.loaded;
+                        // if we're saving a framework, that means we may have changed its dependency frameworks;
+                        // so flag the dependencies that have not yet been loaded so the server can pass them along
+                        obj.dependencies[dep] = framework && !framework.loaded; //use a boolean value to say whether it needs to be loaded
                     }
                 } else if(table == 'concept') {
+                    // convert the data commands for a concept to the form they will be stored in the database
                     obj.commands = (obj.commands || '').replace(/\n/g, '<DELIM>');
                 }
 
                 console.log('saving entry');
                 console.info(obj);
+
+                // finally, pass the entry data to the server to be saved in the database
                 $.ajax({
-                    url: Relation.prototype.saveEntryURL,
+                    url: Relation.prototype.saveEntryURL, // defined in knowledge.html
                     type: 'post',
                     dataType: 'json',
                     data: JSON.stringify(obj),
                     success: function(data) {
                         if(data.hasOwnProperty('id') && !isNaN(data.id)) {
-                            self.storeEntries(data);
+                            // once we know the database has been updated, we must update our local copy of that entry in memory
+                            self.storeEntries(data); // defined in databaseWrappers.js
+                            // also we call the custom callback, if any was specified, on the newly saved entry
                             if(callback) callback.call(self, data.id);
                         }
                     }
@@ -493,11 +594,18 @@
         };
 
 
+        /*
+            addMultipleField: add a row to a list item, with the specified values for all elements in that row.
+            $element should be the '.multiple-wrapper' div (see /views/default/create_edit.load for the mutiple item structure)
+            and 'values' is an object with name-value pairs for each element in the row that has a 'name' attribute.
+        */
         Relation.prototype.addMultipleField = function($element, values) {
+            // the .multiple-template is the dummy row that gets copied each time
             let self = this, $template = $element.find('.multiple-template');
-            //add a new copy of the template
+            // add a new copy of the template
             let $entry = $template.clone().removeClass('multiple-template');
-            //update any input field choices according to the current data set
+            // if the row has any entry-selector dropdowns, update their list of choices (for example, a concept can be an
+            // instance of multiple other concepts, so it has a multiple item where each row has a dropdown to select the parent concept)
             self.updateFields($entry);
             //update the index, and values if given, on all sub-elements that have names for form submission
             $element.find('.multiple-item').last().after($entry);
@@ -507,7 +615,7 @@
                 $this.attr('name', name + '_' + index);
                 if(typeof values == 'object' && values.hasOwnProperty(name)) $this.val(values[name]);
             });
-            //add listener to the REMOVE button
+            //add listener to the REMOVE button in case the user decides to remove this row later
             let $required = $entry.find('.multiple-required'), $removeButton = $entry.find('.multiple-remove');
             $removeButton.click(function(e) {
                 if($(this).hasClass('disabled')) return;
@@ -516,21 +624,31 @@
         };
 
 
+        /*
+            showSearchResults: in the 'search' tab of a modal, show the list of all records whose name
+            contains the specified search text.  This text will be empty (no filtering) when the modal is first shown,
+            and the function is called again whenever the user edits the search text.  Called elsewhere in this file.
+        */
         Relation.prototype.showSearchResults = function(table, text) {
             let self = this;
 
+            // get the local copy of all records for the specified table
             let entries = self.getTable(table), results = [];
             if(!entries) return;
 
             let $tab = $('#' + table + '-search-tab-content'), $results = $tab.find('#' + table + '-results'),
                 $framework = $tab.find('.framework-filter');
+            // see if the user has selected a framework in the framework filter field above the search text;
+            // if so, limit results to that framework as well
             let framework = $framework.val();
 
-            for(let i in entries) {
-                let id = i, entry = entries[id];
+            // loop through the entries in the table and see which match the framework/text filters
+            for(let id in entries) {
+                let entry = entries[id];
                 if(framework > 0 && entry.framework != framework) continue;
                 if(entry.hasOwnProperty('name')) {
                     let name = entry.name.toLowerCase();
+                    // if the entry name contains the search text, create an result div to display it and append it to the results array
                     if(name.indexOf(text) >= 0) {
                         let result =
                             '<div id="' + table + '-result-' + id + '" class="result-display">' +
@@ -539,15 +657,21 @@
                             result += '<span class="result-description">' + entry.description + '</span>';
                         result += '</div>';
                         let $result = $(result);
+
+                        // when the user clicks this div, it means they are selecting that entry. We then update the
+                        // 'selected-id' field of the modal, so when the modal is closed via the 'Select' button,
+                        // we know which record was highlighted.
                         $result.click(function(e) {
                             $('#' + table + '-selected-id').val(id);
                             $results.children().removeClass('selected');
+                            // the CSS specifies a highlight for an entry with the .selected class
                             $(this).addClass('selected');
                         });
                         results.push($result);
                     }
                 }
             }
+            // clear the results display section and fill it with the newly found entries
             $results.empty();
             results.forEach(function($res) { $results.append($res); });
         };

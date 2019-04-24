@@ -1,5 +1,29 @@
+/*
+    databaseWrappers.js - Adam Herbst 4/23/19
+
+    This file's main purpose is to specify the wrapper classes for the database tables.  These tables are
+    specified in /models/db.py.  When we load a database entry from the server, the 'storeEntries' function in this
+    file is called.  That function creates an object in memory to hold the entry so we don't have to load it every time
+    we need to reference it.  The prototype of the created object corresponds to the table it is from.  For example,
+    when we load a concept, a Concept object (defined below) is created.  All fields from the database are stored in the
+    object, and its prototype has functions allowing it to perform actions specific to that table.  For example, the
+    Concept prototype has an 'instanceOf' function to check whether that concept is an instance of another specified concept.
+
+    All table-specific wrapper classes inherit from the generic Entry class.  This defines basic functions like storing data
+    fields passed from the server, and adding event handlers to be fired when the record is updated in a certain way.
+
+    The short Misc library is also defined here since it is used several times by the wrapper classes, although it is used
+    in other files as well, especially nodeData.js.  It simplifies common operations on JavaScript objects like adding an
+    index whose parent indices may or may not have been added already.
+*/
+
         var Misc = {};
 
+        /*
+            get the value at an index of a JS object.  For example, Misc.getIndex(obj, 'a', 'b', 'c') will check if
+            obj['a']['b']['c'] exists, and if so return its value.  Without this helper function we'd have to first check if
+            obj['a'] exists, then obj['a']['b'], then obj['a']['b']['c'] to avoid runtime index errors.
+        */
         Misc.getIndex = function() {
             let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
             for(let i = 1; i < n; i++) {
@@ -12,6 +36,10 @@
             return ref;
         };
 
+        /*
+            like getIndex, but creates the index with the specified value if it doesn't exist yet.  For example,
+            Misc.getOrCreateIndex(obj, 'a', 'b', 5) will return obj['a']['b'] if it already exists, otherwise set it to 5.
+        */
         Misc.getOrCreateIndex = function() {
             let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
             for(let i = 1; i < n; i++) {
@@ -23,6 +51,9 @@
             return ref;
         };
 
+        /*
+            set an index of an object.  Same syntax as above, but in this case the index will be overwritten if it exists.
+        */
         Misc.setIndex = function(obj) {
             let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
             for(let i = 1; i < n-2; i++) {
@@ -34,6 +65,9 @@
             ref[args[n-2]] = args[n-1];
         };
 
+        /*
+            Delete the specified index of the given object.
+        */
         Misc.deleteIndex = function(obj) {
             let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0], i = 1, refs = [];
             for(; i < n-1; i++) {
@@ -49,6 +83,11 @@
             }
         };
 
+        /*
+            loop through each sub-key of the given key of the given object, calling the callback function
+            on the value of the subkey.  If the callback returns true the loop halts.  If the key is omitted,
+            all keys of the object will be looped through.
+        */
         Misc.each = function(obj, callback, key) {
             if(!obj || typeof obj !== 'object') return;
             let stop = callback.call(obj, obj, key);
@@ -60,8 +99,10 @@
             }
         };
 
-        //apply a callback function to a sub-object of an object, treating the sub-object
-        //as an array according to its keys
+        /*
+            apply a callback function to a sub-object of an object, treating the sub-object
+            as an array according to its keys
+        */
         Misc.eachChild = function() {
 
             let n = arguments.length;
@@ -83,6 +124,11 @@
             });
         };
 
+        /*
+            used by the above functions - given an argument list,
+            converts undefined values to empty strings, and unpacks arrays,
+            so that we have a single list of strings, representing a chain of indices in a JS object
+        */
         Misc.cleanArguments = function(args, clean) {
             if(!clean) clean = [];
             for(let i = 0; i < args.length; i++) {
@@ -94,6 +140,12 @@
             return clean;
         };
 
+        /*
+            Convert an object to an array.  If the object has only numeric keys starting from 0,
+            the values of these keys are the elements of the array.  Otherwise, the array's only element is
+            the object itself.  If the object has 0-indexed numeric keys but also other keys, the
+            whole object is appended as a final array element.  Used here and in nodeData.js
+        */
         Misc.asArray = function(obj) {
             if(typeof obj !== 'object') return [obj];
             let arr = [], i = 0;
@@ -106,49 +158,63 @@
 
 
 
+        /*
+            Entry: the generic wrapper class from which all four table-specific wrapper classes inherit.
+            Each instance of this class corresponds to one database record.
+        */
         function Entry() {
             this.eventHandlers = {};
         }
 
+        // get the value of a specified field in this record
         Entry.prototype.get = function(key) {
             return this[key];
         };
 
+        // set the value of a specified field in this record
         Entry.prototype.set = function(key, value) {
             this[key] = value;
         };
 
+        // get the ID of this record
         Entry.prototype.getId = function() {
             return this.id;
         };
 
+        // ask the global relation object to find the specified record from the given table
         Entry.prototype.findEntry = function(table, data) {
             if(this.relation) return this.relation.findEntry(table, data);
             return null;
         };
 
+        // ask the global relation object to find the ID of the record with the given data
         Entry.prototype.findId = function(table, data) {
             if(this.relation) return this.relation.findId(table, data);
             return null;
         };
 
+        // store the given data fields (probably passed from the server) in this record
         Entry.prototype.store = function(data) {
             for(let key in data) {
                 this.set(key, data[key]);
             }
         };
 
+        // defined individually for each wrapper class - to be called before storing the record from the server
         Entry.prototype.preprocess = function() {
         };
 
+        // defined individually for each wrapper class - to be called after storing the record from the server
         Entry.prototype.postprocess = function() {
         };
 
+        // add a callback to this record for the given 'event' string, to be called anytime that event is fired by other code
         Entry.prototype.on = function(event, handler) {
             if(!this.eventHandlers[event]) this.eventHandlers[event] = [];
             this.eventHandlers[event].push(handler);
         };
 
+        // fire the specified event string, with the given data.
         Entry.prototype.trigger = function(event, data) {
             let self = this;
             if(!self.eventHandlers[event]) return;
@@ -158,6 +224,11 @@
         };
 
 
+        /*
+            wrapper class for the 'framework' table in the database.
+            Doesn't currently need any functionality other than the basic functions provided by the Entry prototype,
+            but functions could be added to it as needed.
+        */
         function Framework() {
             Entry.prototype.constructor.call(this);
         }
@@ -167,6 +238,9 @@
         Framework.prototype.table = 'framework';
 
 
+        /*
+            wrapper class for the 'concept' table in the database.
+        */
         function Concept() {
             Entry.prototype.constructor.call(this);
         }
@@ -176,17 +250,28 @@
         Concept.prototype.table = 'concept';
         Concept.prototype.wildcardConcept = 2;
 
+        // convert a concept's data commands from the database storage format to an array of separate commands
         Concept.prototype.postprocess = function() {
             this.commands = (this.commands || '').split('<DELIM>').map(s => s.trim());
         };
 
+        // check if this concept is an instance of that given by 'parent'
         Concept.prototype.instanceOf = function(parent) {
             let self = this;
+            // if parent wasn't given as an ID, retrieve its ID
             if(typeof parent == 'string') parent = self.findId(self.table, parent);
             else if(parent instanceof Concept) parent = parent.id;
+
+            // every concept is an instance of the wildcard concept
             if(parent === self.wildcardConcept) return true;
+
+            // a concept is an instance of itself
             if(self.id == parent) return true;
+
+            // see if this concept is marked as an instance of the parent
             if(self.dependencies[parent]) return true;
+
+            // otherwise check recursively on each of my parent concepts
             for(let dep in self.dependencies) {
                 let concept = self.findEntry(self.table, dep);
                 if(concept.instanceOf(parent)) return true;
@@ -194,23 +279,30 @@
             return false;
         };
 
+        // get an array of all concepts of which this one is an instance
         Concept.prototype.getAllConcepts = function(obj) {
             let self = this;
-            if(!obj) obj = {};
-            if(obj.hasOwnProperty(self.id)) return;
-            obj[self.id] = self;
+
+            if(!obj) obj = {}; // to store all concepts of which I am an instance
+            if(obj.hasOwnProperty(self.id)) return; // this concept has already been checked via the recursion below
+            obj[self.id] = self; // I am an instance of myself
+
+            // recursively add each parent concept to the list
             for(let id in this.dependencies) {
                 let concept = this.findEntry('concept', id);
-                if(concept) concept.getAllConcepts(obj);
+                if(concept) concept.getAllConcepts(obj); // pass the existing list to the parent to be edited
             }
             return obj;
         };
 
-        //compile symbols of this concept and all dependencies into one
+        // get the list of my data commands
         Concept.prototype.getCommands = function() {
             return this.commands;
         };
 
+        // get the data commands of me and all my dependencies in one array
+        // (when a node executes its data commands, it executes those of all concepts of which it is an instance)
+        // used in nodeData.js
         Concept.prototype.getAllCommands = function() {
             let self = this, commands = [];
             let concepts = self.getAllConcepts();
@@ -220,15 +312,15 @@
             return commands;
         };
 
+        // check if this is the wildcard concept
         Concept.prototype.isWildcard = function() {
             return this.framework === null && this.name === 'anything';
         };
 
-        Concept.prototype.isData = function() {
-            return this.framework === null && this.name === 'data';
-        };
 
-
+        /*
+            wrapper class for the 'law' database table.
+        */
         function Law() {
             Entry.prototype.constructor.call(this);
             this.nodes = [];
@@ -241,17 +333,33 @@
         Law.prototype.constructor = Law;
         Law.prototype.table = 'law';
 
+        /*
+            predicateTop: an object that indexes all nodes that are the top node in a law predicate
+            (ie. they are not the child of any node).  For example, Newton's 2nd Law is predicated on a body
+            which has a net force, mass, and acceleration - but these last 3 are child nodes of the body node,
+            so only the body node is a predicate top.  The index is on the concept ID followed by the node ID:
+
+                Law.predicateTop[{concept id}][{node id}] = true
+
+            This is used when matching a node in a problem description tree to possible predicates in the
+            'updateMatches' function of the Node predicate below.
+        */
         Law.predicateTop = {};
 
+        /*
+            postprocess: overrides Entry.postprocess
+            Performed when a law record sent by the server is stored via the 'storeEntries' function below
+        */
         Law.prototype.postprocess = function() {
             let self = this;
-            //update hash tags
+            // the hashtags of a law are stored as a comma-separated string in the database; convert that
+            // to an object with each hashtag as an index
             let hashtags = self.hashtags;
             self.hashtags = {};
             if(hashtags) hashtags.split(',').forEach(function(tag) {
                 if(tag) self.hashtags[tag] = true;
             });
-            //update which nodes are deep nodes of this law
+            // figure out which nodes are deep nodes of this law (ie. have no child nodes)
             self.calculateDeepNodes();
             //update predicate groups
             self.predicateSets = [];
@@ -862,10 +970,6 @@
 
         Node.prototype.getData = function() {
             return this.data;
-        };
-
-        Node.prototype.isData = function() {
-            return this.getConcept().isData();
         };
 
         Node.prototype.getDataKey = function() {
