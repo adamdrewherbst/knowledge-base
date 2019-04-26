@@ -1,5 +1,28 @@
 /*
 
+Because we need to represent law description trees in more understandable ways, ie. through pictures and symbols,
+we store a tree of data in each node which contains the information needed to visualize or symbolize it.
+This tree is the NodeData prototype defined below.
+
+Similarly, each concept stores a set of commands that manipulate the NodeData tree.  This is the NodeDataCommand
+prototype below.  Commands have a particular format.  Consider this command of the 'component' concept,
+which represents a component of a vector, to illustrate:
+
+    A.visual.delta:R += S.value * B.visual.delta:R
+
+The 'A', 'S', and 'B' prefixes represent nodes connected to the given node.  'A' stands for head, 'B' for reference,
+'S' for self, and 'C' for children.  For a 'component', the head will be a 'vector', and the reference will be a
+'direction'.  If we know all the vector's components, and we know how each of its component directions is visualized
+on the screen, then we can draw the vector.  In this case, the direction will have a 'visual.delta' data key, which
+represents the x,y pixel components of that direction's unit vector on screen.  Likewise, the component will have a 'value'
+key which stores the magnitude of that component.  We multiply the component by the unit vector, add those up for all
+components (hence the '+=' operator), and we have the vector's x,y pixel components (it's 'visual.delta').
+
+    (Note that the above command should work for rectangular coordinate systems, but we might need something more sophisticated in general)
+
+The first part of the command is always the node/data-key pair that we are modifying.  Next is the operation (in this case '+=')
+and then the expression.
+
 A node can store various types of data: value, visual, symbol.  All data is stored in
 a single JavaScript object, where each type is under its corresponding key and is further
 specified by subkeys.
