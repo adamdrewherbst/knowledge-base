@@ -1,8 +1,8 @@
 /*
 
 Because we need to represent law description trees in more understandable ways, ie. through pictures and symbols,
-we store a tree of data in each node which contains the information needed to visualize or symbolize it.
-This tree is the NodeData prototype defined below.
+we store data in each node which contains the information needed to visualize or symbolize it.
+This data is stored as a tree within the node, and is implemented by the NodeData prototype defined below.
 
 Similarly, each concept stores a set of commands that manipulate the NodeData tree.  This is the NodeDataCommand
 prototype below.  Commands have a particular format.  Consider this command of the 'component' concept,
@@ -12,142 +12,94 @@ which represents a component of a vector, to illustrate:
 
 The 'A', 'S', and 'B' prefixes represent nodes connected to the given node.  'A' stands for head, 'B' for reference,
 'S' for self, and 'C' for children.  For a 'component', the head will be a 'vector', and the reference will be a
-'direction'.  If we know all the vector's components, and we know how each of its component directions is visualized
-on the screen, then we can draw the vector.  In this case, the direction will have a 'visual.delta' data key, which
-represents the x,y pixel components of that direction's unit vector on screen.  Likewise, the component will have a 'value'
-key which stores the magnitude of that component.  We multiply the component by the unit vector, add those up for all
-components (hence the '+=' operator), and we have the vector's x,y pixel components (it's 'visual.delta').
+'direction'.  The direction will have a 'visual.delta' data key, which represents the x,y pixel components of that
+direction's unit vector on screen.  Likewise, the component will have a 'value' key which stores the magnitude of
+that component.  We multiply the component by the unit vector, add those up for all components (hence the '+=' operator),
+and we have the vector's x,y pixel components (it's 'visual.delta').
 
-    (Note that the above command should work for rectangular coordinate systems, but we might need something more sophisticated in general)
+The 'visual.delta' means that 'visual' is under the root of the data tree, and 'delta' is under that.  This way, 'visual'
+can have other sub-keys, and the entire 'visual' sub-tree is parsed in order to visualize the node.  If the key
+to be modified by a command has not yet been created in the referenced node, it will be automatically.
 
-The first part of the command is always the node/data-key pair that we are modifying.  Next is the operation (in this case '+=')
-and then the expression.
+The data tree is parsed in order to create the representations on the screen; this happens in represent.js.
 
-A node can store various types of data: value, visual, symbol.  All data is stored in
-a single JavaScript object, where each type is under its corresponding key and is further
-specified by subkeys.
+The ':R' flag on the visual.delta keys stands for 'recursive'.  The visual.delta key actually has 'x' and 'y' subkeys
+for the x and y pixel components, but instead of writing one command for each pixel direction, we use 'recursive'
+to say the command should be executed on all matching subkeys of the specified key.
 
-Additionally, a concept stores rules on how data flows through it.  For example,
-an 'equal' node passes value data from its reference to its head.  An 'augment' node
-adds the value of its reference to that of its head.  A 'product' node sets its own
-value to the product of its head and reference values.
+    (Note that the above scheme works for rectangular coordinate systems, but we might need to develop something
+    more sophisticated in general)
 
-The parsing of data-flow rules is hard-coded.  A concept's rules consist of a set of
-one-line commands, where each command specifies:
+The first part of the command is always the node/data-key pair that we are modifying.  Next is the operation
+(in this case '+=') and then the expression.  In addition to the NodeDataCommand prototype, there is an Expression
+prototype to wrap the expression.
 
-    a) the node and the data subkey to be edited by this command.  The node is specified by a
-    chain of letters, where 'S' stands for the current node, 'A' stands for its head, 'B' for its
-    reference, and 'C' for all of its children.  This node specifier is followed by a chain of key
-    names identifying the data key to be updated.
-        So, for example, 'C.visual.origin' means we are editing the visual origin subkeys of
-    all children this node, while 'A.B.value' is the value key of the reference of the head of this node.
-        If no node is specified, the default is 'S', ie. this node.  Also, if the specified key isn't in
-    that node's data tree yet, it is added.
+A couple of operators on data trees are hard-coded below, but if the operator is not one of these, it is assumed to
+be raw JavaScript.  Likewise, any part of the expression that is not a reference to node data is parsed as JavaScript.
 
-    b) an operation to be performed on that node.  Certain special operations are recognized, such as 'add'
-    which adds a new subkey to the specified key, or 'clear' which deletes all its subkeys.  Otherwise
-    the operation can be a normal javascript assignment operator, such as =, +=, *=, etc.
+The code below enables a node to initialize its data tree, compile all commands supplied by its concept(s), and
+execute those commands.  This code is called primarily by the Law.prototype.resolveData function in databaseWrappers.js.
 
-    c) an expression to be passed to the operation.  This can contain references to subkeys of other
-    nodes, in the same format as part (a).
+Since the command can execute on all subkeys via the ':R' flag, the Expression and NodeDataCommand need to store the results
+for each subkey.  So they end up being trees, just like the NodeData.  So, we have all three prototypes inherit from
+a generic prototype, called Dependency, which stores a tree of values.  Also, these three prototypes reference each other
+in a cyclic way: node data may be used in an expression (S.value and B.visual.delta in the expression above), the
+expression is used by its command, and the command modifies data (A.visual.delta above).  Once the data is resolved (all
+commands that affect it have finished executing), the value of the data may in turn be used in some other expression in
+the same or another node.  So, each has to wait for the other to resolve, and when it resolves it may trigger something
+else.  For this reason, the Dependency prototype has functionality to wait on another Dependency, and trigger a
+Dependency once it resolves.
 
-    As an example, the 'equal' concept has a command of 'A.value = B.value', ie. it assigns the value
-    key of its reference (and its entire subtree) to that of its head.
+Finally, there is a small prototype called NodeVariables, also a Dependency, allowing a command to store its result in
+a temporary variable in the node, which may then be referenced by another command.
 
-
-More Examples:
-
-    Visual:
-    'body' - visual.shape.circle.radius = 30
-            C.symbol.subscript add A.symbol + B.symbol
-
-    'box' - visual.shape clear
-            visual.shape.square.width = 30
-                -overrides the default shape provided by 'body' using the clear() function
-
-    'vector' - visual.shape.line
-            symbol.over = &rharu;
-
-    'component' - A.visual.shape.line.delta += S.value * B.visual.delta
-
-        In this 'component' example, A would be a vector and B a direction.  The 'delta' key
-        stores a pixel difference and has keys 'x' and 'y'.  So this command looks for keys
-        'x' and 'y' under any key on the right-hand side, which it finds in B.visual.delta
-        (which represents the pixel delta of the direction's unit vector) and applies the 'x'
-        of the latter to the 'x' of the former etc.
-
-    'rectangular coordinate system' - S.visual.scale = 50
-                                        S.visual.angle = 0
-
-    'x-coordinate' - S.visual.delta.x = A.visual.scale * Math.cos(A.visual.angle)
-                    S.visual.delta.y = A.visual.scale * Math.sin(A.visual.angle)
-    'y-coordinate' - S.visual.delta.y = A.visual.scale * Math.sin(A.visual.angle)
-                    S.visual.delta.x = A.visual.scale * Math.cos(A.visual.angle)
-
-    'sum' - value = A + B
-            symbol = A + B
-
-Visual data will vary widely. Often the first-level keys will be shapes: line, triangle,
-arc, circle, rectangle, etc.  Each of these needs a sufficient set of subkeys to specify
-how it is to be drawn.  A line, for instance, could be determined by a start pixel coupled
-with either an end pixel, a pixel difference, or a length and direction.
-
-Any reference in a command to another node's data key is linked as a dependency.
-When that key is resolved, its value, which will itself be a tree (a subtree of the dependent node's
-data tree) will be passed back.  We have to somehow take all the dependent subtrees in a command
-and combine them per the command operations.
-
-In any part of a command that doesn't contain special operators, the only way to combine these
-subtrees is if they have the same key structure.  For example, if there were a command
-
-    visual.delta += A.visual.delta + B.visual.delta,
-
-and A and B's 'visual.delta' subtrees had 'x' and 'y' subkeys with numerical values, this would resolve to
-
-    visual.delta.x += A.visual.delta.x + B.visual.delta.x
-    visual.delta.y += A.visual.delta.y + B.visual.delta.y
-
-The data tree of a node can also be included directly in a relation, as child nodes of that node which
-have no reference link.
-
-
-We need to make sure no dependency is accidentally resolved before it is linked to its requirements.
-When we initialize data, we have to set all links before allowing anything to resolve.
-And when a command is added during evaluation, it's fine because everything else is already set...
-
-
-A direction only has a rotation and scale as its transform.  A vector additionally has an origin,
-which by default comes from its head.  But for position, the origin comes from the reference.
-The command S.visual.transform.origin:R = A.visual.transform.origin:R must be replaced by:
-    S.visual.transform.origin:R = B.visual.transform.origin:R
-    A.visual.transform.origin:R = S.visual.
 */
 
 
+/*
+    initData: put the default values into this node's data tree before running any commands.
+    This includes any numeric value assigned to the node, the default symbol of the node's concept,
+    and the concept itself.  Storing the concept may turn out to be unnecessary, but I was thinking that
+    the application of certain laws might determine that a node is an instance of another concept
+    in addition to its primary one.
+*/
 Node.prototype.initData = function(type) {
+
+    // if no type specified, initialize all types of data
     let self = this, types = type ? [type] : ['concept', 'symbol', 'value', 'visual'];
+
     types.forEach(function(type) {
         if(self.getData().getValue(type) !== undefined) return;
         switch(type) {
             case 'concept':
+                // this way, the 'concept' key will hold all concepts the node has been marked as, indexed by their record ID
                 self.setData('concept.' + self.concept, self.getConcept());
                 break;
             case 'symbol':
+                // the default symbol is the node's name if any, otherwise the symbol of its concept, or the
+                // first of its inherited concepts that has a symbol
                 let symbol = '';
                 if(self.name) symbol = self.name;
                 else {
                     let s = self.getDefaultSymbol();
                     if(s != null) symbol = s;
                 }
+                // The symbol is displayed as MathML via the MathJax plugin - see knowledge.html for description,
+                // or MathML documentation for explanation of the <m...> tags
+                // at http://www.math-it.org/Publikationen/MathML.html#Basic_Elements
                 if(symbol) {
                     if(!isNaN(symbol)) symbol = '<mn>' + symbol + '</mn>';
                     else if(symbol.length == 1) symbol = '<mi>' + symbol + '</mi>';
                     else if(symbol.length > 1) symbol = '<mtext>' + symbol + '</mtext>';
                 }
+                // we treat the default text as the symbol's main text; the data commands may add keys
+                // such as subscripts and superscripts that modify the main text
                 self.setData('symbol.text', symbol);
+                // the complete symbol text including subscripts etc. will be stored in the 'symbol' key in MathML format
                 self.setData('symbol', '');
                 break;
             case 'value':
+                // if the node has a specified numeric value
                 let value = self.getValue();
                 if(value) self.setData('value', value);
                 else self.setData('value', undefined);
@@ -159,37 +111,55 @@ Node.prototype.initData = function(type) {
     });
 };
 
+
+/*
+    compileCommands: take the raw commands from all concepts of this node, and parse them into
+    NodeDataCommand objects by determining what nodes and data keys they reference, what operation
+    they are performing, etc.
+*/
 Node.prototype.compileCommands = function(doCheck) {
     let self = this;
 
-    //any commands that already exist on this node should be activated
-    //if we are currently propagating that type of data
+    // if commands have already been compiled on this node, activate those whose data type is currently being propagated
     for(let id in self.commands) {
         self.commands[id].checkActive();
     }
 
-    //only compile commands from concepts that have not yet been compiled on this node
-    self.initData('concept');
+    // make a list of concepts that have not yet been compiled on this node
+    self.initData('concept'); // start by making sure our primary concept is in the tree if nothing else
+    // get all dependency concepts from those marked in the tree
     let concepts = self.getAllConcepts(), commandStrings = [];
     for(let id in concepts) {
+        // remove those from the list that have already been compiled
         if(Misc.getIndex(self.conceptInfo, id, 'compiled')) delete concepts[id];
         else {
             commandStrings.push.apply(commandStrings, concepts[id].getCommands());
+            // and mark the others as compiled so they won't be re-compiled next time
             Misc.setIndex(self.conceptInfo, id, 'compiled', true);
         }
     }
 
+    // compile each as yet uncompiled command
     commandStrings.forEach(function(commandStr) {
         if(!commandStr) return;
 
-        let tokens = commandStr.split(/\s+/), tgt = tokens.shift(), op = tokens.shift(),
-            exp = tokens.join(' '), context = false;
+        // split the command into tokens separated by whitespace
+        let tokens = commandStr.split(/\s+/),
+            tgt = tokens.shift(),   // the first token is the node/data key that this command will modify
+            op = tokens.shift(),    // next is the operation to be performed on that key
+            exp = tokens.join(' '), // the rest of the command is the expression to be passed to the operator
+            context = false;    // false if the node references in the expression are relative to this node,
+                                // true if they are relative to the target node
 
+        // figure out which node/data key pair we are modifying (the target)
         let tgtRef = self.parseReferences(tgt)[0];
-        if(!tgtRef || tgtRef.start > 0 || tgtRef.end < tgt.length) return;
+        if(!tgtRef || tgtRef.start > 0 || tgtRef.end < tgt.length) return; // the entire target token should be parsed to a reference
 
+        // the target may modify a temporary variable in this node, to be referenced by another command elsewhere
         if(tgtRef.type === 'var') {
+            // find all node/data references in the expression
             let expression = self.parseExpression(exp);
+            //
             let command = new NodeDataCommand(null, tgtRef.key, op, expression, tgtRef.recursive, tgtRef.variable);
             command.wait(self.variables, tgtRef.var);
         } else if(tgtRef.type === 'node') {
