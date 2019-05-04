@@ -1,4 +1,6 @@
 /*
+    These functions pertain to the middle section of the page, where the user can visually manipulate a law's tree.
+    First, there is a palette on the left side containing all concepts from the framework currently in use;
 
 */
 
