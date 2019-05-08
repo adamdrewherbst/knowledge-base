@@ -1,21 +1,46 @@
 /*
     These functions pertain to the middle section of the page, where the user can visually manipulate a law's tree.
     First, there is a palette on the left side containing all concepts from the framework currently in use;
+    on the right side is a diagram canvas.  The user drags the concept they want from the palette into the diagram,
+    and a node is created with that concept.  They can drag the nodes around to arrange them.  If they drag from the bottom
+    of a node to the top of another node, the first node becomes the head of the second.  From the top of one node to
+    the bottom of another, the first node becomes the reference of the second.  All of this functionality is handled
+    by the GoJS plugin.
 
+    Above the palette/diagram there is a dropdown menu to select one of the law's predicate sets to edit, or create a new one.
+    The user adds nodes to the predicate or removes them from it by right clicking on the node; the deep predicate nodes
+    for the currently selected set are highlighted yellow.
+
+    When the user right-clicks a node they have other options as well, such as giving a name to the node, changing its value, etc.
 */
 
 
+
+        /*
+            initDiagram: called once from knowledge.html to create the palette and diagram canvas; creates the global templates that will
+            be used to display all nodes and links in the diagram.
+
+            Anywhere in this file, '$$' is short for GoJS's go.GraphObject.make function (this was assigned in knowledge.html).
+            See GoJS documentation at https://gojs.net/latest/index.html
+        */
         Relation.prototype.initDiagram = function() {
             let self = this;
+
+            // create the diagram canvas in the #graph-canvas element (defined in knowledge.html)
             self.diagram = $$(go.Diagram, "graph-canvas",  // must name or refer to the DIV HTML element
             {
+                // the canvas has a grid as a background; set the parameters for this
               grid: $$(go.Panel, "Grid",
                       $$(go.Shape, "LineH", { stroke: "lightgray", strokeWidth: 0.5 }),
                       $$(go.Shape, "LineH", { stroke: "gray", strokeWidth: 0.5, interval: 10 }),
                       $$(go.Shape, "LineV", { stroke: "lightgray", strokeWidth: 0.5 }),
                       $$(go.Shape, "LineV", { stroke: "gray", strokeWidth: 0.5, interval: 10 })
                     ),
-              allowDrop: true,  // must be true to accept drops from the Palette
+
+                // allow the user to drag concepts from the palette and drop them in the diagram
+              allowDrop: true,
+
+              // other options for the diagram
               "draggingTool.dragsLink": true,
               "draggingTool.isGridSnapEnabled": true,
               "linkingTool.isUnconnectedLinkValid": true,
@@ -32,9 +57,12 @@
               //"rotatingTool.snapAngleMultiple": 15,
               //"rotatingTool.snapAngleEpsilon": 15,
               "undoManager.isEnabled": true,
+
+              // when the user clicks on a node, call a function to display information about that node
               "ChangedSelection": onSelectionChanged
             });
 
+            // display information about a node when the user clicks on it, in a div to the right of the diagram
             function onSelectionChanged(e) {
                 var graphNode = e.diagram.selection.first();
                 if (!(graphNode instanceof go.Node)) return;
@@ -59,7 +87,7 @@
               if (this.isActive) { this.diagram.layout.invalidateLayout(); }
             }
 
-            // when the document is modified, add a "*" to the title and enable the "Save" button
+            // when the diagram is modified, add a "*" to the page title in the browser, and enable the "Save" button
             self.diagram.addDiagramListener("Modified", function(e) {
               var button = document.getElementById("graph-save-button");
               if (button) button.disabled = !self.diagram.isModified;
@@ -71,6 +99,8 @@
               }
             });
 
+            // called in the node template below to create the top and bottom 'port' on each node;
+            // the user can press on this port and drag to the port of another node to create a link between them
             function makePort(name, spot, output, input, fromMax, toMax) {
                 // the port is basically just a small transparent square
                 var options =
@@ -98,18 +128,19 @@
               });
             }
 
-            // To simplify this code we define a function for creating a context menu button:
+            // generic function to create an option within the context menu of a node
             function makeButton(text, action, visiblePredicate) {
-              return $$("ContextMenuButton",
+                return $$("ContextMenuButton",
                        $$(go.TextBlock, text),
                        { click: action },
                        // don't bother with binding GraphObject.visible if there's no predicate
                        visiblePredicate ? new go.Binding("visible", "", function(o, e) { return o.diagram ? visiblePredicate(o, e) : false; }).ofObject() : {});
             }
 
-            // a context menu is an Adornment with a bunch of buttons in them
-            var partContextMenu =
+            // here is the template that is used as the context menu for each node
+            let partContextMenu =
               $$(go.Adornment, "Vertical",
+                    // give a node a name or rename it if it already has one
                     makeButton("Rename",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
@@ -121,6 +152,13 @@
                                 let part = o.part.adornedPart;
                                 return part.diagram === self.diagram;
                             }),
+                    // either pick a new concept for this node or create a new one;
+                    // by default, the 'concept' modal is brought up in the 'Create' tab,
+                    // but with all the fields copied from the node's current concept (so you
+                    // are creating a modified copy of this node's current concept), and the
+                    // new concept you create is marked as specific to this node (not accessible
+                    // from the palette).  But you can switch to the 'Select' tab, and pick an
+                    // exisiting concept for this node instead.
                     makeButton("Change Concept",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
@@ -152,6 +190,8 @@
                                 let part = o.part.adornedPart;
                                 return part.diagram === self.diagram;
                             }),
+                    // this is if you want to edit the global concept record of the node.  Any changes you make
+                    // here will apply to all nodes that have this concept.
                     makeButton("Edit Concept",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
@@ -161,6 +201,11 @@
                             function(o) {
                                 return true;
                             }),
+                    // give the node a value consisting of a set of real numbers
+                    // enter it as a semi-colon delimited list of intervals and numbers,
+                    // where square brackets represent a closed interval and parentheses an open interval (see example below)
+                    // We may want to eliminate intervals and have each node allowed only one number as its value;
+                    // this depends on what concepts we have
                     makeButton("Set Values",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
@@ -175,6 +220,9 @@
                                 let part = o.part.adornedPart;
                                 return part.diagram === self.diagram;
                             }),
+                    // add the node to the currently selected predicate set;
+                    // either this option or the 'Remove from Predicate' below will be displayed, but not both,
+                    // depending on whether the node is currently in the predicate set
                     makeButton("Add to Predicate",
                             function(e, obj) {
                                 let part = obj.part.adornedPart;
@@ -199,6 +247,7 @@
                             })
               );
 
+            // the string to display when a node is clicked on, to provide information about that node
             let infoString = function(obj) {
                 let part = obj.part;
                 if (part instanceof go.Adornment) part = part.adornedPart;
@@ -211,6 +260,10 @@
                 return msg;
             };
 
+
+            /*
+                This is the template we use for all nodes in the diagram.
+            */
             self.diagram.nodeTemplate = $$(go.Node, "Spot",
                 {
                     locationSpot: go.Spot.Center,

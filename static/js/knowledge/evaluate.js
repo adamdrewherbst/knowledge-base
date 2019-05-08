@@ -2,35 +2,25 @@
 
         RELATION EVALUATION:
 
-        Scheme: Start with the relation R.  For each node N, take its concept C, and find all laws L
-        that have a predicate on C.  Trace the predicate of L up to its roots, all the while matching its
-        nodes with those of the relation R.  If they all match up, retain the map between nodes of L and R.
+        Scheme: Start with the problem graph.  Iterate over all nodes in breadth-first fashion - that is, make sure the list
+        of nodes is such that each child is behind its parents in the list.  For each node, check if it matches a
+        'top predicate node' - ie. a node that has no parents, from the predicate of any law in the framework we are using.
+        Store all such matches.  Then, check if it matches a non-top predicate node whose parents have already matched
+        its parents.  This gives us a match between a triad (head-child-reference) in our law and a triad in the predicate
+        of another law.  In this way we may eventually match a 'deep predicate node', a predicate node whose children are not
+        part of the predicate.  When we do so, we create a map between the predicate node and its ancestors, and the matching
+        node with its matching ancestors.
 
-        If two maps M1 and M2 for the same law, different predicate nodes P1 and P2, are found to intersect - that is,
-        each node of R that is in both M1 and M2 maps to the same node of L, and each node of L that is in both M1 and M2
-        maps to the same node of R - then we check for a logic (AND/OR) relation between P1 and P2 in L.  If there is one,
-        we merge M1 and M2 into a new map M3 (still retaining M1 and M2).
+        This file defines the Map prototype to store these matches.
 
-        When another map M4 is later merged with M3, we again combine the predicate nodes of M4 and M3 using logic
-        from L.  As we keep merging maps, eventually we may have a map whose predicate nodes completely satisfy L.
-        At that point, we can append to our relation R the additional knowledge (relations) that L provides us.
-
-        Meta-Relations:
-        There can be general relations between concepts independent of any context.  For example, 'sum' and 'difference'
-        are inverses, as are several other pairs of mathematical concepts.  We express this as 'sum.inverse => difference'
-        and 'difference.inverse => sum'.
-            How do we apply this?  We can append '.inverse => difference' to every 'sum' in the relation, ie. have 'sum' and
-        'difference' be predicates in the above relation.  Or, we can have it be a concept relation with no predicates,
-        in which case it never gets appended to a relation but can itself be used as a predicate.  But then we can't match
-        on the 'inverse' node because it won't be in the relation.  Instead, seeing that 'inverse' is a meta-relation,
-        we have to check all meta-relation children of 'sum' to see if one of them is 'inverse', and then keep going from that
-        match.
-            Is this related to matching on node data?  A node may have data which is not itself represented as a node -
-        but it will be represented as a node in the law's predicate.  Once the node is matched, we match the data child by
-        seeing if the node has that data.  If it does, the node is marked as matching that data node.
+        If two maps for same law, different predicate nodes, are found to intersect, we create a new map which is the union
+        of those two.  By merging maps whenever they intersect, we may eventually get a map that contains an entire predicate
+        set of the law.  Then we can apply the law to our problem graph.
 
         */
 
+
+        // perform the evaluation on our relation, to find out what if any laws can be applied to it
         Relation.prototype.evaluate = function(opts) {
 
             let self = this;
@@ -56,6 +46,7 @@
         };
 
 
+        // reset the relation to its state before any evaluation was performed
         Relation.prototype.reset = function() {
             this.law.reset();
             Dependency.clearCommands();
@@ -65,11 +56,17 @@
             //this.visualize();
         };
 
+        // get the descriptive tag for the current round of evaluation; we will not re-evaluate a node
+        // for the same tag twice (unless it is reset with the 'reset' function above), but if the tag is
+        // changed and then we re-evaluate the relation, the node will be re-evaluated too.
+        // The default is an empty '' tag.
         Relation.prototype.getEvaluateTag = function() {
             return Misc.getIndex(this.options, 'evaluate', 'tag') || '';
         };
 
 
+        // a wrapper class for the map which stores a matching between predicate nodes from a certain law,
+        // and nodes from our relation
         function Map(law) {
             this.law = law;
             this.relation = law.relation;
@@ -91,22 +88,33 @@
             return str.join(', ');
         };
 
+        // add to this map a matching between the given relation node and predicate node;
+        // because of the way matching is checked (see Node.prototype.updateMatches in databaseWrappers.js),
+        // we also know that the node's parents match the predicate's parents, so we add those matching pairs
+        // to the map recursively.
         Map.prototype.addNode = function(node, predicate) {
             let self = this;
             if(!node || !predicate) return false;
+
+            // first see if this match has already been added to this map
             if(self.idMap[node.id] === predicate.id && self.idMap[predicate.id] === node.id) return true;
 
             console.log('adding node ' + node.id + ' to map ' + this.id + ' as ' + predicate.toString());
 
+            // mark the pair as matching
             self.idMap[node.id] = predicate.id;
             self.idMap[predicate.id] = node.id;
 
+            // if any other maps already contain this matching pair, mark this map as intersecting
+            // with those maps; later they will be checked to see if they fully intersect (see checkIntersection below)
             if(!node.maps[predicate.id]) node.maps[predicate.id] = {};
             for(let mapId in node.maps[predicate.id]) {
                 self.intersections[mapId] = node.maps[predicate.id][mapId];
             }
+            // store in the node the match to this predicate node in this map
             node.maps[predicate.id][self.id] = self;
 
+            // recursively add the matches between this node's parents and the predicate node's parents
             for(let i = 0; i < 2; i++) {
                 let nodeParent = node.getParent(i), predicateParent = predicate.getParent(i);
                 if(!predicateParent) continue;
@@ -115,6 +123,8 @@
             return true;
         };
 
+        // once two maps have been found to fully intersect via checkIntersection below,
+        // create a new map consisting of the union of these two maps
         Map.prototype.merge = function(other) {
             let self = this, map = new Map(self.law);
             map.law = self.law;
@@ -134,12 +144,17 @@
                     map.addNode(node, predicate);
                 });
             }
+
+            // now that we've created the merged map, we don't need to re-check the intersection
+            // between the original 2 maps
             delete map.intersections[self.id];
             delete map.intersections[other.id];
 
             return map;
         };
 
+        // for every map that has at least one node-predicate matching in common with this one,
+        // check to see if the two maps fully intersect
         Map.prototype.checkIntersections = function() {
             let self = this;
             for(let mapId in this.intersections) {
@@ -147,6 +162,9 @@
             }
         };
 
+        // see whether two maps fully intersect; that is, every predicate node that is in either map is matched
+        // with the same node from our relation.  If so, we merge them into a new joint map, while keeping the original maps
+        // so they can be merged with other maps
         Map.prototype.checkIntersection = function(other) {
 
             let self = this, law = self.law;
@@ -230,7 +248,8 @@
             return true;
         };
 
-        //given a correspondence between nodes in the relation and predicate, fill in the rest of the law
+        // given a correspondence between nodes in the relation and predicate, fill in the rest of the law
+        // (ie. create new nodes in our relation corresponding to the non-predicate nodes of the law)
         Map.prototype.append = function() {
 
             var self = this;
@@ -253,16 +272,23 @@
             });
         };
 
+        // while applying a law, add a new node to our relation corresponding to the predicate node given by nodeId;
+        // if the predicate node's parents have not been appended yet, we do this recursively
         Map.prototype.appendNode = function(nodeId) {
 
             let self = this, law = self.law, relation = self.relation;
+
+            // if this predicate node has already been added to our relation, nothing to do
             if(self.idMap.hasOwnProperty(nodeId)) return relation.findEntry('node', self.idMap[nodeId]);
 
+            // get the parents of the predicate node to make sure they've been added first
             let node = relation.findEntry('node', nodeId), head = node.head, reference = node.reference,
                 newHead = null, newReference = null;
+
+            // this global option determines whether appended knowledge will be considered tentative
             let tentative = relation.options.evaluate.tentative || false;
 
-            //if the head and reference of this node haven't been appended yet, do that first
+            //if the parents haven't been added yet, we need those first, so that we have something to connect this node to
             if(head) {
                 newHead = self.appendNode(head);
                 if(newHead == null) return null;
@@ -272,10 +298,13 @@
                 if(newReference == null) return null;
             }
 
-            //data nodes are treated separately as they are added to the node's data tree/command set
+            //not currently being used, but 'data nodes' would have to be treated separately
+            // as they are added to the node's data tree/command set (see appendDataNode below)
             if(node.isData()) return self.appendDataNode(node, newHead, newReference);
 
-            //if the head and reference are already related by this concept, don't add the node
+            // if the head and reference are already related by this concept, don't add the node - two nodes can only
+            // be related by one instance of a given concept - eg. to have two forces between the same pair of bodies,
+            // we need to specify the concept 'force' further for each instance
             let childMatch = null;
             if(head) {
                 newHead.getChildren(0).every(function(child) {
@@ -287,11 +316,15 @@
                 });
             }
             if(childMatch) {
+                // if the existing child was appended by another map, then we'll add ourself to the list of its sources;
+                // that way, if all of those source maps are later removed, the child will be deleted when the last map is;
+                // but, if the child was part of the original relation (not from any map), it should never be deleted except by the user
                 if(Object.keys(childMatch.fromMap).length > 0)
                     childMatch.addFromMap(self);
                 return childMatch;
             }
 
+            // create the new node
             let newNode = law.addNode({
                 'law': law.id,
                 'concept': node.concept,
@@ -301,16 +334,22 @@
                 'appended': true,
             }), newId = newNode.getId();
 
+            // mark the new node as having been added by this map, and give it the same tentative status as the map has
             newNode.addFromMap(self);
             newNode.setTentative(self);
+
             relation.stats.evaluate.nodesAppended++;
 
+            // mark this new node as corresponding to the given predicate node, and vice versa
             self.idMap[nodeId] = newId;
             self.idMap[newId] = nodeId;
 
             return newNode;
         };
 
+        // not currently being used - we would need this if we chose to allow node data commands (see nodeData.js)
+        // to be represented using nodes in the law - these would then be a separate type of node called a 'data' node;
+        // right now data commands are stored in text format inside the concept record
         Map.prototype.appendDataNode = function(node, head, ref) {
             let self = this;
             if(!head) return false;
@@ -349,13 +388,19 @@
             }
         };
 
+        // mark this map as tentative or not.  Each node in the map will be marked tentative if it is
+        // not part of the original relation or part of a non-tentative map.
         Map.prototype.setTentative = function(tentative) {
             let self = this;
             self.tentative = tentative;
+            // only mark our deep nodes as tentative/not tentative, as these will recursively
+            // do the same to their parents.
             self.deepNodes.forEach(function(id) {
                 let node = self.relation.findEntry('node', id);
                 node.setTentative(self);
             });
+            // if the map is now tentative, its deep nodes are no longer deep nodes of the law,
+            // so we need to re-check which are the law's deep nodes now
             self.law.calculateDeepNodes();
         };
 
