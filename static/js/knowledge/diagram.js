@@ -262,25 +262,39 @@
 
 
             /*
-                This is the template we use for all nodes in the diagram.
+                This is the template GoJS will use to display nodes in the diagram.  This determines how nodes will appear.
+                Also, GoJS stores a data object for each node, and the display of the node may change depending on
+                its data values.  This happens through the Bindings you see in this template.
             */
             self.diagram.nodeTemplate = $$(go.Node, "Spot",
                 {
+                    // if you set the "loc" key in the node data (see the binding below these brackets),
+                    // that determines where the center of the node will appear in the diagram
                     locationSpot: go.Spot.Center,
+                    // this is what appears when you hover the mouse over the node
                     toolTip:
                       $$(go.Adornment, "Auto",
                         $$(go.Shape, { fill: "#EFEFCC" }),
                         $$(go.TextBlock, { margin: 4, width: 140 },
-                          new go.Binding("text", "", infoString).ofObject())
+                            // we pop up a box next to the cursor, showing some info about the node using the infoString function above
+                            new go.Binding("text", "", infoString).ofObject())
                       )
                 },
+                // the 'loc' data key is parsed into a go.Point object, and this determines the location of the node on screen;
+                // specifically, it determines the center of the node on screen, per the 'locationSpot' option above.  Also,
+                // when you drag the node to a new position, its new center pixel is stringified and stored as its 'loc' data key
                 new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+                // use the boolean 'visible' data key to show or hide a node
                 new go.Binding("visible", "visible"),
+                // not really used right now
                 new go.Binding("angle").makeTwoWay(),
-                // the main object is a Panel that surrounds a TextBlock with a Shape
+
+                // the main object is a Panel which contains a Shape surrounding a TextBlock
                 $$(go.Panel, "Auto",
                   { name: "PANEL" },
                   new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+
+                  // the default shape will be a rounded rectangle (see the nodeTemplates member in knowledge.html)
                   $$(go.Shape, self.nodeTemplates['default'].shape,  // default figure
                     {
                       cursor: "pointer",
@@ -289,6 +303,8 @@
                     },
                     new go.Binding("figure"),
                     new go.Binding("fill")),
+
+                  // inside that is a text block displaying the node name if any, and the concept name
                   $$(go.TextBlock,
                     {
                       font: "bold 11pt Helvetica, Arial, sans-serif",
@@ -297,8 +313,14 @@
                       wrap: go.TextBlock.WrapFit,
                       editable: true
                     },
+                    // we use a function to determine what text the node will display
                     new go.Binding("text", "", function(data, node) {
+
+                        // in the palette, each node just represents a concept from our framework
                         if(node.diagram === self.palette) return self.concepts[data.concept].name;
+
+                        // if the node has a name, the text will be the node name followed
+                        // by the concept name in brackets; otherwise, just the concept name
                         let text = '';
                         if(typeof data.name == 'string' && data.name.length > 0) {
                             text = data.name;
@@ -312,37 +334,41 @@
                         return text;
                     }))
                 ),
-                //port on top for head/reference, port on bottom for properties/referrers
+                // the port on top has an incoming link from my head node, and an outgoing link to my reference node
                 makePort("T", go.Spot.Top, true, true, 1, 1),
+                // port on the bottom has an outgoing arrow to nodes whose head I am,
+                // and an incoming arrow from nodes whose reference I am
                 makePort("B", go.Spot.Bottom, true, true),
-                { // handle mouse enter/leave events to show/hide the ports
+                // handle mouse enter/leave events to show/hide the ports
+                {
                     mouseEnter: function(e, node) { showSmallPorts(node, true); },
                     mouseLeave: function(e, node) { showSmallPorts(node, false); },
                     contextMenu: partContextMenu
                 }
             );
 
+            // GoJS also needs a template to specify how links between nodes will appear
             self.diagram.linkTemplate =
                 $$(go.Link,
                   $$(go.Shape,
                     new go.Binding("stroke", "color"),
                     new go.Binding("strokeWidth", "width"),
                     new go.Binding("strokeDashArray", "", function(data, link) {
-                        console.log('calculating dash');
-                        console.log(data);
-                        console.log(link);
+                        // if this is a link from the top of a node to the bottom of another, then it is pointing
+                        // from a node to its reference; to distinguish these from head links, we make them dashed lines
                         if(data.fromPort === 'T') return [4, 4];
                         else return null;
                     })
                 ));
 
-            // initialize the Palette that is on the left side of the page
+            // initialize the Palette that is on the left side of the page, which lists the concepts in the current framework
             self.palette = $$(go.Palette, "concept-palette",  // must name or refer to the DIV HTML element
             {
                 maxSelectionCount: 1,
                 nodeTemplateMap: self.diagram.nodeTemplateMap,  // share the templates used by the diagram
             });
 
+            // concepts in the palette will be displayed in alphabetical order
             self.palette.layout.comparer = function(a, b) {
                 let c1 = a.data.concept, c2 = b.data.concept;
                 if(c1 && c2 && self.concepts.hasOwnProperty(c1) && self.concepts.hasOwnProperty(c2))
@@ -350,9 +376,12 @@
                 return 0;
             };
 
+            // initialize the nodes that are in the palette according to the concepts we have currently loaded, if any
             self.setPaletteModel();
+            // initially the diagram should be clear, ready for the user to load a law or create their own
             self.clearDiagram();
 
+            // below the diagram is the HTML5 canvas that will be used to visualize the relation (see knowledge.html)
             let canvas = document.getElementById('visualization-canvas');
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -360,32 +389,47 @@
         };
 
 
+        // create one node in the palette for each concept we have currently loaded from the server, but only
+        // display those from the currently active framework
         Relation.prototype.setPaletteModel = function() {
             let self = this, concepts = self.concepts;
             let dataArray = [];
+            // loop through all concepts we have in memory
             for(let id in concepts) {
                 let concept = concepts[id];
+                // create a node for that concept in the palette
                 dataArray.push({
                     concept: concept.id,
                     framework: concept.framework,
+                    // but only display it if that concept is from the current framework
                     visible: self.framework && (self.framework.id <= 0 || concept.framework == self.framework.id)
                 });
             }
+            // overwrite any nodes the palette had previously with this new set
             self.palette.model = $$(go.GraphLinksModel, {
                 nodeDataArray: dataArray,
+                // we don't link nodes inside the palette; we link them in the diagram
                 linkDataArray: []
             });
         };
 
 
+        // when the user switches to a different framework, or filters which framework is visible in the palette
+        // using the .framework-filter dropdown next to the palette, we make sure only concepts from the selected
+        // framework are visible
         Relation.prototype.filterPalette = function(framework) {
             let self = this;
 
+            // if the .framework-filter dropdown was changed, we will be passed the new framework to display;
+            // otherwise, we are just displaying the currently active framework
             if(framework === undefined) {
                 if(self.framework) framework = self.framework.id;
                 else return;
             }
             self.paletteFramework = framework;
+
+            // if the filter dropdown was not set, we will display concepts from the current framework and all its dependencies;
+            // here we get the list of those dependencies
             let frameworks = [];
             if(framework < 0) {
                 frameworks.push(undefined);
@@ -398,15 +442,20 @@
                     }
                     ind++;
                 }
+            // but if the filter was set, we only display concepts from the framework chosen in the filter, not its dependencies
             } else frameworks.push(framework);
+
             self.paletteFrameworks = frameworks;
 
+            // now that we have the list of frameworks whose concepts should be visible, we go through each concept in the
+            // palette and determine whether it is visible
             self.palette.nodes.each(function(node) {
                 self.palette.model.set(node.data, 'visible', self.isVisibleInPalette(node.data.concept));
             });
         }
 
 
+        // helper function to determine whether a given concept should be visible in the palette
         Relation.prototype.isVisibleInPalette = function(conceptId) {
             let self = this, concept = self.concepts[conceptId];
             if(concept.law > 0) return concept.law == self.law.id;
@@ -417,6 +466,7 @@
         };
 
 
+        // remove all nodes and links from the diagram
         Relation.prototype.clearDiagram = function() {
             let self = this;
             self.diagram.model = $$(go.GraphLinksModel,
@@ -428,24 +478,34 @@
         };
 
 
+        // if the user loads an existing law, we call this function to attempt to display it in the diagram,
+        // such that parent nodes are above their child nodes and nodes are not on top of each other.  Currently
+        // it uses a simple algorithm which doesn't always look great, so it could stand to be improved.
         Relation.prototype.draw = function() {
             let self = this;
+            // get rid of any nodes currently in the diagram
             self.diagram.removeParts(self.diagram.nodes);
-            //start by arranging the nodes visually as a tree descending from the root,
-            //then allow the force layout to adjust them
-            //=> first we need to identify the children of each node
+
+            // create a dummy node with an id of -1 to represent the root of the whole tree (in case there
+            // are multiple nodes without parents in the law, they will all be children of this node).
+            // Then create an 'meta' object for each node which will store the information needed to draw it.
             let rootNodes = [];
             let nodeMeta = {'-1': {children: []}};
             self.law.nodes.forEach(function(node) {
                 nodeMeta[node] = {children: []};
             });
+            // first, store each node's children in its meta object.  Also, nodes with no parents
+            // are marked as level 0, meaning they will be drawn in the top row of the diagram
             self.law.nodes.forEach(function(node) {
                 if(node < 0) return;
-                let head = self.nodes[node].head, root = !head;;
+                let head = self.nodes[node].head, root = !head;
                 nodeMeta[root ? -1 : head].children.push(node);
                 if(root) nodeMeta[node].level = 0;
             });
 
+            // recursively calculate the 'width of the subtree' of each node.  For example, if a node
+            // has 2 children and each of these has 3 children, there will be 6 children in the bottom row
+            // of the subtree, so we allot 600 pixels of width to that node.
             let horizontal = 100, vertical = 100;
             let getOffsets = function(node) {
                 let nc = nodeMeta[node].children.length, width = horizontal;
@@ -455,6 +515,8 @@
                         nodeMeta[child].offset = width;
                         width += getOffsets(child);
                     });
+                    // also since we have the children in an ordered list, we assign each
+                    // child its slot within that allotted subtree width
                     nodeMeta[node].children.forEach(function(child) {
                         nodeMeta[child].offset -= width / 2 - horizontal / 2;
                     });
@@ -464,26 +526,32 @@
             };
             getOffsets(-1);
 
+            // now that we know where each node will appear relative to its parent, we can recursively draw all nodes,
+            // starting with the dummy (invisible) -1 node in the top center of the diagram
             let drawNodes = function(node, x, y) {
                 if(node >= 0) {
-                    self.drawNode(node, {
+                    self.drawNode(node, { // this function is defined below
                         loc: '' + x + ' ' + y,
                     });
                 }
                 nodeMeta[node].children.forEach(function(child) {
-                    drawNodes(child, x + nodeMeta[child].offset, y + 100);
+                    drawNodes(child, x + nodeMeta[child].offset, y + vertical);
                 });
             };
             drawNodes(-1, self.diagram.viewportBounds.width/2, 50);
 
+            // after that we draw the links between parent and child nodes
             let drawLinks = function(node) {
-                if(node >= 0) self.drawLinks(node);
+                if(node >= 0) self.drawLinks(node); // defined below
                 nodeMeta[node].children.forEach(function(child) {
                     drawLinks(child);
                 });
             };
             drawLinks(-1);
 
+            // we store the list of the law's predicate sets in the global relation object; as predicate sets are modified
+            // in the diagram, this global object will be updated; then, when we save the law, the law's predicate sets will
+            // be set to the contents of the global object before saving
             self.predicateSets = [];
             $('#set-predicate').children().slice(1, -1).remove();
             if(self.law.predicates) {

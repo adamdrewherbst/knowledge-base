@@ -52,8 +52,6 @@
             Dependency.clearCommands();
             $('#suggestion-wrapper').empty();
             $('#symbolization-wrapper').empty();
-            //this.symbolize();
-            //this.visualize();
         };
 
         // get the descriptive tag for the current round of evaluation; we will not re-evaluate a node
