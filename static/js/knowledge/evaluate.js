@@ -271,7 +271,7 @@
         };
 
         // while applying a law, add a new node to our relation corresponding to the predicate node given by nodeId;
-        // if the predicate node's parents have not been appended yet, we do this recursively
+        // if the predicate node's parents have not been appended yet, we do this first, recursively
         Map.prototype.appendNode = function(nodeId) {
 
             let self = this, law = self.law, relation = self.relation;
@@ -295,10 +295,6 @@
                 newReference = self.appendNode(reference);
                 if(newReference == null) return null;
             }
-
-            //not currently being used, but 'data nodes' would have to be treated separately
-            // as they are added to the node's data tree/command set (see appendDataNode below)
-            if(node.isData()) return self.appendDataNode(node, newHead, newReference);
 
             // if the head and reference are already related by this concept, don't add the node - two nodes can only
             // be related by one instance of a given concept - eg. to have two forces between the same pair of bodies,
@@ -343,47 +339,6 @@
             self.idMap[newId] = nodeId;
 
             return newNode;
-        };
-
-        // not currently being used - we would need this if we chose to allow node data commands (see nodeData.js)
-        // to be represented using nodes in the law - these would then be a separate type of node called a 'data' node;
-        // right now data commands are stored in text format inside the concept record
-        Map.prototype.appendDataNode = function(node, head, ref) {
-            let self = this;
-            if(!head) return false;
-            if(head instanceof Node) head = {type: 'node', node: head};
-
-            //if this is part of a data tree, just return the key
-            if(!ref) {
-                if(head.type === 'node') {
-                    return {
-                        type: 'data',
-                        node: head.node,
-                        key: node.getDataKey()
-                    };
-                } else if(head.type === 'data') {
-                    head.key += '.' + node.getDataKey();
-                    return head;
-                } else return false;
-            } else if(node.isDeep) {
-                if(head.type !== 'data') return false;
-                let expression = null;
-                if(ref.type === 'expression') expression = ref.expression;
-                else if(ref.type === 'data') expression = Expression.fromNodeKey(ref.node, ref.key);
-                else return false;
-                let command = new NodeDataCommand(head.node.getData(), head.key || 'value', node.getDataKey(), expression);
-                command.init();
-                return command;
-            } else {
-                let headExpression = null, refExpression = null;
-                if(head.type === 'expression') headExpression = head.expression;
-                else if(head.type === 'data') headExpression = Expression.fromNodeKey(head.node, head.key);
-                if(ref.type === 'expression') refExpression = ref.expression;
-                else if(ref.type === 'data') refExpression = Expression.fromNodeKey(ref.node, ref.key);
-                if(!headExpression || !refExpression) return false;
-                let expression = Expression.fromPair(headExpression, node.getDataKey(), refExpression);
-                return {type: 'expression', expression: expression};
-            }
         };
 
         // mark this map as tentative or not.  Each node in the map will be marked tentative if it is

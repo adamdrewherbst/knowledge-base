@@ -742,7 +742,7 @@ Dependency.prototype.resolved = function(key, doProbe) {
         // marking a key as 'known' means we consider it resolved, regardless of anything it is waiting on
         if(node.known) return true;
         let isWaiting = false;
-        // which means any reference it is waiting on has been resolved
+        // for the key to be resolved, any reference it is waiting on must be resolved
         for(let depId in node.waiting) {
             for(let depKey in node.waiting[depId]) {
                 let obj = node.waiting[depId][depKey], depResolved = obj.resolved;
@@ -958,14 +958,37 @@ NodeData.prototype.setValue = function(key, value) {
 NodeData.prototype.fullyResolve = function(key) {
     let self = this;
     switch(key) {
+
         // combine all subscripts, superscripts, arguments, etc. into one MathML string
         // and set this as the value of the 'symbol' key
         case 'symbol':
-            let symbol = self.collectData(key), types = ['text', 'over', 'subscript', 'superscript', 'arguments'], text = '';
+
+            // first convert the entire 'symbol' subtree into an object for easy traversing
+            let symbol = self.collectData(key),
+
+            // and define the order in which we will assemble the subkeys of 'symbol' together
+            types = ['text', 'over', 'subscript', 'superscript', 'arguments'], text = '';
+
+            // if the 'symbol' key already has a value, that is taken as the full symbol; only if it's blank
+            // do we piece its subkeys (the parts of the symbol) together to make a full symbol
             if(symbol._value) break;
+
+            // loop through all the parts of a symbol, in order
             types.forEach(function(type) {
+
+                // see if this 'symbol' subtree contains that part
                 if(!symbol.hasOwnProperty(type)) return;
+
+                // the subkey may have numeric index subkeys of its own, meaning it is actually an array of those parts;
+                // otherwise, we just treat it as a single instance of that part
+                // (eg. if we have 'symbol.subscript.0' and 'symbol.subscript.1', then we have 2 subscripts)
+
                 let arr = Misc.asArray(symbol[type]), combined = '';
+
+                // we take all instances of that part, string them together according to the part type (for example,
+                // subscripts are simply concatenated while arguments are comma-separated and bracketed), put the result
+                // in MathML format, and append it to the growing MathML symbol string.
+
                 arr.forEach(function(str, ind) {
                     if(str == null) str = '';
                     if(type !== 'text' && !str) return;
@@ -974,18 +997,27 @@ NodeData.prototype.fullyResolve = function(key) {
                     if(last) combined = '<mrow>' + combined.substring(0, combined.length-1) + '</mrow>';
                     str = '<mrow>' + str + '</mrow>';
                     switch(type) {
+
+                        // the main text of the symbol
                         case 'text':
                             text += str;
                             break;
+
+                        // something displayed on top of the symbol; for example, for a vector it is '&rharu;' which
+                        // is html code for a right-arrow
                         case 'over':
                             text = '<mover>' + text + str + '</mover>';
                             break;
+
+                        // subscripts and superscripts
                         case 'subscript':
                             text = '<msub>' + text + str + '</msub>';
                             break;
                         case 'superscript':
                             text = '<msup>' + text + str + '</msup>';
                             break;
+
+                        // arguments, eg. to a mathematical function, will be 'fenced' (drawn in parentheses)
                         case 'arguments':
                             if(last)
                                 text = '<mrow>' + text + '<mfenced>' + combined + '</mfenced></mrow>';
@@ -994,6 +1026,10 @@ NodeData.prototype.fullyResolve = function(key) {
                     }
                 });
             });
+
+            // the resulting MathML string becomes the value of the 'symbol' data key for this node, which will be displayed
+            // in Relation.prototype.symbolize in represent.js or Relation.prototype.suggest in suggest.js
+
             self.setValue('symbol', text);
             break;
         default: break;

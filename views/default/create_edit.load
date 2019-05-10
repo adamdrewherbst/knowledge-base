@@ -3,9 +3,9 @@
 #   This is the form for creating or editing an entry (framework, law, or concept).  It is included in
 #   entry.load which is the popup dialog containing this form.
 #
-#   'table' and 'type' (referenced below as {{=table}} and {{=type}}) are parameters passed in by the including
-#   file.  'table' is either 'framework', 'concept', or 'law'; and 'type' is either 'create' or 'edit'.  The
-#   fields in the form will vary depending on the table or type.
+#   'table' and 'type' are parameters passed in by the including file.  'table' is either 'framework',
+#   'concept', or 'law'; and 'type' is either 'create' or 'edit'.  The fields in the form will vary
+#   depending on the table or type.
 #
 #}}
 

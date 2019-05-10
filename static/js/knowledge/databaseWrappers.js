@@ -13,8 +13,8 @@
     fields passed from the server, and adding event handlers to be fired when the record is updated in a certain way.
 
     The short Misc library is also defined here since it is used several times by the wrapper classes, although it is used
-    in other files as well, especially nodeData.js.  It simplifies common operations on JavaScript objects like adding an
-    index whose parent indices may or may not have been added already.
+    in other files as well, especially nodeData.js.  It simplifies common operations on JavaScript objects like adding a
+    key whose parent keys may or may not have been added already.
 */
 
         var Misc = {};
@@ -152,7 +152,13 @@
             for(; obj.hasOwnProperty(i); i++) {
                 arr.push(obj[i]);
             }
-            if(arr.length == 0 || Object.keys(obj).length > i) arr.push(obj);
+            let keys = Object.keys(obj);
+            // if there were no indexed keys or if the object has other subkeys, add the whole object to the array
+            if(arr.length == 0 || keys.length > i) {
+                // ... unless the only other key is an empty '_value' key
+                if(!(i > 0 && keys.length == i+1 && keys[i] == '_value' && !obj._value))
+                    arr.push(obj);
+            }
             return arr;
         };
 
@@ -656,8 +662,6 @@
             this.drawn = false;
             // whether it has been visualized in the visualization canvas
             this.visualized = false;
-            // this may not be needed, but it could store visual parameters that are used by descendant nodes
-            this.visualContext = {};
 
             // make sure all fields are set to their default values at first
             this.reset();

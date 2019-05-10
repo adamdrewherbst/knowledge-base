@@ -1,25 +1,49 @@
+/*
+    These functions are used to determine the symbolic or visual representation for each node in the diagram.
+    We do this be executing the data commands on each node using the functionality in nodeData.js, then
+    parsing the resulting data tree of each node into its symbol and visual.
+*/
+
+// get the symbolic representation of each node from the diagram, and display those of the deep nodes by default;
+// once this function has been run, the user can then click on any node and its symbol will be displayed
+
 Relation.prototype.symbolize = function() {
     let self = this;
 
+    // defined in databaseWrappers.js, and uses functionality from nodeData.js
     self.law.resolveData('symbol');
 
+    // the symbols are displayed in this div, which is below the diagram (see knowledge.html)
     $('#symbolization-wrapper').empty();
+
+    // The symbol of each deep node describes the relation encoded by that node's entire
+    // ancestor tree.  So, by displaying the symbols for only the deep nodes, we capture
+    // the essence of the entire relation.
 
     self.law.deepNodes.forEach(function(id) {
         let node = self.findEntry('node', id);
         if(!node) return;
         let symbol = node.getData().getValue('symbol');
         if(!symbol) return;
+
+        // the symbol is in MathML format (see NodeData.prototype.fullyResolve in nodeData.js),
+        // so we embed it in a <math> tag; this by itself would display decently in most browsers, but we
+        // also run the MathJax plugin (loaded in the header in knowledge.html) to make sure it looks pretty across platforms
+
         let element = '<p><math scriptlevel="-3">' + symbol + '</math></p>';
         $('#symbolization-wrapper').append(element);
     });
 };
 
+// draw the visual representation of the relation, by first executing all visual node data commands
+// and then parsing each node's data tree into a visual representation
 Relation.prototype.visualize = function() {
     let self = this, canvas = self.canvas;
 
+    // execute all node data commands that modify the 'visual' key of the node data tree
     self.law.resolveData('visual');
 
+    // clear the canvas and draw a horizontal and vertical dashed line for the x and y axes
     let canvasEl = canvas.canvas;
     canvasEl.height = Math.max(canvasEl.height, 600);
     let width  = canvasEl.width, height = canvasEl.height;
@@ -33,37 +57,60 @@ Relation.prototype.visualize = function() {
     canvas.stroke();
     canvas.setLineDash([]);
 
+    // parse each node's data tree in order to draw it on the canvas
     self.law.nodes.forEach(function(id) {
         let node = self.findEntry('node', id);
         node.visualize();
     });
 }
 
+// parse the 'visual' subtree of this node's data tree in order to actually draw it on the canvas
+
 Node.prototype.visualize = function() {
     let self = this;
-    /*if(self.visualized) return self.visualContext;
-    let head = self.getHead(), ref = self.getReference(),
-        headContext = {}, refContext = {};
-    if(head) headContext = head.visualize();
-    if(ref) refContext = ref.visualize();*/
 
-    let visual = self.collectData('visual');
+    // start by converting the 'visual' subtree into an object which is easy to traverse
+    let visual = self.collectData('visual'); // defined in nodeData.js
+
+    // the visualization of a node may be given an origin (x & y coordinates relative to the center of the
+    // canvas), a rotation (in radians clockwise from the horizontal), and a scale.  These parameters may
+    // also be specified within each shape of the visualization - see below
+
     let globalOpts = ['origin', 'rotation', 'scale'];
-    /*globalOpts.forEach(function(opt) {
-        if(visual.hasOwnProperty(opt)) {
-            self.visualContext[opt] = visual[opt];
-        } else if(headContext.hasOwnProperty(opt)) {
-            self.visualContext[opt] = headContext[opt];
-        }
-    });//*/
 
+    // in case the children of the 'visual' key are numeric indices, we treat each one as a separate
+    // subtree in its own right - otherwise, eachChild (defined in databaseWrappers.js) will just operate once on the whole subtree
     Misc.eachChild(visual, function(child) {
+
+        // see if the subtree contains one or more shapes, so we can draw it
         if(child.shape) {
             let canvas = self.relation.canvas;
+
+            // each subkey of 'shape' should be the name of a shape, eg. 'circle' or 'line' (see below);
+            // within each shape, we look for the subkeys below specifying the parameters of the shape
+            //
+            //  - start = starting pixel with x & y subkeys
+            //  - end = ending pixel
+            //  - delta = difference between start and end - this replaces 'end'
+            //  - direction = the rotation of the shape clockwise from the horizontal, in radians
+            //  - length = length of the shape in pixels
+            //
+            // A shape may also specify its origin, rotation, and scale, thus overriding any values of these from
+            // higher in the 'visual' subtree.
+            //
+            // These are the parameters that are common to many shapes.  Then each shape can look for its
+            // own parameters, for example 'circle' expects a 'radius' - this happens within the switch statement below
+
             let shapeOpts = globalOpts.concat(['start', 'end', 'delta', 'direction', 'length']);
             for(let shapeName in child.shape) {
+
+                // same as above, there may be multiple copies of this shape, in which case they are given
+                // numeric indices - for example, under 'circle', there may be 'circle.0' and 'circle.1'
                 Misc.eachChild(child.shape, shapeName, function(shape) {
-                    let opts = {}, chain = [shape, child, visual, self.visualContext];
+
+                    // for the display parameters described above, we first check this specific shape, then the numeric index of
+                    // the visual subtree if we are under one, then the visual subtree itself
+                    let opts = {}, chain = [shape, child, visual];
                     shapeOpts.forEach(function(opt) {
                         chain.every(function(ctx) {
                             if(ctx.hasOwnProperty(opt)) {
@@ -73,6 +120,8 @@ Node.prototype.visualize = function() {
                             return true;
                         });
                     });
+
+                    // store the display parameters in local variables for easy referencing
                     let origin = opts.origin, rotation = opts.rotation || 0, scale = opts.scale || 1,
                         start = opts.start, end = opts.end, delta = opts.delta,
                         direction = opts.direction, length = opts.length;
@@ -81,10 +130,18 @@ Node.prototype.visualize = function() {
                     scale = parseFloat(scale);
                     canvas.save();
 
+                    // canvas is the HTML5 CanvasRenderingContext2D of the #visualization-context canvas
+                    // (see its declaration at the end of initDiagram in diagram.js),
+                    // so we apply the origin, rotation, and scale directly to it.  Then when we draw
+                    // the shape it will automatically be transformed by these parameters.
+
                     if(origin) canvas.translate(origin.x, origin.y);
                     if(rotation) canvas.rotate(rotation);
                     canvas.lineWidth = 2 / scale;
                     if(scale) canvas.scale(scale, scale);
+
+                    // now we draw the shape, using the common parameters parsed above as well as any that may need
+                    // to be parsed for the specific shape type (as you can see, not all types have been implemented yet)
 
                     switch(shapeName) {
                         case 'line':
@@ -141,12 +198,14 @@ Node.prototype.visualize = function() {
                             break;
                         default: break;
                     }
+
+                    // undo the translation/rotation/scale on the canvas; otherwise, the next time visualization is run, the new
+                    // transform will compound the previous one
                     canvas.restore();
                 });
             }
         }
     });
     self.visualized = true;
-    return self.visualContext;
 };
 

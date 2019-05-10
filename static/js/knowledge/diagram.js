@@ -381,7 +381,8 @@
             // initially the diagram should be clear, ready for the user to load a law or create their own
             self.clearDiagram();
 
-            // below the diagram is the HTML5 canvas that will be used to visualize the relation (see knowledge.html)
+            // below the diagram is the HTML5 canvas that will be used to visualize the relation
+            // (the canvas is created in knowledge.html, and visualization happens in represent.js)
             let canvas = document.getElementById('visualization-canvas');
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -565,6 +566,8 @@
         };
 
 
+        // draw the specified node - its pixel location in the diagram and any other display options are
+        // passed in the options parameter
         Relation.prototype.drawNode = function(nodeId, options) {
 
             let self = this, node = self.findEntry('node', nodeId);
@@ -572,16 +575,30 @@
 
             if(!options) options = {};
             let template = {};
+
+            // which shape, color, etc. to use for this node - the possibilities are listed in
+            // the nodeTemplates member defined in the Relation constructor in knowledge.html
             if(options.template) {
                 if(self.nodeTemplates.hasOwnProperty(options.template))
                     template = self.nodeTemplates[options.template];
             }
+            // whether to draw the links from this node to its parents
             let drawLinks = options.drawLinks ? true : false;
+
+            // remove the above two options from the object; the rest of the keys in the options object
+            // will be directly included in the node data object that we pass to GoJS; the effects of these
+            // keys can be seen in the bindings within the GoJS node template defined above in initDiagram
             delete options.template;
             delete options.drawLinks;
 
+            // any keys within the node record, the options parameter, or the template from nodeTemplates,
+            // are put into the GoJS node data object
             let nodeData = Object.assign({}, node, options, template);
+            // if the node has a numeric/interval value, that is stringified and put in the data as well
             nodeData.value = node.value.writeValue();
+
+            // if the location of the node has not yet been specified, place it horizontally in the midpoint
+            // between its two parents and vertically 75 pixels below the lower of its two parents
             if(!nodeData.hasOwnProperty('loc')) {
                 let x = 0, y = 0;
                 for(let i = 0; i < 2; i++) {
@@ -597,12 +614,18 @@
                 nodeData.loc = '' + (x/2) + ' ' + (y+75);
             }
 
+            // when we add the data object to GoJS's model for the diagram, GoJS will automatically display it using that data
             self.diagram.model.addNodeData(nodeData);
+
+            // optionally draw the links to the parents now that the node is displayed
             if(drawLinks) self.drawLinks(nodeId);
             node.drawn = true;
         };
 
 
+        // draw arrows from the given node in the diagram to its head and reference nodes; a solid arrow will
+        // be drawn from the head to the node, and a dashed arrow will be drawn from the node to its reference
+        // (the solid/dashed is specified in the GoJS link template in initDiagram above)
         Relation.prototype.drawLinks = function(nodeId) {
             let self = this, node = self.nodes[nodeId];
             if(node.head) {
@@ -614,6 +637,8 @@
         };
 
 
+        // set which of the templates from Relation.nodeTemplates (defined in the Relation constructor in knowledge.html)
+        // will be used to display the given node - determines its shape, color, etc. on screen
         Relation.prototype.setNodeTemplate = function(node, template) {
             let self = this;
             if(!self.nodeTemplates.hasOwnProperty(template)) return false;
@@ -623,12 +648,14 @@
                 if(!node) return false;
             }
             let nodeTemplate = self.nodeTemplates[template];
+            // treat the template as a list of key/values that should be set in the GoJS node data object for this node
             for(let property in nodeTemplate) {
                 self.diagram.model.setDataProperty(node, property, nodeTemplate[property]);
             }
         };
 
 
+        // set the specified key of the GoJS data object for the given node
         Relation.prototype.setNodeData = function(nodeId, attr, value) {
             console.log('setting node ' + nodeId + ' ' + attr + ' to ' + value);
             let self = this, node = self.nodes[nodeId];
@@ -638,6 +665,10 @@
         };
 
 
+        // for the given node, construct a string that gives a bunch of information about that node
+        // this will be displayed in the #node-description side panel of the diagram when a node is clicked on
+        // (see onSelectionChanged above), or in a popup text box next to the cursor when a node is hovered over
+        // (see infoString above)
         Relation.prototype.getNodeString = function(id) {
 
             let self = this, node = self.nodes[id], law = self.law;
@@ -659,19 +690,6 @@
             else predicates = predicates.substring(0, predicates.length-2);
 
             let mappings = '';
-            if(self.nodeMap.hasOwnProperty(id)) {
-                for(let p in self.nodeMap[id]) {
-                    for(let m in self.nodeMap[id][p]) {
-                        let map = self.map[m], law = self.laws[map.lawId];
-                        let mapStr = '';
-                        for(let n in map.idMap) if(self.nodes[n].law == law.id) mapStr += '' + n + ',';
-                        mapStr = mapStr.substring(0, mapStr.length-1);
-                        mappings += '' + p + ' [' + self.concepts[self.nodes[p].concept].name + ']' + "\n"
-                            + '.  in ' + law.name + ' [' + law.id + ']' + "\n"
-                            + '.  ' + mapStr + ' (map ' + m + ')' + "\n";
-                    }
-                }
-            }
             if(mappings == '') mappings = 'none';
             else mappings = "\n" + mappings;
 
@@ -684,18 +702,28 @@
         };
 
 
+        // replace the nodes and connections of the current law with whatever the user has constructed in the diagram.
+        // ie. if they have deleted or added nodes from the diagram, or changed which node is a parent of which node,
+        // make those changes in the records of those nodes in memory.  This is needed whenever we are saving or
+        // evaluating the current relation.
+
         Relation.prototype.syncGraph = function() {
             let self = this, graphNodes = [];
 
+            // prepare each node record of the current law to be updated
             self.law.eachNode(function(node) {
                 node.preprocess();
             });
 
+            // for any node in the diagram that doesn't have a record in memory, create the corresponding record
             self.diagram.nodes.each(function(node) {
                 let id = parseInt(node.data['id']);
                 self.findOrCreateEntry('node', id);
                 if(graphNodes.indexOf(id) < 0) graphNodes.push(id);
             });
+
+            // now that there is a record for each node in the diagram, go through all the nodes in the diagram
+            // and make sure its record is up to date in terms of concept, name, value, and links to its parents
             self.diagram.nodes.each(function(node) {
                 let id = parseInt(node.data['id']);
                 let entry = self.findEntry('node', id);
@@ -712,11 +740,15 @@
                 });
             });
 
+            // any node record from the law that is no longer on the diagram, delete the record
             self.law.eachNode(function(node) {
                 if(graphNodes.indexOf(node.id) < 0) node.remove();
             });
+
+            // the list of nodes in the law should now match that from the diagram
             self.law.nodes = graphNodes;
 
+            // perform any required post-update actions on each node
             self.law.eachNode(function(node) {
                 node.postprocess();
             });

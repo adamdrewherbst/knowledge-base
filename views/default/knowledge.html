@@ -5,37 +5,73 @@
 #   JavaScript section (block_page_js).
 #
 #   The site uses a few plugins:
-#       Bootstrap
-#       GoJS
-#       MathJax
 #
-#      jQuery: a very common JavaScript plugin which is pre-installed with web2py.
-#      jQuery makes common operations on elements in the web page much simpler in code, such as:
-#          selecting, adding, and editing elements on the page
-#          sending requests to the server - in this case, to load and save frameworks, concepts, and laws
-#      Wherever you see $(...) in the JavaScript, that is the jQuery selector function, which selects elements
-#      based on the given criteria and turns them into
+#       Bootstrap: lets you create common pieces of a website with little code.  Here, for example, we use
+#           its Modal functionality to create modals (pop-up dialogs with arbitrary content inside) that let
+#           the user select, create, and edit records from the database.
+#
+#           https://getbootstrap.com/
+#
+#               Our installation of Bootstrap is a little sensitive because both the web2py framework and GoJS (below)
+#               already come with Bootstrap for their own purposes, so we need to include Bootstrap files that are
+#               compatible with both of these as well as our modals etc.  Right now you will see in the header below
+#               that we are using both css/bootstrap.min.css, which I downloaded directly from getbootstrap.com,
+#               and css/web2py-bootstrap3.js which came with web2py.  Whereas the only JS file is
+#               GoJS-master/assets/js/bootstrap.min.js, the one from GoJS.  That seems to be stable, but could
+#               conceivably have to be tweaked.
+#
+#       GoJS: we use this to display the interactive diagram that represents the problem as a graph of
+#           connected concepts.
+#           v 1.8.17, installed 4/20/2018
+#           Browse the docs for the installed version at:
+#               https://adamdrewherbst.pythonanywhere.com/welcome/static/GoJS-master/index.html
+#           Or if you're planning to upgrade to the latest version:
+#               https://gojs.net/latest/index.html
+#
+#       MathJax: we use this to render the symbolic representation of the relation, in mathematical notation.
+#           The latest version is included via the script tag in the header below.  We render symbols in MathML
+#              (http://math-it.org/Publikationen/MathML.html)
+#           and MathJax automatically on-the-fly makes sure they look good in the browser.
+#
+#           https://www.mathjax.org
+#
+#       jQuery: a very common JavaScript plugin which is pre-installed with web2py.
+#       jQuery makes common operations on elements in the web page much simpler in code, such as:
+#           selecting, adding, and editing elements on the page
+#           sending requests to the server - in this case, to load and save frameworks, concepts, and laws
+#
+#           https://api.jquery.com/
+#
+#       Wherever you see $(...) in the JavaScript, that is the jQuery selector function, which selects all elements
+#       based on the given criteria and turns them into a jQuery object so you can call jQuery functions on them,
+#       such as .remove(), .append(), etc. to change how they are displayed, add/remove elements, animate them,
+#       trigger a function when a user clicks them, etc.  Also you will see $.ajax wherever we make a call to the server.
 #
 #}}
 
 
 <html>
 
+    {{#
+    #   Here we include CSS files which determine how elements are visually styled (margins, padding, colors, fonts, etc)
+    #}}
     <head>
         <link rel="stylesheet" href="{{=URL('static','css/bootstrap.min.css')}}"/>
         <link rel="stylesheet" href="{{=URL('static','css/web2py-bootstrap3.css')}}"/>
         <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/main.css')}}">
         <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/highlight.css')}}">
         <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/jquery-ui.min.css')}}">
+        <link rel="stylesheet" href="{{=URL('static','css/main.css')}}">
 
-        <script type="text/javascript" async
-          src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=MML_CHTML">
-        </script>
+        {{#  As well as MathJax to auto-prettify mathematical symbols }}
+
+        <script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=MML_CHTML"></script>
     </head>
 
     <body>
 
-        <!-- controls -->
+        {{# Here are the controls to load a new framework or law, or edit the name, description, etc. of the current one }}
+
         <div id="controls">
             <div class="entry-wrapper" table="framework">
                 <button class="entry-set-button" type="button" class="btn btn-primary">Select Framework</button>
@@ -53,7 +89,12 @@
             </div>
         </div>
 
-        <!-- graph editor -->
+        {{#
+        # Here is the palette & diagram where the user can drag concepts from the palette onto the diagram and arrange them into
+        # a connected relation represented the problem at hand, or a general law.  This functionality is provided by the GoJS
+        # plugin and used mainly in diagram.js
+        # }}
+
         <h2>Build a relation with concepts</h2>
         <div id="graph-buttons" style="margin-bottom: 20px">
             <div id="graph-controls">
@@ -87,9 +128,19 @@
             </div>
         </div>
 
+        {{#
+        # These are the 3 modals (pop-up dialogs) for selecting/creating/editing frameworks, concepts and laws.
+        # They are hidden by default but each one appears when triggered by the user.
+        #}}
+
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'framework'}) }}
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'law'}) }}
         {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'concept'}) }}
+
+        {{#
+        # Here we display the relation in symbolic form when the 'Symbolize' button is clicked.  You can then click on any
+        # node to display its particular symbol.
+        #}}
 
         <div id="symbolization">
             <div id="sybolization-controls">
@@ -104,6 +155,8 @@
             </div>
         </div>
 
+        {{# And here we display the entire relation as a picture when you click 'Visualize' }}
+
         <div id="visualization">
             <div id="visualization-controls">
                 <button id="visualize-relation" type="button" class="btn btn-primary">Visualize</button>
@@ -113,229 +166,6 @@
         </div>
 
     </body>
-
-
-
-    {{block page_css}}
-    <style>
-        html {
-            height: 100%;
-        }
-        body {
-            min-height: 100%;
-            margin: 20px;
-        }
-
-        .entry-wrapper {
-            padding: 10px 0;
-        }
-        .entry-set-button {
-            display: inline-block;
-        }
-        .entry-info {
-            display: inline-block;
-        }
-        .entry-msg {
-            display: inline-block;
-            margin-right: 20px;
-        }
-        .entry-edit-button {
-            display: inline-block;
-        }
-
-
-        .entry-modal {
-            /*overflow: scroll;*/
-        }
-        .entry-modal .modal-dialog {
-            width: 70%;
-        }
-        .entry-modal .nav-tabs {
-            border-width: 2px;
-        }
-        .entry-modal .nav-tabs > li {
-            font-size: 16px;
-        }
-        .entry-modal .nav-tabs > li > a {
-            border-width: 2px;
-        }
-        .entry-modal .tab-content {
-            padding: 10px;
-        }
-        .entry-modal .tab-pane > * {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .entry-modal input, .entry-modal select, .entry-modal textarea {
-            border-radius: 5px;
-            font-size: 18px;
-            background-color: #eff;
-            color: #000;
-        }
-        .entry-modal .form-group label {
-            display: block;
-        }
-        .entry-modal input {
-            width: 50%;
-        }
-        .entry-modal textarea {
-            width: 100%;
-        }
-        .entry-modal .result-display {
-            padding: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            white-space: nowrap;
-            overflow-x: hidden;
-        }
-        .entry-modal .result-display.selected {
-            background-color: #ddf;
-            border-radius: 10px;
-        }
-        .entry-modal .result-display > span {
-            display: inline-block;
-            white-space: nowrap;
-            overflow-x: hidden;
-        }
-        .entry-modal .result-display > .result-name {
-            width: 40%;
-        }
-        .entry-modal .result-display > .result-description {
-        }
-        .entry-modal .tab-footer {
-            text-align: right;
-        }
-
-
-        .multiple-template {
-            display: none;
-        }
-
-
-
-        /*.concept {
-            border: 3px solid red;
-            border-radius: 4px;
-            padding: 6px;
-            font-size: 14px;
-            color: black;
-        }*/
-
-        #editor-wrapper {
-            display: table;
-            width: 100%;
-            height: 100%;
-        }
-        #editor-container {
-            display: table-row;
-            width: 100%;
-            height: 100%;
-        }
-        #concept-container, #graph-container {
-            display: table-cell;
-        }
-        #concept-container {
-            width: 10%;
-            height: 100%;
-            border: 3px solid blue;
-        }
-        #graph-container {
-            width: auto;
-            height: 100%;
-            border: 3px solid green;
-        }
-
-        #graph-controls {
-        }
-        #predicate-controls, #relation-controls {
-            margin-bottom: 20px;
-        }
-        #graph-controls button, #graph-controls select {
-            padding: 5px 10px;
-            border: 2px solid black;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            background-color: #aaaaff;
-            color: black;
-        }
-        #predicate-controls {
-            float: left;
-        }
-        #predicate-controls button {
-        }
-        #remove-predicate, #predicate-help {
-            display: none;
-        }
-        #relation-controls {
-            float: right;
-        }
-        #relation-controls button {
-        }
-
-        #node-info {
-            background-color: #8ff;
-            color: #604;
-            font-weight: bold;
-            padding: 0 20px;
-        }
-
-
-        #symbolization {
-        }
-        #symbolization-controls {
-            margin: 20px 0;
-        }
-        #symbolization-wrapper {
-            width: 100%;
-            text-align: center;
-        }
-
-        #visualization {
-        }
-        #visualization-controls {
-            margin: 20px 0;
-        }
-        #visualization-canvas {
-            border: 3px solid green;
-        }
-
-        #suggestion-wrapper {
-            display: table;
-            width: 100%;
-        }
-        .suggestion {
-            display: table-row;
-        }
-        .suggestion-name {
-            font-size: 28px;
-            font-weight: bold;
-            float: left;
-        }
-        .suggestion-symbol {
-            margin-left: 5%;
-            font-size: 18px;
-            color: #606;
-        }
-        .suggestion-accept {
-            color: white;
-            background-color: #080;
-            margin-left: 5%;
-        }
-
-        hr {
-            display: block;
-            height: 1px;
-            border: 0;
-            border-top: 1px solid #ccc;
-            margin: 1em 0;
-            padding: 0;
-        }
-    </style>
-    {{end page_css}}
-
-
 
 
     {{block page_js}}
@@ -355,40 +185,69 @@
 
         function Relation() {
 
+            // this stores the current selection in the framework dropdown next to the palette of concepts,
+            // which determines what concepts are currently being displayed in that palette
             this.paletteFramework = null;
             this.paletteFrameworks = [];
 
+            // this list mirrors the 'framework' database on the server, ie. it is a local copy.  Everytime the
+            // useFramework function is called (see interface.js), the list is re-copied to make sure it's up to date.
+            // The framework records are indexed by their ID.
+
             this.frameworks = {};
-            this.frameworks[-1] = new Framework();
+
+            // the code assumes that there is always a single framework in use.  Since no records have been loaded
+            // from the server yet, we create a dummy framework record and set the current framework to it.
+
+            this.frameworks[-1] = new Framework(); // the Framework class is defined in databaseWrappers.js
             this.frameworks[-1].id = -1;
             this.frameworks[-1].relation = this;
+
+            // the framework currently in use
             this.framework = this.frameworks[-1];
 
+            // Similarly, this list mirrors the 'concept' database.  But the concepts are not loaded initially.  Only
+            // when the user loads a framework are the concepts from that framework loaded into memory (to keep memory low).
             this.concepts = {};
 
+            // Same thing for the 'law' database as for 'concept'.
             this.laws = {};
-            this.laws[-1] = new Law();
+
+            // Again, there is a single 'law' in use at any time.  The database is called 'law', but this could also
+            // be a specific problem description as opposed to a general law (they are represented the same way).
+
+            this.laws[-1] = new Law(); // the Law class is defined in databaseWrappers.js
             this.laws[-1].id = -1;
             this.laws[-1].relation = this;
+
+            // the 'law' currently in use.  This is also sometimes called the 'relation', since a law or problem description
+            // is a relation between concepts.
+
             this.law = this.laws[-1];
 
+            // Same thing for the 'node' database.
             this.nodes = {};
-            this.nodes[0] = new Node();
+
+            // I forget why it's necessary to have a dummy node record, but it is...
+
+            this.nodes[0] = new Node(); // the Node class is defined in databaseWrappers.js
             this.nodes[0].id = 0;
             this.nodes[0].relation = this;
 
-            this.predicates = {};
-            this.predicateNodes = {};
+            // when the user creates a new record but hasn't saved it yet, it is given a negative id number
+            // temporarily (so it doesn't clash with any positive id numbers from the database), and when it
+            // is saved its id is updated to that of its new record in the database.
 
-            this.nodesToCheck = [];
-            this.newNodes = [];
-            this.evaluated = {};
+            this.nextId = {'concept': -1, 'node': -1, 'law': -1, 'framework': -1};
 
-            this.tempIdMap = null;
-            this.nodeMap = {};
-            this.map = {};
-            this.nextMapId = 0;
-            this.nextNodeId = 0;
+            // When the user is constructing a general law, they can mark a node as being a predicate node of that law,
+            // meaning it and it's ancestors must be present in a relation before this law can be applied to it.  This
+            // stores the marked predicate nodes, then when the law is saved, they are stored in the law record.
+
+            this.predicateSets = [];
+            this.currentPredicate = -1;
+
+            // parameters used to display nodes in the diagram according to what type of node it is
 
             this.nodeTemplates = {
                 'default': {
@@ -409,13 +268,7 @@
                 }
             };
 
-            this.concepts = {};
-            this.wildcardConcept = 2;
-
-            this.nextId = {'concept': -1, 'node': -1, 'law': -1, 'framework': -1};
-
-            this.predicateSets = [];
-            this.currentPredicate = -1;
+            // options that control how evaluation is performed, and stats to keep track of how many nodes have been checked, etc.
 
             this.options = {
                 evaluate: {}
@@ -425,10 +278,15 @@
             };
         }
 
+        // the URLs we will need in other JavaScript files when making server calls
+
         Relation.prototype.loadFrameworkURL = "{{=URL('default', 'loadFramework', extension='json')}}";
         Relation.prototype.saveEntryURL = "{{=URL('default', 'saveEntry', extension='json')}}";
         Relation.prototype.saveRelationURL = "{{=URL('default', 'saveRelation', extension='json')}}";
     </script>
+
+
+    {{# The rest of the JavaScript, which provides most of the page functionality }}
 
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/databaseWrappers.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/diagram.js')}}"></script>
@@ -437,6 +295,12 @@
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/evaluate.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/represent.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/suggest.js')}}"></script>
+
+
+    {{#
+    # Here we perform initial JS functions once the page has been loaded, such as pulling the list of frameworks from
+    # the server, and attaching handlers to various elements on the page so they perform their desired action upon user input
+    #}}
 
     <script type="text/javascript">
 
@@ -585,7 +449,6 @@
                 relation.removePredicate();
             });
 
-            // save the
             $('#save-relation').click(function(e) {
                 relation.save();
             });

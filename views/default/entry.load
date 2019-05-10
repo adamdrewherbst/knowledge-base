@@ -5,9 +5,8 @@
 #   - it is included 3 times, once for each type of entry.  Each of the 3 modals is initially hidden, popping up when triggered
 #   by a user action.
 #
-#   The 'table' parameter (referenced as {{=table}} below) is passed in when the template is included, and specifies the database
-#   table: framework, concept, or law.  The fields in the form to create/edit an entry (create_edit.load, included below) vary
-#   depending on the table.
+#   The 'table' parameter is passed in when the template is included, and specifies the database table: framework, concept, or law.
+#   The fields in the form to create/edit an entry (create_edit.load, included below) vary depending on the table.
 #
 #}}
 
