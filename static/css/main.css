@@ -1,0 +1,216 @@
+{{# Determines how elements are styled on the page.  The elements themselves are created in knowledge.html }}
+
+        html {
+            height: 100%;
+        }
+        body {
+            min-height: 100%;
+            margin: 20px;
+        }
+
+        {{# Corresponds to the controls section }}
+
+        .entry-wrapper {
+            padding: 10px 0;
+        }
+        .entry-set-button {
+            display: inline-block;
+        }
+        .entry-info {
+            display: inline-block;
+        }
+        .entry-msg {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        .entry-edit-button {
+            display: inline-block;
+        }
+
+        {{# The pop-up dialogs for selecting/creating/editing database entries }}
+
+        .entry-modal {
+            /*overflow: scroll;*/
+        }
+        .entry-modal .modal-dialog {
+            width: 70%;
+        }
+        .entry-modal .nav-tabs {
+            border-width: 2px;
+        }
+        .entry-modal .nav-tabs > li {
+            font-size: 16px;
+        }
+        .entry-modal .nav-tabs > li > a {
+            border-width: 2px;
+        }
+        .entry-modal .tab-content {
+            padding: 10px;
+        }
+        .entry-modal .tab-pane > * {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .entry-modal input, .entry-modal select, .entry-modal textarea {
+            border-radius: 5px;
+            font-size: 18px;
+            background-color: #eff;
+            color: #000;
+        }
+        .entry-modal .form-group label {
+            display: block;
+        }
+        .entry-modal input {
+            width: 50%;
+        }
+        .entry-modal textarea {
+            width: 100%;
+        }
+        .entry-modal .result-display {
+            padding: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow-x: hidden;
+        }
+        .entry-modal .result-display.selected {
+            background-color: #ddf;
+            border-radius: 10px;
+        }
+        .entry-modal .result-display > span {
+            display: inline-block;
+            white-space: nowrap;
+            overflow-x: hidden;
+        }
+        .entry-modal .result-display > .result-name {
+            width: 40%;
+        }
+        .entry-modal .result-display > .result-description {
+        }
+        .entry-modal .tab-footer {
+            text-align: right;
+        }
+        .multiple-template {
+            display: none;
+        }
+
+
+        {{# The palette & diagram section where the user builds the relation graph }}
+
+        #editor-wrapper {
+            display: table;
+            width: 100%;
+            height: 100%;
+        }
+        #editor-container {
+            display: table-row;
+            width: 100%;
+            height: 100%;
+        }
+        #concept-container, #graph-container {
+            display: table-cell;
+        }
+        #concept-container {
+            width: 10%;
+            height: 100%;
+            border: 3px solid blue;
+        }
+        #graph-container {
+            width: auto;
+            height: 100%;
+            border: 3px solid green;
+        }
+
+        #graph-controls {
+        }
+        #predicate-controls, #relation-controls {
+            margin-bottom: 20px;
+        }
+        #graph-controls button, #graph-controls select {
+            padding: 5px 10px;
+            border: 2px solid black;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: #aaaaff;
+            color: black;
+        }
+        #predicate-controls {
+            float: left;
+        }
+        #predicate-controls button {
+        }
+        #remove-predicate, #predicate-help {
+            display: none;
+        }
+        #relation-controls {
+            float: right;
+        }
+        #relation-controls button {
+        }
+
+        #node-info {
+            background-color: #8ff;
+            color: #604;
+            font-weight: bold;
+            padding: 0 20px;
+        }
+
+
+        {{# Where the symbolic representation of the relation is displayed }}
+
+        #symbolization {
+        }
+        #symbolization-controls {
+            margin: 20px 0;
+        }
+        #symbolization-wrapper {
+            width: 100%;
+            text-align: center;
+        }
+
+        {{# And the visual representation }}
+
+        #visualization {
+        }
+        #visualization-controls {
+            margin: 20px 0;
+        }
+        #visualization-canvas {
+            border: 3px solid green;
+        }
+
+        {{# Where suggestions for laws to apply are listed }}
+
+        #suggestion-wrapper {
+            display: table;
+            width: 100%;
+        }
+        .suggestion {
+            display: table-row;
+        }
+        .suggestion-name {
+            font-size: 28px;
+            font-weight: bold;
+            float: left;
+        }
+        .suggestion-symbol {
+            margin-left: 5%;
+            font-size: 18px;
+            color: #606;
+        }
+        .suggestion-accept {
+            color: white;
+            background-color: #080;
+            margin-left: 5%;
+        }
+
+        hr {
+            display: block;
+            height: 1px;
+            border: 0;
+            border-top: 1px solid #ccc;
+            margin: 1em 0;
+            padding: 0;
+        }

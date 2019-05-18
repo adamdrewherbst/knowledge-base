@@ -114,7 +114,7 @@
                 </div>
                 <div id="relation-controls">
                     <button id="save-relation" type="button" class="btn btn-primary">Save Relation</button>
-                    <button id="evaluate-relation" type="button" class="btn btn-primary">Evaluate</button>
+                    <!--<button id="evaluate-relation" type="button" class="btn btn-primary">Evaluate</button>-->
                     <label id="evaluate-msg"></label>
                 </div>
             </div>
@@ -449,12 +449,20 @@
                 relation.removePredicate();
             });
 
+            // save the relation (which means just the nodes and the predicate sets of the current law
+            // as well as the law record itself)
             $('#save-relation').click(function(e) {
                 relation.save();
             });
+
+            // this button will *fully* evaluate the relation, ie. keep applying laws (non-tentatively)
+            // as long as it can.  The idea is that it would fully solve a problem on its own.  That could
+            // be nice if the algorithm is made much more intelligent, but for now this button is hidden -
+            // we want the user to choose each law to apply using the 'Suggest' button
             $('#evaluate-relation').click(function(e) {
                 relation.evaluate({ reset: true });
             });
+
             $('#reset-relation').click(function(e) {
                 relation.reset();
             });
