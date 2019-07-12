@@ -390,6 +390,49 @@
         };
 
 
+        Concept.prototype.loadToPalette = function() {
+            let self = this;
+
+            // clear the palette
+            let groups = Concept.palette.findTopLevelGroups();
+            while(groups.next()) {
+                let group = groups.value;
+                let sub = group.getSubGraphParts();
+                let parts = sub.iterator;
+                while(parts.next()) {
+                    let part = parts.value;
+                    let data = Concept.palette.model.findNodeDataForKey(part.key);
+                    if(data) Concept.palette.model.removeNodeData(data);
+                }
+            }
+
+            // all my instances
+            self.getInstances().forEach(function(instance) {
+                instance.addToPalette('instance');
+            });
+
+            // all my children
+            self.getChildren().forEach(function(child) {
+                child.addToPalette('children');
+            });
+
+            // all relations in which the given concept is instantiated
+            self.getRelations().forEach(function(relation) {
+                relation.addToPalette('relations');
+            });
+        };
+
+
+        Concept.prototype.addToPalette = function(group) {
+            let self = this;
+            Concept.palette.model.addNodeData({
+                group: group,
+                id: self.id,
+                name: self.name
+            });
+        };
+
+
         // create one node in the palette for each concept we have currently loaded from the server, but only
         // display those from the currently active framework
         Relation.prototype.setPaletteModel = function() {

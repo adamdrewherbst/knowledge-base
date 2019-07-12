@@ -1449,6 +1449,248 @@
         };
 
 
+        Page.prototype.parseRecords = function(data) {
+            let self = this;
+
+            for(let table in data) {
+                for(let id in data[table]) {
+                    let record = data[table][id];
+                    self.getTable(table).storeRecord(record);
+                }
+            }
+        };
+
+
+        Table.prototype.storeRecord = function(record) {
+            let self = this;
+
+            if(!self.records[record.id]) self.records[record.id] = new self.class();
+
+            self.records[record.id].update(record);
+        };
+
+
+        Record.prototype.update = function(data) {
+            let self = this;
+
+            self.name = data.name;
+            self.description = data.description;
+        };
+
+
+        function Concept() {
+            let self = this;
+            self.predicates = {};
+
+            self.add('head', 'concept');
+            self.add('head_child', 'concept', 'multiple');
+            self.add('reference', 'concept');
+            self.add('reference_child', 'concept', 'multiple');
+            self.add('parent', 'concept', 'multiple');
+            self.add('child', 'concept', 'multiple');
+            self.add('relation', 'relation');
+            self.add('predicate', 'number', 'multiple');
+
+            bind('concept', 'predicate[i]', 'relation.concept',
+                'relation', 'predicate[i][concept.id]', 'concept.relation');
+            bind('concept', 'head', 'concept', 'head_child');
+        }
+
+        Concept.setBindings = function() {
+            bind(Concept, 'head', Concept, 'head_child');
+            bind(Concept, 'reference', Concept, 'reference_child');
+            bind(Concept, 'parent', Concept, 'child');
+            bind(Concept, 'relation', Relation, 'concept');
+            bind(Concept, 'predicate', 'relation', 'predicate');
+        };
+
+        function bind() {
+            let classes = [];
+            for(let i = 0; i < arguments.length; i++) {
+                let arg = arguments[i];
+                if(typeof arg === 'function') {
+                    classes.push(arg);
+
+                }
+            }
+        }
+
+            head: {
+                complement: 'head-child'
+            },
+            'head-child': {
+                complement: 'head',
+                multiple: true
+            },
+
+            reference: {
+                complement: 'reference-child'
+            },
+            'reference-child': {
+                complement: 'reference',
+                multiple: true
+            },
+
+            parent: {
+                complement: 'child',
+                multiple: true
+            },
+            child: {
+                complement: 'parent',
+                multiple: true
+            },
+
+            relation: {
+                table: Relation,
+                complement: 'concept'
+            },
+
+            predicate: {
+                table: Relation,
+                store: function(predicate) {
+                    this.predicates[predicate] = true;
+                }
+            }
+        };
+
+
+        function Relation() {
+            let self = this;
+        }
+
+        Relation.bindings = {
+            concept: {
+                table: Concept,
+                complement: 'relation',
+                multiple: true
+            },
+            predicate: {
+                table: Concept,
+                store: function(predicate) {
+                    if(!this.predicates[predicate]) this.predicates[predicate] = {};
+                    this.predicates[predicate][concept.id] = true;
+                }
+            }
+        };
+
+        // bind any field in one object to a field in another, so if the one gets changed the other
+        // will be updated.  the field could be nested inside structure.  the predicate groups of a concept
+        // have to be updated in the relation and vice versa.
+        // bind Concept.predicates[i] = true  to  Relation.predicates[i][concept_id] = true
+        // bind(Relation, Concept, )
+
+        Concept.prototype.update = function(data) {
+            let self = this;
+
+            Record.prototype.update.call(self, data);
+
+            self.setRelation(data.law);
+
+            for(let id in data.parents) {
+                self.addParent(id);
+            }
+
+            for(let id in data.children) {
+                self.addChild(id);
+            }
+
+            self.setHead(data.head);
+
+            for(let id in data.head_children) {
+                self.setAsHead(id);
+            }
+
+            self.setReference(data.reference);
+
+            for(let id in data.reference_children) {
+                self.setAsReference(id);
+            }
+
+            data.predicates.split(',').forEach(function(predicate) {
+                self.addToPredicate(predicate);
+            });
+        };
+
+
+        Record.prototype.setLink = function(link, record) {
+            let self = this;
+
+            let desc = self.getLinkDescription(link);
+
+            if(!(record = desc.table.find(record))) return false;
+
+            if(desc.multiple) {
+                if(self[link] && self[link][record.id] === record) return true;
+                self[link][record.id] = record;
+            } else {
+                if(self[link] === record) return true;
+                self[link] = record;
+            }
+
+            record.setLink(desc.complement, self);
+        };
+
+
+        Record.prototype.getLinkDescription = function(link) {
+            return this.constructor.links[link];
+        };
+
+
+        Concept.prototype.setRelation = function(relation) {
+            this.setLink('relation', relation);
+        };
+
+        Concept.prototype.setHead = function(concept) {
+            this.setLink('head', concept);
+        };
+
+        Concept.prototype.setAsHead = function(concept) {
+            this.setLink('head-child', concept);
+        };
+
+        Concept.prototype.setReference = function(concept) {
+            this.setLink('reference', concept);
+        };
+
+        Concept.prototype.setAsReference = function(concept) {
+            this.setLink('reference-child', concept);
+        };
+
+        Concept.prototype.addParent = function(concept) {
+            this.setLink('parent', concept);
+        };
+
+        Concept.prototype.addChild = function(concept) {
+            this.setLink('child', concept);
+        };
+
+        Concept.prototype.addToPredicate = function(predicate) {
+            let self = this;
+            self.predicates[predicate] = true;
+            let relation = self.getRelation();
+            if(relation) relation.addConceptToPredicate(self, predicate);
+        };
+
+
+        Relation.prototype.update = function(data) {
+            let self = this;
+
+            Record.prototype.update.call(self, data);
+        };
+
+
+        Relation.prototype.addConcept = function(concept) {
+            this.setLink('concept', concept);
+        };
+
+        Relation.prototype.addConceptToPredicate = function(concept, predicate) {
+
+        };
+
+
+
+
+
         /*
             storeEntries: whenever we save or load anything, the server (via /controllers/default.py) passes us the
             corresponding records from the database.  We then create or update our local copy of those records to

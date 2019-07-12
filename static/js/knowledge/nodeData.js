@@ -953,7 +953,6 @@ NodeData.prototype.setValue = function(key, value) {
     }
 };
 
-
 // when a key of a node's data resolves, specific actions may need to be taken
 NodeData.prototype.fullyResolve = function(key) {
     let self = this;

@@ -63,6 +63,51 @@
         };
 
 
+        Concept.prototype.updateMatches = function() {
+            let self = this;
+
+            // find every predicate concept of which I am an instance
+            let predicates = {};
+            self.getAncestors().forEach(function(ancestor) {
+                ancestor.getInstances().forEach(function(instance) {
+                    if(!instance.isPredicate() || self.matched(instance)) return;
+                    let head = self.getHead(), ref = self.getReference();
+                    if((!head || head.matched(instance.getHead())
+                        && (!ref || ref.matched(instance.getReference()))) {
+                        self.addMatch(instance);
+                    }
+                });
+            });
+        };
+
+
+        Concept.prototype.instanceOf = function(concept) {
+            let self = this;
+
+            if(concept.isPredicate()) {
+                return concept.getParents().every(function(parent) {
+                    return self.instanceOf(parent);
+                });
+            } else {
+                return self.getAncestors().indexOf(concept) >= 0;
+            }
+        };
+
+
+        Concept.prototype.getParents = function() {
+            let self = this, arr = [];
+            for(let id in self.parents) arr.push(self.parents[id]);
+            return arr;
+        };
+
+
+        Concept.prototype.getAncestors = function() {
+            let self = this, arr = [];
+            for(let id in self.ancestors) arr.push(self.ancestors[id]);
+            return arr;
+        }
+
+
         // a wrapper class for the map which stores a matching between predicate nodes from a certain law,
         // and nodes from our relation
         function Map(law) {

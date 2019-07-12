@@ -387,3 +387,31 @@ CREATE TABLE concept_context(
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
 success!
+timestamp: 2019-07-09T23:07:58.983694
+ALTER TABLE concept ADD law INT  , ADD INDEX law__idx (law), ADD FOREIGN KEY (law) REFERENCES concept (id) ON DELETE CASCADE;
+success!
+timestamp: 2019-07-09T23:07:59.515171
+ALTER TABLE concept DROP COLUMN inherits;
+success!
+timestamp: 2019-07-09T23:07:59.694598
+ALTER TABLE concept DROP COLUMN symbol;
+success!
+timestamp: 2019-07-09T23:07:59.789161
+ALTER TABLE concept DROP COLUMN commands;
+success!
+timestamp: 2019-07-09T23:07:59.906774
+ALTER TABLE concept DROP COLUMN value;
+success!
+timestamp: 2019-07-09T23:08:00.013493
+ALTER TABLE concept DROP COLUMN symmetric;
+success!
+timestamp: 2019-07-09T23:08:00.174751
+ALTER TABLE concept DROP COLUMN framework;
+timestamp: 2019-07-09T23:11:13.930807
+ALTER TABLE concept DROP COLUMN law_specific;
+success!
+timestamp: 2019-07-09T23:11:14.017421
+ALTER TABLE concept DROP COLUMN node_specific;
+success!
+timestamp: 2019-07-09T23:11:14.102553
+ALTER TABLE concept DROP COLUMN framework;
