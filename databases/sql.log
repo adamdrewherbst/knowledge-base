@@ -415,3 +415,27 @@ ALTER TABLE concept DROP COLUMN node_specific;
 success!
 timestamp: 2019-07-09T23:11:14.102553
 ALTER TABLE concept DROP COLUMN framework;
+timestamp: 2019-08-15T18:15:53.148509
+ALTER TABLE concept DROP COLUMN framework;
+timestamp: 2019-08-15T18:25:25.600178
+ALTER TABLE concept DROP COLUMN framework;
+success!
+timestamp: 2019-08-15T18:25:25.922033
+ALTER TABLE concept DROP COLUMN law;
+success!
+timestamp: 2019-08-15T18:25:26.083479
+CREATE TABLE concept_instance_of(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    instance_of INT  , INDEX instance_of__idx (instance_of), FOREIGN KEY (instance_of) REFERENCES concept (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2019-08-15T18:25:26.224292
+CREATE TABLE concept_predicate(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    predicate INT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!

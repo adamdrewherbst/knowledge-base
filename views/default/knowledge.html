@@ -70,25 +70,6 @@
 
     <body>
 
-        {{# Here are the controls to load a new framework or law, or edit the name, description, etc. of the current one }}
-
-        <div id="controls">
-            <div class="entry-wrapper" table="framework">
-                <button class="entry-set-button" type="button" class="btn btn-primary">Select Framework</button>
-                <div class="entry-info">
-                    <div class="entry-msg">Using Framework <span class="entry-name">NONE</span></div>
-                    <button class="entry-edit-button" type="button" class="btn btn-primary">Edit</button>
-                </div>
-            </div>
-            <div class="entry-wrapper" table="law">
-                <button class="entry-set-button" type="button" class="btn btn-primary">Select Law</button>
-                <div class="entry-info">
-                    <div class="entry-msg">Using Law <span class="entry-name">NONE</span></div>
-                    <button class="entry-edit-button" type="button" class="btn btn-primary">Edit</button>
-                </div>
-            </div>
-        </div>
-
         {{#
         # Here is the palette & diagram where the user can drag concepts from the palette onto the diagram and arrange them into
         # a connected relation represented the problem at hand, or a general law.  This functionality is provided by the GoJS
@@ -128,20 +109,6 @@
             </div>
         </div>
 
-        {{#
-        # These are the 3 modals (pop-up dialogs) for selecting/creating/editing frameworks, concepts and laws.
-        # They are hidden by default but each one appears when triggered by the user.
-        #}}
-
-        {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'framework'}) }}
-        {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'law'}) }}
-        {{ =LOAD('default', 'entry.load', ajax=False, vars={'table': 'concept'}) }}
-
-        {{#
-        # Here we display the relation in symbolic form when the 'Symbolize' button is clicked.  You can then click on any
-        # node to display its particular symbol.
-        #}}
-
         <div id="symbolization">
             <div id="sybolization-controls">
                 <button id="reset-relation" type="button" class="btn btn-primary">Reset</button>
@@ -170,119 +137,60 @@
 
     {{block page_js}}
     {{include 'web2py_ajax.html'}}
-    <script type="text/javascript" src="/welcome/static/GoJS-master/release/go.js"></script>
+
+    <script type="text/javascript" src="https://unpkg.com/gojs/release/go.js"></script>
+    <!--<script type="text/javascript" src="/welcome/static/GoJS-master/release/go.js"></script>
     <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/highlight.js"></script>
-    <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/bootstrap.min.js"></script>-->
+
     <script type="text/javascript">
 
         var $$ = go.GraphObject.make;
 
-        /*********   RELATION   *****************
+        /*********   PAGE   *****************
 
         A wrapper class for all functionality on this page
 
         *****************************************/
 
-        function Relation() {
+        var Page = {};
 
-            // this stores the current selection in the framework dropdown next to the palette of concepts,
-            // which determines what concepts are currently being displayed in that palette
-            this.paletteFramework = null;
-            this.paletteFrameworks = [];
+        Page.nodeTemplates = {
+            'default': {
+                shape: "RoundedRectangle",
+                fill: "#88AD5F"
+            },
+            'predicate': {
+                shape: "Rectangle",
+                fill: "yellow"
+            },
+            'appended': {
+                shape: 'RoundedRectangle',
+                fill: '#FF66AA'
+            },
+            'tentative': {
+                shape: 'RoundedRectangle',
+                fill: '#8888FF'
+            }
+        };
 
-            // this list mirrors the 'framework' database on the server, ie. it is a local copy.  Everytime the
-            // useFramework function is called (see interface.js), the list is re-copied to make sure it's up to date.
-            // The framework records are indexed by their ID.
+        Page.currentConcept = null;
+        Page.currentPredicate = -1;
 
-            this.frameworks = {};
+        // options that control how evaluation is performed, and stats to keep track of how many nodes have been checked, etc.
 
-            // the code assumes that there is always a single framework in use.  Since no records have been loaded
-            // from the server yet, we create a dummy framework record and set the current framework to it.
-
-            this.frameworks[-1] = new Framework(); // the Framework class is defined in databaseWrappers.js
-            this.frameworks[-1].id = -1;
-            this.frameworks[-1].relation = this;
-
-            // the framework currently in use
-            this.framework = this.frameworks[-1];
-
-            // Similarly, this list mirrors the 'concept' database.  But the concepts are not loaded initially.  Only
-            // when the user loads a framework are the concepts from that framework loaded into memory (to keep memory low).
-            this.concepts = {};
-
-            // Same thing for the 'law' database as for 'concept'.
-            this.laws = {};
-
-            // Again, there is a single 'law' in use at any time.  The database is called 'law', but this could also
-            // be a specific problem description as opposed to a general law (they are represented the same way).
-
-            this.laws[-1] = new Law(); // the Law class is defined in databaseWrappers.js
-            this.laws[-1].id = -1;
-            this.laws[-1].relation = this;
-
-            // the 'law' currently in use.  This is also sometimes called the 'relation', since a law or problem description
-            // is a relation between concepts.
-
-            this.law = this.laws[-1];
-
-            // Same thing for the 'node' database.
-            this.nodes = {};
-
-            // I forget why it's necessary to have a dummy node record, but it is...
-
-            this.nodes[0] = new Node(); // the Node class is defined in databaseWrappers.js
-            this.nodes[0].id = 0;
-            this.nodes[0].relation = this;
-
-            // when the user creates a new record but hasn't saved it yet, it is given a negative id number
-            // temporarily (so it doesn't clash with any positive id numbers from the database), and when it
-            // is saved its id is updated to that of its new record in the database.
-
-            this.nextId = {'concept': -1, 'node': -1, 'law': -1, 'framework': -1};
-
-            // When the user is constructing a general law, they can mark a node as being a predicate node of that law,
-            // meaning it and it's ancestors must be present in a relation before this law can be applied to it.  This
-            // stores the marked predicate nodes, then when the law is saved, they are stored in the law record.
-
-            this.predicateSets = [];
-            this.currentPredicate = -1;
-
-            // parameters used to display nodes in the diagram according to what type of node it is
-
-            this.nodeTemplates = {
-                'default': {
-                    shape: "RoundedRectangle",
-                    fill: "#88AD5F"
-                },
-                'predicate': {
-                    shape: "Rectangle",
-                    fill: "yellow"
-                },
-                'appended': {
-                    shape: 'RoundedRectangle',
-                    fill: '#FF66AA'
-                },
-                'tentative': {
-                    shape: 'RoundedRectangle',
-                    fill: '#8888FF'
-                }
-            };
-
-            // options that control how evaluation is performed, and stats to keep track of how many nodes have been checked, etc.
-
-            this.options = {
-                evaluate: {}
-            };
-            this.stats = {
-                evaluate: {}
-            };
-        }
+        Page.options = {
+            evaluate: {}
+        };
+        Page.stats = {
+            evaluate: {}
+        };
 
         // the URLs we will need in other JavaScript files when making server calls
 
-        Relation.prototype.loadFrameworkURL = "{{=URL('default', 'loadFramework', extension='json')}}";
-        Relation.prototype.saveEntryURL = "{{=URL('default', 'saveEntry', extension='json')}}";
-        Relation.prototype.saveRelationURL = "{{=URL('default', 'saveRelation', extension='json')}}";
+        Page.loadConceptURL = "{{=URL('default', 'loadRecord', extension='json')}}";
+        Page.saveConceptURL = "{{=URL('default', 'saveRecord', extension='json')}}";
+
     </script>
 
 
@@ -290,11 +198,11 @@
 
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/databaseWrappers.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/diagram.js')}}"></script>
-    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/interface.js')}}"></script>
+<!--    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/interface.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/nodeData.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/evaluate.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/represent.js')}}"></script>
-    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/suggest.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/suggest.js')}}"></script>-->
 
 
     {{#
@@ -304,180 +212,22 @@
 
     <script type="text/javascript">
 
-        //Create a global instance of the Relation class. This is our main variable: it will store the state of the page
-        //and run functions in response to user input to load, save, and evaluate problems & laws, define concepts, etc.
-        var relation;
-
         $(document).ready(function() {
-            relation = new Relation();
 
-            //create the canvas where we can create and edit laws.  This includes the palette of concepts to choose from
-            //on the left side, and the diagram for editing the law on the right.
-            relation.initDiagram();
+            Concept.setFields();
+            Concept.setBindings();
 
-            //temporarily hard-coding which framework & law to load so I don't have to select it each time
-            relation.useFramework(7, 9);
+            Page.tables = {
+                concept: new Table(Concept),
+            }
+            Concept.table = Page.tables.concept;
 
-            //a regular expression finds patterns in text; refRegex is defined in nodeData.js and is used
-            //to parse a concept's representation rules
-            relation.regex = refRegex();
+            Page.initDiagram();
 
-            /*  EVENT HANDLERS
-                The rest of this code adds event handlers to buttons in the interface; when the button is clicked,
-                the event handler will run to perform the desired action
-            */
-
-            /* Modals
-            A 'modal' is a popup dialog supplied by the Bootstrap plugin, documented here:
-                https://getbootstrap.com/docs/4.0/components/modal/
-
-            The modals in this site are used to create, edit, and select frameworks, concepts, and laws (collectively called
-            'entries' since each one has an entry in the database).  Nodes within laws are not managed through modals, rather
-            they are manipulated directly in the diagram canvas.
-
-            The layout of the modals is specified in /views/default/entry.load
-
-                These modals are set up so that the action is performed when they are closed - for example, the user hits the
-            'Select' or 'Save Changes' button, the modal is closed, and the selection or save is simultaneously done (that turned
-            out to be the easiest way based on the Modal functionality supplied by Bootstrap).  So, we add event handlers
-            to the 'hide' event which Bootstrap always fires when a modal is closed.
-            */
-
-            let $hideButton = null;
-            //first we need to know which button the user clicked to close the modal
-            // - if it was 'Cancel', we won't perform the action
-            $('.entry-modal button[data-dismiss=modal]').click(function(e) {
-                $hideButton = $(this);
-            });
-            $('.entry-modal').on('show.bs.modal', function(e) {
-                $hideButton = null;
+            Page.loadConcept(1, function() {
+                Page.getConcept(1).load();
             });
 
-            //then we perform the corresponding action for the given modal/button combination
-            $('.entry-modal').on('hide.bs.modal', function(e) {
-                relation.onModalHide($(this), $hideButton); //defined in /static/js/knowledge/interface.js
-            });
-
-            // although there is always a single framework in use, it may have dependencies, so we actually are
-            // using the entire dependent set of frameworks.  So, to view concepts or laws from only one of those
-            // frameworks, we have framework filter dropdown menus.  When such a filter is changed, we have to redisplay
-            // the list of concepts/laws the user is looking at to only show those from the selected framework.
-
-            let $filters = $('.framework-filter');
-            $filters.change(function(e) {
-                let $this = $(this), framework = $this.val(), $modal = $(this).parents('.modal');
-
-                // if the filter is inside a modal, it means we are currently selecting a concept or law
-                // so update the search results displayed in that modal
-
-                if($modal.length > 0) {
-                    let table = $modal.attr('id').split('-')[0];
-                    $modal.find('.framework-filter').val(framework);
-                    relation.showSearchResults(table, '');
-
-                // the only other place that has a filter is the concept palette used for adding nodes to law trees
-
-                } else if($this.attr('id') == 'palette-concept-filter') {
-                    relation.filterPalette(framework);
-                }
-            });
-
-            // There is always a single framework and a single law within that framework in use (if any)
-            // The .entry-wrapper divs contain the controls for selecting a different framework/law or editing
-            // the record of the one currently in use
-
-            $('.entry-wrapper').each(function() {
-                let $this = $(this), table = $this.attr('table');
-
-                $this.find('.entry-set-button').click(function(e) {
-
-                    // when the 'Select Framework' or 'Select Law' button is clicked,
-                    // pop up the corresponding modal to load a different framework/law
-
-                    relation.selectEntry(table, function(id) { //defined in interface.js
-                        if(table == 'framework') relation.useFramework(id); //defined in interface.js
-                        else if(table == 'law') relation.useLaw(id); //defined in interface.js
-                        let entry = relation.findEntry(table, id);
-                        $this.find('.entry-name').text(entry.name || 'None');
-                        $this.find('.entry-info').show();
-                    });
-                });
-                $this.find('.entry-edit-button').click(function(e) {
-
-                    // when the 'Edit Framework' or 'Edit Law' button is clicked, pop up the
-                    // corresponding modal to edit the record currently in use
-
-                    let id = table == 'framework' ? relation.framework.id : table == 'law' ? relation.law.id : null;
-                    if(!id) return;
-                    relation.editEntry(table, id);
-                });
-            });
-
-            // inside the modals to select a new record is a search field to narrow down the list
-            // when the user changes the text in the search field, update the list of results accordingly
-
-            $('.search-field').on('keydown change', function(e) {
-                let $this = $(this), text = $this.val().toLowerCase(), table = $this.attr('id').split('-')[0];
-                relation.showSearchResults(table, text);
-            });
-
-            // multiple fields refers to fields in the database that have multiple items - for example,
-            // a concept can be an instance of multiple other concepts.  On the forms, these are displayed as
-            // one row (eg. a dropdown to select the parent concept) with an Add button next to it to
-
-            $('.multiple-wrapper').each(function() {
-                let $this = $(this);
-                relation.addMultipleField($this);
-                $this.find('.multiple-add').click(function(e) {
-                    relation.addMultipleField($this);
-                });
-            });
-
-            // pop up the dialog to create a new concept in the current framework
-            $('#concept-create-button').click(function(e) {
-                relation.newEntry('concept');
-            });
-
-            // add, select, and remove predicate sets from the current law
-            // for more on these, see /models/db.py
-            // you can right-click on a node and add it to the current predicate (see diagram.js)
-
-            $('#set-predicate').change(function(e) {
-                relation.setPredicate($(this).val());
-            });
-            $('#remove-predicate').click(function(e) {
-                relation.removePredicate();
-            });
-
-            // save the relation (which means just the nodes and the predicate sets of the current law
-            // as well as the law record itself)
-            $('#save-relation').click(function(e) {
-                relation.save();
-            });
-
-            // this button will *fully* evaluate the relation, ie. keep applying laws (non-tentatively)
-            // as long as it can.  The idea is that it would fully solve a problem on its own.  That could
-            // be nice if the algorithm is made much more intelligent, but for now this button is hidden -
-            // we want the user to choose each law to apply using the 'Suggest' button
-            $('#evaluate-relation').click(function(e) {
-                relation.evaluate({ reset: true });
-            });
-
-            $('#reset-relation').click(function(e) {
-                relation.reset();
-            });
-            $('#resolve-data').click(function(e) {
-                relation.law.resolveData();
-            });
-            $('#visualize-relation').click(function(e) {
-                relation.visualize();
-            });
-            $('#symbolize-relation').click(function(e) {
-                relation.symbolize();
-            });
-            $('#suggest-step').click(function(e) {
-                relation.suggest();
-            });
         });
     </script>
     {{end page_js}}

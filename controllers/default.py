@@ -28,6 +28,13 @@ from datetime import datetime
 #   render the page for the user.  You can add a new page to the site in the same way.
 #
 def knowledge():
+
+    #   make sure the global ROOT concept exists; this is the root of the tree of all concepts
+    db['concept'].update_or_insert(id=1, name='ROOT', description='root of the concept tree')
+
+    #   also the 'relation' concept, which represents the root of a relation
+    db['concept'].update_or_insert(id=2, name='RELATION', description='a specific relation')
+
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
     return dict()
@@ -60,36 +67,23 @@ def loadRecordHelper(table, record, records):
 
     rec = record.as_dict()
 
-    if table is 'law':
+    rec['instance_of'] = {}
+    rec['instance'] = {}
+    rec['head_of'] = {}
+    rec['reference_of'] = {}
 
-        rec['concepts'] = {}
+#    for dep in db(concept_instance_of.concept == record.id).iterselect():
+#        loadRecord('concept', db['concept'][dep.instance_of], records)
+#        rec['instance_of'][dep.instance_of] = True
 
-        for concept in db(concept.law == record.id).iterselect():
-            loadRecord('concept', concept, records)
-            rec['concepts'][concept.id] = True
+#    for dep in db(concept_instance_of.instance_of == record.id).iterselect():
+#        loadRecord('concept', db['concept'][dep.concept], records)
+#        rec['instance'][dep.concept] = True
 
-    elif table is 'concept':
-
-        rec['parents'] = {}
-        rec['children'] = {}
-        rec['head_children'] = {}
-        rec['reference_children'] = {}
-
-        for law in db(law.id == record.law).iterselect():
-            loadRecord('law', law, records)
-
-        for dep in db(concept_parent.concept == record.id).iterselect():
-            loadRecord('concept', db['concept'][dep.parent], records)
-            rec['parents'][dep.parent] = True
-
-        for dep in db(concept.parent.parent == record.id).iterselect():
-            loadRecord('concept', db['concept'][dep.concept], records)
-            rec['children'][dep.concept] = True
-
-        for concept in db(concept.head == record.id).iterselect():
-            rec['head_children'][concept.id] = True
-        for concept in db(concept.reference == record.id).iterselect():
-            rec['reference_children'][concept.id] = True
+#    for con in db(concept.head == record.id).iterselect():
+#        rec['head_of'][con.id] = True
+#    for con in db(concept.reference == record.id).iterselect():
+#        rec['reference_of'][con.id] = True
 
     records[table][record.id] = rec
 

@@ -1,13 +1,13 @@
 (dp1
-S'description'
+S'head'
 p2
 (dp3
 S'sortable'
 p4
-I3
+I5
 sS'sql'
 p5
-S'VARCHAR(512)'
+S'INT  , INDEX head__idx (head), FOREIGN KEY (head) REFERENCES concept (id) ON DELETE CASCADE'
 p6
 sS'length'
 p7
@@ -20,17 +20,17 @@ p9
 I00
 sS'type'
 p10
-S'string'
+S'reference concept'
 p11
-ssS'reference'
+ssS'description'
 p12
 (dp13
 S'sortable'
 p14
-I6
+I3
 sS'sql'
 p15
-S'INT  , INDEX reference__idx (reference), FOREIGN KEY (reference) REFERENCES concept (id) ON DELETE CASCADE'
+S'VARCHAR(512)'
 p16
 sS'length'
 p17
@@ -43,33 +43,33 @@ p19
 I00
 sS'type'
 p20
-S'reference concept'
+S'string'
 p21
-ssS'head'
+ssS'reference'
 p22
 (dp23
-g14
-I5
-sg15
-S'INT  , INDEX head__idx (head), FOREIGN KEY (head) REFERENCES concept (id) ON DELETE CASCADE'
+g4
+I6
+sg5
+S'INT  , INDEX reference__idx (reference), FOREIGN KEY (reference) REFERENCES concept (id) ON DELETE CASCADE'
 p24
-sg17
+sg7
 I512
-sg18
+sg8
 I00
-sg19
+sg9
 I00
-sg20
-g21
-ssS'name'
+sg10
+g11
+ssS'id'
 p25
 (dp26
 S'sortable'
 p27
-I2
+I1
 sS'sql'
 p28
-S'VARCHAR(512)'
+S'INT AUTO_INCREMENT NOT NULL'
 p29
 sS'length'
 p30
@@ -82,56 +82,16 @@ p32
 I00
 sS'type'
 p33
-S'string'
+S'id'
 p34
-ssS'framework'
+ssS'name'
 p35
 (dp36
-g4
-I5
-sg5
-S'INT  , INDEX framework__idx (framework), FOREIGN KEY (framework) REFERENCES framework (id) ON DELETE CASCADE'
-p37
-sg7
-I512
-sg8
-I00
-sg9
-I00
-sg10
-S'reference framework'
-p38
-ssS'law'
-p39
-(dp40
-S'sortable'
-p41
-I6
-sS'sql'
-p42
-S'INT  , INDEX law__idx (law), FOREIGN KEY (law) REFERENCES concept (id) ON DELETE CASCADE'
-p43
-sS'length'
-p44
-I512
-sS'notnull'
-p45
-I00
-sS'unique'
-p46
-I00
-sS'type'
-p47
-S'reference concept'
-p48
-ssS'id'
-p49
-(dp50
 g27
-I1
+I2
 sg28
-S'INT AUTO_INCREMENT NOT NULL'
-p51
+S'VARCHAR(512)'
+p37
 sg30
 I512
 sg31
@@ -139,6 +99,6 @@ I00
 sg32
 I00
 sg33
-S'id'
-p52
+S'string'
+p38
 ss.
