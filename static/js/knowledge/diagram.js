@@ -28,7 +28,7 @@
             Page.diagram = $$(go.Diagram, "graph-canvas",  // must name or refer to the DIV HTML element
             {
                 // the canvas has a grid as a background; set the parameters for this
-              grid: $$(go.Panel, "Grid",
+                grid: $$(go.Panel, "Grid",
                       $$(go.Shape, "LineH", { stroke: "lightgray", strokeWidth: 0.5 }),
                       $$(go.Shape, "LineH", { stroke: "gray", strokeWidth: 0.5, interval: 10 }),
                       $$(go.Shape, "LineV", { stroke: "lightgray", strokeWidth: 0.5 }),
@@ -77,20 +77,56 @@
 
             // dragging a node invalidates the Diagram.layout, causing a layout during the drag
             Page.diagram.toolManager.draggingTool.doMouseMove = function() {
-              go.DraggingTool.prototype.doMouseMove.call(this);
-              if (this.isActive) { this.diagram.layout.invalidateLayout(); }
+                go.DraggingTool.prototype.doMouseMove.call(this);
+                if (this.isActive) { this.diagram.layout.invalidateLayout(); }
             }
 
             // when the diagram is modified, add a "*" to the page title in the browser, and enable the "Save" button
             Page.diagram.addDiagramListener("Modified", function(e) {
-              var button = document.getElementById("graph-save-button");
-              if (button) button.disabled = !Page.diagram.isModified;
-              var idx = document.title.indexOf("*");
-              if (Page.diagram.isModified) {
-                if (idx < 0) document.title += "*";
-              } else {
-                if (idx >= 0) document.title = document.title.substr(0, idx);
-              }
+                console.log('diagram modified');
+                var button = document.getElementById("graph-save-button");
+                if (button) button.disabled = !Page.diagram.isModified;
+                var idx = document.title.indexOf("*");
+                if (Page.diagram.isModified) {
+                    if (idx < 0) document.title += "*";
+                } else {
+                    if (idx >= 0) document.title = document.title.substr(0, idx);
+                }
+            });
+
+            let editListener = function(e) {
+                console.log('diagram edited: ' + e.name);
+                switch(e.name) {
+                    case 'TextEdited':
+                        let node = e.subject.part;
+                        if(node instanceof go.Node) {
+                            console.log('node is now ' + node.getDocumentBounds().width + ' wide');
+                        }
+                        break;
+                    case 'SelectionDeleted':
+                        let it = e.subject.iterator;
+                        while(it.next()) {
+                            let part = it.value;
+                            if(part instanceof go.Node) {
+                                let concept = Page.getConcept(part);
+                                if(concept) {
+                                    concept.getHeadOf().forEach(function(child) {
+                                        child.removeFromDiagram();
+                                    });
+                                }
+                            }
+                        }
+                        break;
+                    default: break;
+                }
+            };
+            Page.diagram.addDiagramListener('TextEdited', editListener);
+            Page.diagram.addDiagramListener('SelectionDeleted', editListener);
+
+            Page.diagram.addDiagramListener('LayoutCompleted', function(e) {
+                console.log('LAYOUTED');
+                let concept = Page.currentConcept;
+                if(concept) concept.layoutTree();
             });
 
             // called in the node template below to create the top and bottom 'port' on each node;
@@ -136,9 +172,11 @@
               $$(go.Adornment, "Vertical",
                     makeButton("Add Child",
                         function(e, obj) {
-                            let concept = Page.getConcept(obj.part.adornedPart);
-                            concept.setAsHead(Page.createConcept());
-                            Page.currentConcept.drawTree();
+                            let concept = Page.getConcept(obj.part.adornedPart),
+                                child = Page.createConcept();
+                            child.setHead(concept);
+                            child.initTree();
+                            Page.currentConcept.layoutTree();
                         },
                         function(o) {
                             let part = o.part.adornedPart;
@@ -215,47 +253,39 @@
 
                 // the main object is a Panel which contains a Shape surrounding a TextBlock
                 $$(go.Panel, "Auto",
-                  { name: "PANEL" },
-                  new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+                    { name: "PANEL" },
+                    new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
 
-                  // the default shape will be a rounded rectangle (see the nodeTemplates member in knowledge.html)
-                  $$(go.Shape, Page.nodeTemplates['default'].shape,  // default figure
+                    // the default shape will be a rounded rectangle (see the nodeTemplates member in knowledge.html)
+                    $$(go.Shape, Page.nodeTemplates['default'].shape,  // default figure
                     {
-                      cursor: "pointer",
-                      fill: Page.nodeTemplates['default'].fill,  // default color
-                      strokeWidth: 2
+                        cursor: "pointer",
+                        fill: Page.nodeTemplates['default'].fill,  // default color
+                        strokeWidth: 2
                     },
                     new go.Binding("figure"),
                     new go.Binding("fill")),
 
-                  // inside that is a text block displaying the node name if any, and the concept name
-                  $$(go.TextBlock,
+                    // inside that is a text block displaying the node name if any, and the concept name
+                    $$(go.TextBlock,
                     {
-                      font: "bold 11pt Helvetica, Arial, sans-serif",
-                      margin: 8,
-                      maxSize: new go.Size(160, NaN),
-                      wrap: go.TextBlock.WrapFit,
-                      editable: true
+                        font: "bold 11pt Helvetica, Arial, sans-serif",
+                        margin: 8,
+                        maxSize: new go.Size(160, NaN),
+                        wrap: go.TextBlock.WrapFit,
+                        editable: true
                     },
                     // we use a function to determine what text the node will display
-                    new go.Binding("text", "", function(data, node) {
-
-                        // in the palette, each node just represents a concept from our framework
-                        if(node.diagram === Page.palette) return self.concepts[data.concept].name;
-
-                        // if the node has a name, the text will be the node name followed
-                        // by the concept name in brackets; otherwise, just the concept name
-                        let text = '';
-                        if(typeof data.name == 'string' && data.name.length > 0) {
-                            text = data.name;
+                    new go.Binding('text', '', function(data, node) {
+                        if(node.diagram === Page.palette) {
+                            return data.name;
+                        } else {
+                            return data.name + ' [' + data.id + ']';
                         }
-                        if(data.concept && self.concepts.hasOwnProperty(data.concept)) {
-                            let conceptName = self.concepts[data.concept].name;
-                            if(text) conceptName = ' [' + conceptName + ']';
-                            text += conceptName;
-                        }
-                        //text += ' [' + data.id + ']';
-                        return text;
+                    }).makeTwoWay(function(text, data, model) {
+                        model.setDataProperty(data, 'name', text);
+                        let concept = Page.getConcept(data.id);
+                        if(concept) concept.set('name', text);
                     }))
                 ),
                 // the port on top has an incoming link from my head node, and an outgoing link to my reference node
@@ -330,6 +360,7 @@
             Page.eachNode(function(node) {
                 Page.getConcept(node).removeFromDiagram();
             });
+            Page.diagram.requestUpdate();
         };
 
         Page.eachNode = function(callback) {
@@ -344,10 +375,11 @@
         Concept.prototype.removeFromDiagram = function() {
             this.width = 0;
             this.treeWidth = 0;
-            let node = this.getNode(), links = node.findLinksTo();
+            let node = this.getNode(), links = node.findLinksConnected();
             Page.diagram.model.removeNodeData(node.data);
             while(links.next()) {
-                Page.diagram.model.removeLinkData(links.value.data);
+                let link = links.value;
+                Page.diagram.model.removeLinkData(link.data);
             }
         };
 
@@ -408,27 +440,23 @@
         };
 
         Concept.prototype.drawTree = function() {
-            let self = this,
-                x = 0, y = -Page.diagram.viewportBounds.height / 2 + 50
+            if(Page.drawingTree) return;
+            Page.drawingTree = true;
+            let self = this;
 
             Page.clearDiagram();
 
             let treeCount = self.getTreeCount(), listener = function(e) {
                 console.log('laid out ' + Page.diagram.nodes.count + ' nodes');
                 if(Page.diagram.nodes.count == treeCount) {
-                    let it = Page.diagram.nodes;
-                    console.log('all ' + it.count + ' nodes');
-                    while(it.next()) {
-                        let node = it.value;
-                        console.log('  ' + node.getDocumentBounds().width);
-                    }
-                    self.calculateTreeWidth();
-                    self.layoutTree(x, y);
+                    console.log('drawing tree for ' + treeCount + ' nodes');
+                    self.layoutTree();
                     Page.diagram.removeDiagramListener('LayoutCompleted', listener);
+                    Page.drawingTree = false;
                 }
             };
             Page.diagram.addDiagramListener('LayoutCompleted', listener);
-            self.initTree(x, y);
+            self.initTree();
         };
 
         Concept.prototype.getTreeCount = function() {
@@ -442,10 +470,29 @@
         Concept.prototype.initTree = function(x, y) {
             let self = this;
 
+            if(x === undefined) {
+                x = 0;
+                y = -Page.diagram.viewportBounds.height / 2 + 50;
+            }
+
             Page.diagram.model.addNodeData({
                 id: self.id,
-                name: self.name + ' [' + self.id + ']',
+                name: self.name,
                 loc: '' + x + ' ' + y
+            });
+
+            let head = self.getHead(), ref = self.getReference();
+            if(head) Page.diagram.model.addLinkData({
+                from: head.getId(),
+                to: self.id,
+                fromPort: 'B',
+                toPort: 'T'
+            });
+            if(ref) Page.diagram.model.addLinkData({
+                from: self.id,
+                to: ref.getId(),
+                fromPort: 'T',
+                toPort: 'B'
             });
 
             self.getHeadOf().forEach(function(child) {
@@ -454,15 +501,25 @@
         };
 
         Concept.prototype.layoutTree = function(x, y) {
+            if(x === undefined) {
+                x = 0;
+                y = -Page.diagram.viewportBounds.height / 2 + 50;
+            }
+            this.calculateTreeWidth();
+            this.positionTree(x, y);
+            Page.diagram.updateAllTargetBindings();
+        };
+
+        Concept.prototype.positionTree = function(x, y) {
             let self = this;
 
             self.setNodeData('loc', '' + x + ' ' + y);
 
-            let currentX = x - self.getTreeWidth() / 2;
+            let currentX = x - self.childTreeWidth / 2;
 
             self.getHeadOf().forEach(function(child) {
                 let childWidth = child.getTreeWidth();
-                child.layoutTree(currentX + childWidth/2, y + 100);
+                child.positionTree(currentX + childWidth/2, y + 100);
                 currentX += childWidth;
             });
         };
@@ -470,14 +527,15 @@
         Concept.prototype.calculateTreeWidth = function() {
             let self = this, node = self.getNode();
 
-            if(node) self.width = node.getDocumentBounds().width;
+            if(node) self.nodeWidth = node.getDocumentBounds().width;
+            else self.nodeWidth = 0;
 
-            let width = 0;
+            self.childTreeWidth = 0;
             self.getHeadOf().forEach(function(child) {
-                width += child.calculateTreeWidth();
+                self.childTreeWidth += child.calculateTreeWidth();
             });
 
-            self.treeWidth = Math.max(self.width, width);
+            self.treeWidth = Math.max(self.nodeWidth > 0 ? self.nodeWidth + 30 : 0, self.childTreeWidth);
             return self.treeWidth;
         };
 

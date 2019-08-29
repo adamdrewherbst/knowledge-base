@@ -319,7 +319,14 @@
         Concept.prototype = Object.create(Record.prototype);
         Concept.prototype.constructor = Concept;
 
-        function c(id) { return Page.getConcept(id); }
+        function c(id) {
+            return Page.getConcept(id);
+        }
+        function n(id) {
+            let concept = Page.getConcept(id);
+            if(concept) return concept.getNode();
+            return null;
+        }
 
         Concept.setFields = function() {
             add(Concept, 'head', Concept);
@@ -370,7 +377,7 @@
 
         Concept.prototype.getHead = function() {
             let head = this.get('head');
-            if(head.isRelation()) return null;
+            if(head && head.isRelation()) return null;
             return head;
         };
 
@@ -476,6 +483,9 @@
         Concept.prototype.instanceOf = function(concept) {
             let self = this;
 
+            concept = Page.getConcept(concept);
+            if(!concept) return false;
+
             if(concept.isPredicate()) {
                 return concept.getParents().every(function(parent) {
                     return self.instanceOf(parent);
@@ -487,6 +497,10 @@
 
         Concept.prototype.isRelation = function() {
             return this.instanceOf('RELATION');
+        };
+
+        Concept.prototype.isPredicate = function() {
+            return this.isPredicate;
         };
 
         Concept.prototype.sync = function() {
