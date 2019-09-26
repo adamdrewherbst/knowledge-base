@@ -200,12 +200,16 @@
         };
 
         Page.getConcept = function(info) {
+            if(info instanceof Concept) {
+                return info;
+            }
             if(info instanceof go.Node) {
                 info = info.data.id;
             }
             if(!isNaN(info)) {
                 return Page.getTable('concept').findRecord(info);
             }
+            return null;
         };
 
         Page.createConcept = function() {
@@ -315,17 +319,15 @@
         function Concept() {
             Record.constructor.call(this);
             this.predicates = {};
+            this.nodeWidth = {};
+            this.childTreeWidth = {};
+            this.treeWidth = {};
         }
         Concept.prototype = Object.create(Record.prototype);
         Concept.prototype.constructor = Concept;
 
         function c(id) {
             return Page.getConcept(id);
-        }
-        function n(id) {
-            let concept = Page.getConcept(id);
-            if(concept) return concept.getNode();
-            return null;
         }
 
         Concept.setFields = function() {

@@ -23,10 +23,158 @@
             Anywhere in this file, '$$' is short for GoJS's go.GraphObject.make function (this was assigned in knowledge.html).
             See GoJS documentation at https://gojs.net/latest/index.html
         */
-        Page.initDiagram = function() {
-            // create the diagram canvas in the #graph-canvas element (defined in knowledge.html)
-            Page.diagram = $$(go.Diagram, "graph-canvas",  // must name or refer to the DIV HTML element
+
+        function Explorer() {
+            let self = this;
+
+            self.id = Explorer.nextId++;
+            self.concept = null;
+
+            self.$wrapper = $('#concept-explorer-template').clone().attr('id', 'concept-explorer-' + this.id).appendTo('#concept-wrapper');
+
+            self.modes = {};
+            self.$wrapper.find('.concept-mode').each(function(i, wrapper) {
+                let $wrapper = $(wrapper), mode = $wrapper.attr('mode'), $diagram = $wrapper.find('.gojs-diagram');
+                $diagram.attr('id', 'concept-' + mode + '-' + self.id);
+                self.modes[mode] = {
+                    wrapper: $wrapper,
+                    diagram: mode == 'palette' ? self.makePalette($diagram) : self.makeGraph($diagram)
+                };
+            });
+
+            self.$wrapper.find('.explorer-mode-button').click(function(e) {
+                self.setMode($(this).attr('mode'));
+            });
+            self.$wrapper.find('.concept-create-button').click(function(e) {
+                let concept = Page.createConcept();
+                concept.setHead(self.concept);
+                Page.updateConcept(concept);
+            });
+            self.$wrapper.find('.concept-level-up-button').click(function(e) {
+                let head = null;
+                if(self.concept) head = self.concept.getHead();
+                if(head) self.open(head);
+            });
+
+            Page.explorers[self.id] = self;
+        }
+        Explorer.nextId = 0;
+
+        function e(id) { return Page.explorers[id]; }
+        function d(id) { return Page.explorers[id].getActiveDiagram(); }
+
+        Explorer.prototype.open = function(concept, mode) {
+            this.concept = Page.getConcept(concept);
+            this.setMode(mode || this.mode || 'palette');
+        };
+
+        Explorer.prototype.update = function() {
+            if(!this.concept) return;
+
+            let diagram = this.getActiveDiagram();
+            if(diagram) switch(this.mode) {
+                case 'palette':
+                    this.fillPalette();
+                    break;
+                case 'graph':
+                    this.drawGraph();
+                    break;
+                default: break;
+            }
+        };
+
+        Explorer.prototype.setMode = function(mode) {
+            if(mode !== this.mode) {
+                let obj = this.modes[mode];
+                if(!obj) return;
+                this.$wrapper.find('.concept-mode').hide();
+                obj.wrapper.show();
+                this.mode = mode;
+            }
+
+            this.update();
+        };
+
+        Explorer.prototype.setPosition = function(explorer, before) {
+            if(before) this.$wrapper.insertBefore(explorer.$wrapper);
+            else this.$wrapper.insertAfter(explorer.$wrapper);
+        };
+
+        Explorer.prototype.openInNew = function(concept, before) {
+            let explorer = new Explorer();
+            explorer.open(concept);
+            explorer.setPosition(this, before);
+        };
+
+        Explorer.prototype.clear = function(mode) {
+            let self = this;
+            let diagram = self.getActiveDiagram();
+            if(diagram) Page.clearDiagram(diagram);
+        };
+
+        Explorer.prototype.updateConcept = function(concept) {
+            let diagram = this.getActiveDiagram();
+            if(diagram) concept.updateNode(diagram, this.mode == 'graph');
+        };
+
+        Explorer.prototype.addNode = function(concept, mode) {
+        };
+
+        Explorer.prototype.getActiveDiagram = function() {
+            return this.mode ? this.modes[this.mode].diagram : null;
+        };
+
+        Explorer.prototype.fillPalette = function() {
+            let self = this, diagram = self.getPalette();
+
+            Page.clearDiagram(diagram);
+
+            this.concept.getHeadOf().forEach(function(child) {
+                child.addNodeData(diagram);
+            });
+        };
+
+        Explorer.prototype.drawGraph = function(concept) {
+            let self = this, diagram = self.getGraph();
+            concept = concept || self.concept;
+
+            if(self.drawingConceptTree) return;
+            self.drawingConceptTree = true;
+
+            if(concept === self.concept) Page.clearDiagram(diagram);
+
+            let nodeCount = diagram.nodes.count,
+                treeCount = concept.getTreeCount(),
+                listener = function(e) {
+                    console.log('laid out ' + diagram.nodes.count + ' nodes');
+                    if(diagram.nodes.count == nodeCount + treeCount) {
+                        console.log('drawing tree for ' + treeCount + ' nodes');
+                        console.log('graph height: ' + diagram.viewportBounds.height);
+                        self.concept.layoutTree(diagram);
+                        diagram.removeDiagramListener('LayoutCompleted', listener);
+                        self.drawingConceptTree = false;
+                    }
+                };
+            diagram.addDiagramListener('LayoutCompleted', listener);
+
+            concept.initTree(diagram);
+        };
+
+        Explorer.prototype.getGraph = function() {
+            return this.modes.graph.diagram;
+        };
+
+        Explorer.prototype.getPalette = function() {
+            return this.modes.palette.diagram;
+        };
+
+        Explorer.prototype.makeGraph = function($div) {
+            let self = this;
+
+            let diagram = $$(go.Diagram, $div.attr('id'),  // must name or refer to the DIV HTML element
             {
+                position: new go.Point(0, -50),
+
                 // the canvas has a grid as a background; set the parameters for this
                 grid: $$(go.Panel, "Grid",
                       $$(go.Shape, "LineH", { stroke: "lightgray", strokeWidth: 0.5 }),
@@ -36,34 +184,34 @@
                     ),
 
                 // allow the user to drag concepts from the palette and drop them in the diagram
-              allowDrop: true,
+                allowDrop: true,
 
-              // other options for the diagram
-              "draggingTool.dragsLink": true,
-              "draggingTool.isGridSnapEnabled": true,
-              "linkingTool.isUnconnectedLinkValid": true,
-              "linkingTool.portGravity": 20,
-              "relinkingTool.isUnconnectedLinkValid": true,
-              "relinkingTool.portGravity": 20,
-              "relinkingTool.fromHandleArchetype":
+                // other options for the diagram
+                "draggingTool.dragsLink": true,
+                "draggingTool.isGridSnapEnabled": true,
+                "linkingTool.isUnconnectedLinkValid": true,
+                "linkingTool.portGravity": 20,
+                "relinkingTool.isUnconnectedLinkValid": true,
+                "relinkingTool.portGravity": 20,
+                "relinkingTool.fromHandleArchetype":
                 $$(go.Shape, "Diamond", { segmentIndex: 0, cursor: "pointer", desiredSize: new go.Size(8, 8), fill: "tomato", stroke: "darkred" }),
-              "relinkingTool.toHandleArchetype":
+                "relinkingTool.toHandleArchetype":
                 $$(go.Shape, "Diamond", { segmentIndex: -1, cursor: "pointer", desiredSize: new go.Size(8, 8), fill: "darkred", stroke: "tomato" }),
-              "linkReshapingTool.handleArchetype":
+                "linkReshapingTool.handleArchetype":
                 $$(go.Shape, "Diamond", { desiredSize: new go.Size(7, 7), fill: "lightblue", stroke: "deepskyblue" }),
-              //rotatingTool: $(TopRotatingTool),  // defined below
-              //"rotatingTool.snapAngleMultiple": 15,
-              //"rotatingTool.snapAngleEpsilon": 15,
-              "undoManager.isEnabled": true,
+                //rotatingTool: $(TopRotatingTool),  // defined below
+                //"rotatingTool.snapAngleMultiple": 15,
+                //"rotatingTool.snapAngleEpsilon": 15,
+                "undoManager.isEnabled": true,
 
-              // when the user clicks on a node, call a function to display information about that node
-              "ChangedSelection": onSelectionChanged
+                // when the user clicks on a node, call a function to display information about that node
+                "ChangedSelection": onSelectionChanged
             });
 
             // display information about a node when the user clicks on it, in a div to the right of the diagram
             function onSelectionChanged(e) {
-                let graphNode = e.diagram.selection.first(),
-                    concept = Page.getConcept(graphNode);
+                let node = e.diagram.selection.first(),
+                    concept = Page.getConcept(node);
                 if(!concept) return;
 
                 let title = document.getElementById('node-title'), description = document.getElementById('node-description');
@@ -76,18 +224,18 @@
             }
 
             // dragging a node invalidates the Diagram.layout, causing a layout during the drag
-            Page.diagram.toolManager.draggingTool.doMouseMove = function() {
+            diagram.toolManager.draggingTool.doMouseMove = function() {
                 go.DraggingTool.prototype.doMouseMove.call(this);
-                if (this.isActive) { this.diagram.layout.invalidateLayout(); }
+                if (this.isActive) { diagram.layout.invalidateLayout(); }
             }
 
             // when the diagram is modified, add a "*" to the page title in the browser, and enable the "Save" button
-            Page.diagram.addDiagramListener("Modified", function(e) {
+            diagram.addDiagramListener("Modified", function(e) {
                 console.log('diagram modified');
                 var button = document.getElementById("graph-save-button");
-                if (button) button.disabled = !Page.diagram.isModified;
+                if (button) button.disabled = !diagram.isModified;
                 var idx = document.title.indexOf("*");
-                if (Page.diagram.isModified) {
+                if (diagram.isModified) {
                     if (idx < 0) document.title += "*";
                 } else {
                     if (idx >= 0) document.title = document.title.substr(0, idx);
@@ -110,9 +258,7 @@
                             if(part instanceof go.Node) {
                                 let concept = Page.getConcept(part);
                                 if(concept) {
-                                    concept.getHeadOf().forEach(function(child) {
-                                        child.removeFromDiagram();
-                                    });
+                                    concept.delete();
                                 }
                             }
                         }
@@ -120,10 +266,10 @@
                     default: break;
                 }
             };
-            Page.diagram.addDiagramListener('TextEdited', editListener);
-            Page.diagram.addDiagramListener('SelectionDeleted', editListener);
+            diagram.addDiagramListener('TextEdited', editListener);
+            diagram.addDiagramListener('SelectionDeleted', editListener);
 
-            Page.diagram.addDiagramListener('LayoutCompleted', function(e) {
+            diagram.addDiagramListener('LayoutCompleted', function(e) {
                 console.log('LAYOUTED');
                 let concept = Page.currentConcept;
                 if(concept) concept.layoutTree();
@@ -167,6 +313,7 @@
                        visiblePredicate ? new go.Binding("visible", "", function(o, e) { return o.diagram ? visiblePredicate(o, e) : false; }).ofObject() : {});
             }
 
+
             // here is the template that is used as the context menu for each node
             let partContextMenu =
               $$(go.Adornment, "Vertical",
@@ -175,12 +322,11 @@
                             let concept = Page.getConcept(obj.part.adornedPart),
                                 child = Page.createConcept();
                             child.setHead(concept);
-                            child.initTree();
-                            Page.currentConcept.layoutTree();
+                            self.drawGraph(child);
                         },
                         function(o) {
                             let part = o.part.adornedPart;
-                            return part.diagram === Page.diagram;
+                            return !(part.diagram instanceof go.Palette);
                         }),
                     // add the node to the currently selected predicate set;
                     // either this option or the 'Remove from Predicate' below will be displayed, but not both,
@@ -192,7 +338,7 @@
                             },
                             function(o) {
                                 let part = o.part.adornedPart;
-                                if(part.diagram !== Page.diagram) return false;
+                                if(part.diagram instanceof go.Palette) return false;
                                 let concept = Page.getConcept(concept);
                                 return concept && !concept.inPredicate();
                             }),
@@ -203,32 +349,27 @@
                             },
                             function(o) {
                                 let part = o.part.adornedPart;
-                                if(part.diagram !== Page.diagram) return false;
+                                if(part.diagram instanceof go.Palette) return false;
                                 let concept = Page.getConcept(concept);
                                 return concept && concept.inPredicate();
+                            }),
+                    makeButton("Open Graph",
+                            function(e, obj) {
+                                let concept = Page.getConcept(obj.part.adornedPart);
+                                if(concept) new Explorer().open(concept, 'graph');
+                            },
+                            function(o) {
+                                let part = o.part.adornedPart;
+                                return part.diagram instanceof go.Palette;
                             })
               );
-
-            // the string to display when a node is clicked on, to provide information about that node
-            let infoString = function(obj) {
-                let part = obj.part;
-                if (part instanceof go.Adornment) part = part.adornedPart;
-                let msg = "";
-                if (part instanceof go.Link) {
-                    msg = "";
-                } else if (part instanceof go.Node) {
-                    msg = self.getNodeString(part.data.id);
-                }
-                return msg;
-            };
-
 
             /*
                 This is the template GoJS will use to display nodes in the diagram.  This determines how nodes will appear.
                 Also, GoJS stores a data object for each node, and the display of the node may change depending on
                 its data values.  This happens through the Bindings you see in this template.
             */
-            Page.diagram.nodeTemplate = $$(go.Node, "Spot",
+            diagram.nodeTemplate = $$(go.Node, "Spot",
                 {
                     // if you set the "loc" key in the node data (see the binding below these brackets),
                     // that determines where the center of the node will appear in the diagram
@@ -238,8 +379,17 @@
                       $$(go.Adornment, "Auto",
                         $$(go.Shape, { fill: "#EFEFCC" }),
                         $$(go.TextBlock, { margin: 4, width: 140 },
-                            // we pop up a box next to the cursor, showing some info about the node using the infoString function above
-                            new go.Binding("text", "", infoString).ofObject())
+                            // we pop up a box next to the cursor, showing some info about the node
+                            new go.Binding("text", "", function(obj) {
+                                let part = obj.part;
+                                if (part instanceof go.Adornment) part = part.adornedPart;
+                                let msg = "";
+                                if (part instanceof go.Link) {
+                                } else if (part instanceof go.Node) {
+                                    msg = self.getNodeString(part.data.id);
+                                }
+                                return msg;
+                            }).ofObject())
                       )
                 },
                 // the 'loc' data key is parsed into a go.Point object, and this determines the location of the node on screen;
@@ -302,7 +452,7 @@
             );
 
             // GoJS also needs a template to specify how links between nodes will appear
-            Page.diagram.linkTemplate =
+            diagram.linkTemplate =
                 $$(go.Link,
                   $$(go.Shape,
                     new go.Binding("stroke", "color"),
@@ -315,148 +465,167 @@
                     })
                 ));
 
-            // initialize the Palette that is on the left side of the page, which lists the concepts in the current framework
-            Page.palette = $$(go.Palette, "concept-palette",  // must name or refer to the DIV HTML element
-            {
-                maxSelectionCount: 1,
-                nodeTemplateMap: Page.diagram.nodeTemplateMap,  // share the templates used by the diagram
-            });
-
-            // concepts in the palette will be displayed in alphabetical order
-            Page.palette.layout.comparer = function(a, b) {
-                let c1 = Page.getConcept(a), c2 = Page.getConcept(b);
-                if(c1 && c2) return c1.getName().localeCompare(c2.getName());
-                return 0;
-            };
-
-            Page.palette.model = $$(go.GraphLinksModel,
-            {
-                nodeKeyProperty: 'id'
-            });
-            Page.diagram.model = $$(go.GraphLinksModel,
+            diagram.model = $$(go.GraphLinksModel,
             {
                 nodeKeyProperty: 'id',
                 linkFromPortIdProperty: 'fromPort',
                 linkToPortIdProperty: 'toPort',
             });
 
-            // below the diagram is the HTML5 canvas that will be used to visualize the relation
-            // (the canvas is created in knowledge.html, and visualization happens in represent.js)
-            let canvas = document.getElementById('visualization-canvas');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            Page.canvas = canvas.getContext('2d');
+            return diagram;
         };
 
-        Page.clearPalette = function() {
 
-            Page.palette.model.nodeDataArray = [
-                {name: 'Instance Of', isGroup: true},
-                {name: 'Relations', isGroup: true}
-            ];
-        };
+        Explorer.prototype.makePalette = function($div) {
+            let self = this;
 
-        Page.clearDiagram = function() {
-            Page.eachNode(function(node) {
-                Page.getConcept(node).removeFromDiagram();
+            // initialize the Palette that is on the left side of the page, which lists the concepts in the current framework
+            let palette = $$(go.Palette, $div.attr('id'),  // must name or refer to the DIV HTML element
+            {
+                maxSelectionCount: 1,
+                nodeTemplateMap: self.modes.graph.diagram.nodeTemplateMap,  // share the templates used by the diagram
+                isReadOnly: false
             });
-            Page.diagram.requestUpdate();
+
+            // concepts in the palette will be displayed in alphabetical order
+            palette.layout.comparer = function(a, b) {
+                let c1 = Page.getConcept(a), c2 = Page.getConcept(b);
+                if(c1 && c2) {
+                    let n1 = c1.getName(), n2 = c2.getName();
+                    if(n1 && n2) return n1.localeCompare(n2);
+                }
+                return 0;
+            };
+
+            palette.addDiagramListener('ObjectDoubleClicked', function(e) {
+                let node = e.subject.part;
+                if(node instanceof go.Node) {
+                    let concept = Page.getConcept(node);
+                    if(!concept) return;
+                    if(concept.isRelation()) self.open(concept, 'graph');
+                    else self.open(concept, 'palette');
+                }
+            });
+
+            palette.model = $$(go.GraphLinksModel,
+            {
+                nodeKeyProperty: 'id'
+            });
+
+            return palette;
         };
 
-        Page.eachNode = function(callback) {
-            let nodes = Page.diagram.nodes;
+
+
+        Page.explorers = {};
+
+        Page.clearDiagram = function(diagram) {
+            Page.eachNode(diagram, function(node) {
+                Page.getConcept(node).removeFromDiagram(diagram);
+            });
+            diagram.requestUpdate();
+        };
+
+        Page.eachNode = function(diagram, callback) {
+            let nodes = diagram.nodes;
             while(nodes.next()) {
                 let node = nodes.value;
                 callback.call(node, node);
             }
         };
 
-
-        Concept.prototype.removeFromDiagram = function() {
-            this.width = 0;
-            this.treeWidth = 0;
-            let node = this.getNode(), links = node.findLinksConnected();
-            Page.diagram.model.removeNodeData(node.data);
-            while(links.next()) {
-                let link = links.value;
-                Page.diagram.model.removeLinkData(link.data);
+        Page.updateConcept = function(concept) {
+            concept = Page.getConcept(concept);
+            if(!concept) return;
+            for(let id in Page.explorers) {
+                let explorer = Page.explorers[id];
+                explorer.updateConcept(concept);
             }
         };
 
-        Concept.prototype.load = function() {
-            let self = this;
 
-            // clear the palette
-            let groups = Page.palette.findTopLevelGroups();
-            while(groups.next()) {
-                let group = groups.value;
-                let sub = group.findSubGraphParts();
-                let parts = sub.iterator;
-                while(parts.next()) {
-                    let part = parts.value;
-                    let data = Page.palette.model.findNodeDataForKey(part.key);
-                    if(data) Page.palette.model.removeNodeData(data);
+        Concept.prototype.removeFromDiagram = function(diagram) {
+            let node = this.getNode(diagram);
+            if(node) {
+                links = node.findLinksConnected();
+                diagram.model.removeNodeData(node.data);
+                while(links.next()) {
+                    let link = links.value;
+                    diagram.model.removeLinkData(link.data);
                 }
             }
-
-            // all my instances
-            self.getInstances().forEach(function(instance) {
-                instance.addToPalette('Instance Of');
-            });
-
-            // all relations in which the given concept is instantiated
-            //self.getRelations().forEach(function(relation) {
-            //    relation.addToPalette('Relations');
-            //});
-
-            self.drawTree();
-
-            Page.currentConcept = this;
         };
 
+        Concept.prototype.delete = function(diagram) {
+            this.removeFromDiagram(diagram);
+            this.deleted = true;
+            this.getHeadOf().forEach(function(child) {
+                child.delete(diagram);
+            });
+        };
 
-        Concept.prototype.addToPalette = function(group) {
+        Concept.prototype.getNode = function(diagram) {
+            return diagram.findNodeForKey(this.getId());
+        };
+
+        Concept.prototype.addNodeData = function(diagram, drawLinks) {
             let self = this;
-            Page.palette.model.addNodeData({
-                group: group,
+
+            diagram.model.addNodeData({
                 id: self.id,
-                name: self.name
+                name: self.name,
+                loc: '0 0'
             });
+
+            if(drawLinks) {
+                let head = self.getHead(), ref = self.getReference();
+                if(head) diagram.model.addLinkData({
+                    from: head.getId(),
+                    to: self.id,
+                    fromPort: 'B',
+                    toPort: 'T'
+                });
+                if(ref) diagram.model.addLinkData({
+                    from: self.id,
+                    to: ref.getId(),
+                    fromPort: 'T',
+                    toPort: 'B'
+                });
+            }
+
+            return diagram.model.findNodeDataForKey(self.id);
         };
 
-        Concept.prototype.getNode = function() {
-            return Page.diagram.findNodeForKey(this.getId());
+        Concept.prototype.updateNode = function(diagram, drawLinks) {
+            let self = this;
+            if(self.deleted) self.delete(diagram);
+            let data = self.getNodeData(diagram);
+            if(!data) data = self.addNodeData(diagram, drawLinks);
+            diagram.model.set(data, {
+                name: self.name,
+                head: self.head,
+                reference: self.ref
+            });
+            diagram.updateAllTargetBindings();
         };
 
-        Concept.prototype.getNodeData = function(key) {
-            let data = Page.diagram.model.findNodeDataForKey(this.getId());
+        Concept.prototype.getNodeData = function(diagram, key) {
+            let data = diagram.model.findNodeDataForKey(this.getId());
             if(data) return key === undefined ? data : data[key];
             return undefined;
         };
 
-        Concept.prototype.setNodeData = function(key, value) {
-            let data = Page.diagram.model.findNodeDataForKey(this.getId());
-            if(data) Page.diagram.model.set(data, key, value);
-        };
-
-        Concept.prototype.drawTree = function() {
-            if(Page.drawingTree) return;
-            Page.drawingTree = true;
-            let self = this;
-
-            Page.clearDiagram();
-
-            let treeCount = self.getTreeCount(), listener = function(e) {
-                console.log('laid out ' + Page.diagram.nodes.count + ' nodes');
-                if(Page.diagram.nodes.count == treeCount) {
-                    console.log('drawing tree for ' + treeCount + ' nodes');
-                    self.layoutTree();
-                    Page.diagram.removeDiagramListener('LayoutCompleted', listener);
-                    Page.drawingTree = false;
+        Concept.prototype.setNodeData = function(diagram, key, value) {
+            let data = diagram.model.findNodeDataForKey(this.getId());
+            if(data) {
+                if(typeof key === 'object') {
+                    for(let k in key) {
+                        diagram.model.set(data, k, key[k]);
+                    }
+                } else {
+                    diagram.model.set(data, key, value);
                 }
-            };
-            Page.diagram.addDiagramListener('LayoutCompleted', listener);
-            self.initTree();
+            }
         };
 
         Concept.prototype.getTreeCount = function() {
@@ -467,79 +636,62 @@
             return count;
         };
 
-        Concept.prototype.initTree = function(x, y) {
+        Concept.prototype.initTree = function(diagram) {
             let self = this;
 
-            if(x === undefined) {
-                x = 0;
-                y = -Page.diagram.viewportBounds.height / 2 + 50;
-            }
-
-            Page.diagram.model.addNodeData({
-                id: self.id,
-                name: self.name,
-                loc: '' + x + ' ' + y
-            });
-
-            let head = self.getHead(), ref = self.getReference();
-            if(head) Page.diagram.model.addLinkData({
-                from: head.getId(),
-                to: self.id,
-                fromPort: 'B',
-                toPort: 'T'
-            });
-            if(ref) Page.diagram.model.addLinkData({
-                from: self.id,
-                to: ref.getId(),
-                fromPort: 'T',
-                toPort: 'B'
-            });
+            self.addNodeData(diagram, true);
 
             self.getHeadOf().forEach(function(child) {
-                child.initTree(x, y);
+                child.initTree(diagram);
             });
         };
 
-        Concept.prototype.layoutTree = function(x, y) {
-            if(x === undefined) {
-                x = 0;
-                y = -Page.diagram.viewportBounds.height / 2 + 50;
-            }
-            this.calculateTreeWidth();
-            this.positionTree(x, y);
-            Page.diagram.updateAllTargetBindings();
+        Concept.prototype.layoutTree = function(diagram) {
+            this.calculateTreeWidth(diagram);
+            this.positionTree(diagram, 0, 0);
+            diagram.updateAllTargetBindings();
         };
 
-        Concept.prototype.positionTree = function(x, y) {
-            let self = this;
+        Concept.prototype.positionTree = function(diagram, x, y) {
+            let self = this, childTreeWidth = self.getNodeData(diagram, 'childTreeWidth');
 
-            self.setNodeData('loc', '' + x + ' ' + y);
+            self.setNodeData(diagram, 'loc', '' + x + ' ' + y);
 
-            let currentX = x - self.childTreeWidth / 2;
+            let currentX = x - childTreeWidth / 2;
 
             self.getHeadOf().forEach(function(child) {
-                let childWidth = child.getTreeWidth();
-                child.positionTree(currentX + childWidth/2, y + 100);
+                let childWidth = child.getTreeWidth(diagram);
+                child.positionTree(diagram, currentX + childWidth/2, y + 100);
                 currentX += childWidth;
             });
         };
 
-        Concept.prototype.calculateTreeWidth = function() {
-            let self = this, node = self.getNode();
+        Concept.prototype.calculateTreeWidth = function(diagram) {
+            let self = this, node = self.getNode(diagram),
+                nodeWidth = 0, childTreeWidth = 0, treeWidth = 0;
 
-            if(node) self.nodeWidth = node.getDocumentBounds().width;
-            else self.nodeWidth = 0;
+            if(node) nodeWidth = node.getDocumentBounds().width;
 
-            self.childTreeWidth = 0;
             self.getHeadOf().forEach(function(child) {
-                self.childTreeWidth += child.calculateTreeWidth();
+                childTreeWidth += child.calculateTreeWidth(diagram);
             });
 
-            self.treeWidth = Math.max(self.nodeWidth > 0 ? self.nodeWidth + 30 : 0, self.childTreeWidth);
-            return self.treeWidth;
+            treeWidth = Math.max(nodeWidth > 0 ? nodeWidth + 30 : 0, childTreeWidth);
+
+            self.setNodeData(diagram, {
+                nodeWidth: nodeWidth,
+                childTreeWidth: childTreeWidth,
+                treeWidth: treeWidth
+            });
+
+            return treeWidth;
         };
 
-        Concept.prototype.getTreeWidth = function() {
-            return this.treeWidth;
+        Concept.prototype.getTreeWidth = function(diagram) {
+            return this.getNodeData(diagram, 'treeWidth');
         };
+
+
+
+
 

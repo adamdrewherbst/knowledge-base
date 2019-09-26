@@ -8,6 +8,10 @@
             margin: 20px;
         }
 
+        .clear {
+            clear: both;
+        }
+
         {{# Corresponds to the controls section }}
 
         .entry-wrapper {
@@ -98,59 +102,63 @@
 
         {{# The palette & diagram section where the user builds the relation graph }}
 
-        #editor-wrapper {
-            display: table;
+        #concept-wrapper {
             width: 100%;
-            height: 100%;
-        }
-        #editor-container {
-            display: table-row;
-            width: 100%;
-            height: 100%;
-        }
-        #concept-container, #graph-container {
-            display: table-cell;
-        }
-        #concept-container {
-            width: 10%;
-            height: 100%;
-            border: 3px solid blue;
-        }
-        #graph-container {
-            width: auto;
-            height: 100%;
-            border: 3px solid green;
+            height: 620px;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
         }
 
-        #graph-controls {
-        }
-        #predicate-controls, #relation-controls {
-            margin-bottom: 20px;
-        }
-        #graph-controls button, #graph-controls select {
-            padding: 5px 10px;
-            border: 2px solid black;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            background-color: #aaaaff;
-            color: black;
-        }
-        #predicate-controls {
-            float: left;
-        }
-        #predicate-controls button {
-        }
-        #remove-predicate, #predicate-help {
+        #concept-explorer-template {
             display: none;
         }
-        #relation-controls {
-            float: right;
-        }
-        #relation-controls button {
+
+        .concept-explorer {
+            height: 100%;
+            flex-grow: 1;
         }
 
-        #node-info {
+        .concept-mode {
+            width: 100%;
+            height: 100%;
+        }
+
+        .palette-wrapper {
+            background-color: whitesmoke;
+            border: 1px solid black;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .concept-palette {
+            flex-grow: 1;
+        }
+
+        .diagram-wrapper {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .concept-diagram {
+            flex-grow: 1;
+            display: block;
+            border: 1px solid black;
+        }
+
+        .explorer-controls {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .controls-left {
+            float: left;
+        }
+        .controls-right {
+            float: right;
+        }
+
+        .node-info {
             background-color: #8ff;
             color: #604;
             font-weight: bold;

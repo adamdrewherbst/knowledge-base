@@ -76,36 +76,37 @@
         # plugin and used mainly in diagram.js
         # }}
 
-        <h2>Build a relation with concepts</h2>
-        <div id="graph-buttons" style="margin-bottom: 20px">
-            <div id="graph-controls">
-                <div id="palette-controls">
-                    <button id="concept-create-button" type="button" class="btn btn-primary">New Concept</button>
-                    <select id="palette-concept-filter" class="framework-filter">
-                        <option value="-1">-- Filter --</option>
-                    </select>
+        <div id="concept-wrapper">
+            <div id="concept-explorer-template" class="concept-explorer">
+                <div class="concept-mode diagram-wrapper" mode="graph">
+                    <div class="diagram-controls explorer-controls">
+                        <div class="controls-left">
+
+                        </div>
+                        <div class="controls-right">
+                            <button class="explorer-mode-button btn btn-primary" mode="palette" type="button">Palette</button>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="concept-diagram gojs-diagram"></div>
+                    <div id="node-info" style="display: inline-block; vertical-align: top;">
+                        <h3 id="node-title"></h3>
+                        <p id="node-description"></p>
+                    </div>
                 </div>
-                <div id="predicate-controls">
-                    <select id="set-predicate">
-                        <option value="-1">Select Predicate</option>
-                        <option value="new">New Predicate</option>
-                    </select>
-                    <button id="remove-predicate" type="button" class="btn btn-primary">Remove Predicate</button>
-                    <label id="predicate-help">Right-click a node to add/remove it from this predicate</label>
+                <div class="concept-mode palette-wrapper" mode="palette">
+                    <div class="diagram-controls explorer-controls">
+                        <div class="controls-left">
+                            <button class="concept-create-button btn btn-primary" type="button">New Concept</button>
+                            <button class="concept-level-up-button btn btn-primary" type="button">Up A Level</button>
+                        </div>
+                        <div class="controls-right">
+                            <button class="explorer-mode-button btn btn-primary" mode="graph" type="button">Graph</button>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="concept-palette gojs-diagram"></div>
                 </div>
-                <div id="relation-controls">
-                    <button id="save-relation" type="button" class="btn btn-primary">Save All Changes</button>
-                    <!--<button id="evaluate-relation" type="button" class="btn btn-primary">Evaluate</button>-->
-                    <label id="evaluate-msg"></label>
-                </div>
-            </div>
-        </div>
-        <div style="width: 100%; display: flex; justify-content: space-between">
-            <div id="concept-palette" style="width: 160px; margin-right: 2px; background-color: whitesmoke; border: solid 1px black"></div>
-            <div id="graph-canvas" style="flex-grow: 1; height: 620px; border: solid 1px black"></div>
-            <div id="node-info" style="display: inline-block; vertical-align: top;">
-                <h3 id="node-title"></h3>
-                <p id="node-description"></p>
             </div>
         </div>
 
@@ -222,10 +223,16 @@
             }
             Concept.table = Page.tables.concept;
 
-            Page.initDiagram();
+            // below the diagram is the HTML5 canvas that will be used to visualize the relation
+            // (the canvas is created in knowledge.html, and visualization happens in represent.js)
+            let canvas = document.getElementById('visualization-canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            Page.canvas = canvas.getContext('2d');
 
             Page.loadConcept(1, function() {
-                Page.getConcept(1).load();
+                let explorer = new Explorer();
+                explorer.open(1);
             });
 
         });
