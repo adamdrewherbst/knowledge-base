@@ -184,13 +184,13 @@
                     id: concept
                 },
                 success: function(data) {
-                    Page.parseRecords(data);
+                    Page.storeRecords(data);
                     if(typeof callback === 'function') callback.call(Page, data);
                 }
             });
         };
 
-        Page.parseRecords = function(data) {
+        Page.storeRecords = function(data) {
             for(let table in data) {
                 for(let id in data[table]) {
                     let record = data[table][id];
@@ -216,6 +216,30 @@
             return Page.getTable('concept').newRecord();
         };
 
+        Page.eachConcept = function(callback) {
+            Page.getTable('concept').eachRecord(callback);
+        }
+
+        Page.saveChanges = function() {
+            let data = {records: {concept: {}}};
+            Page.eachConcept(function(concept) {
+                data.records.concept[concept.id] = {
+                    name: concept.getName(),
+                    description: concept.getDescription(),
+                    head: concept.getHeadId(),
+                    reference: concept.getReferenceId()
+                };
+            });
+            $.ajax({
+                url: Page.saveConceptURL,
+                dataType: 'json',
+                data: data,
+                success: function(data) {
+                    Page.storeRecords(data);
+                }
+            });
+        };
+
 
         function Table(constructor) {
             this.class = constructor;
@@ -226,7 +250,12 @@
         Table.prototype.storeRecord = function(record) {
             let self = this;
 
-            if(!self.records[record.id]) self.records[record.id] = new self.class();
+            if(record.oldId && self.records[record.oldId]) {
+                self.records[record.id] = self.records[record.oldId];
+                delete self.records[record.oldId];
+                delete record.oldId;
+            }
+            else if(!self.records[record.id]) self.records[record.id] = new self.class();
 
             self.records[record.id].update(record);
         };
@@ -245,6 +274,12 @@
             record.set('id', this.nextId--);
             this.records[record.getId()] = record;
             return record;
+        };
+
+        Table.prototype.eachRecord = function(callback) {
+            for(let id in this.records) {
+                callback.call(this.records[id], this.records[id], id);
+            }
         };
 
 
@@ -373,14 +408,29 @@
             }
         };
 
+        Concept.prototype.update = function(data) {
+            Record.prototype.update.call(this, data);
+            this.updateNodes();
+        };
+
         Concept.prototype.getName = function() {
             return this.get('name');
+        };
+
+        Concept.prototype.getDescription = function() {
+            return this.get('description');
         };
 
         Concept.prototype.getHead = function() {
             let head = this.get('head');
             if(head && head.isRelation()) return null;
             return head;
+        };
+
+        Concept.prototype.getHeadId = function() {
+            let head = this.get('head');
+            if(head) return head.getId();
+            return null;
         };
 
         Concept.prototype.setHead = function(concept) {
@@ -401,8 +451,14 @@
             return reference;
         };
 
+        Concept.prototype.getReferenceId = function() {
+            let reference = this.get('reference');
+            if(reference) return reference.getId();
+            return null;
+        };
+
         Concept.prototype.setReference = function(concept) {
-            this.setLink('reference', concept);
+            this.set('reference', concept);
         };
 
         Concept.prototype.getReferenceOf = function(concept) {
@@ -410,7 +466,7 @@
         };
 
         Concept.prototype.setAsReference = function(concept) {
-            this.setLink('reference_child', concept);
+            this.set('reference_child', concept);
         };
 
         Concept.prototype.getInstanceOf = function() {
@@ -422,7 +478,7 @@
         };
 
         Concept.prototype.addInstanceOf = function(concept) {
-            this.setLink('instance_of', concept);
+            this.set('instance_of', concept);
         };
 
         Concept.prototype.getInstances = function() {
@@ -430,7 +486,7 @@
         };
 
         Concept.prototype.addInstance = function(concept) {
-            this.setLink('instance', concept);
+            this.set('instance', concept);
         };
 
         Concept.prototype.addToPredicate = function(predicate) {

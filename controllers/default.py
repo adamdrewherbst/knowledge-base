@@ -96,13 +96,19 @@ def saveRecords():
     request_vars = json.loads(body)
     records = request_vars['records']
 
+    newRecords = {}
+
     for table in records:
+        newRecords[table] = {}
         for record in records[table]:
             existing = db[table][record['id']]
             if existing:
                 existing.update_record(**record)
             else:
-                db[table].insert(**record)
+                newId = db[table].insert(**record)
+                newRecords[table][newId] = {'oldId': record['id']}
+
+    return response.json(newRecords)
 
 
 #   This serves a test page I was using to learn how to display MathML.  Not needed by the main site

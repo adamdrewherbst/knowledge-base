@@ -12,95 +12,9 @@
             clear: both;
         }
 
-        {{# Corresponds to the controls section }}
-
-        .entry-wrapper {
-            padding: 10px 0;
-        }
-        .entry-set-button {
-            display: inline-block;
-        }
-        .entry-info {
-            display: inline-block;
-        }
-        .entry-msg {
-            display: inline-block;
-            margin-right: 20px;
-        }
-        .entry-edit-button {
-            display: inline-block;
-        }
-
-        {{# The pop-up dialogs for selecting/creating/editing database entries }}
-
-        .entry-modal {
-            /*overflow: scroll;*/
-        }
-        .entry-modal .modal-dialog {
-            width: 70%;
-        }
-        .entry-modal .nav-tabs {
-            border-width: 2px;
-        }
-        .entry-modal .nav-tabs > li {
-            font-size: 16px;
-        }
-        .entry-modal .nav-tabs > li > a {
-            border-width: 2px;
-        }
-        .entry-modal .tab-content {
-            padding: 10px;
-        }
-        .entry-modal .tab-pane > * {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .entry-modal input, .entry-modal select, .entry-modal textarea {
-            border-radius: 5px;
-            font-size: 18px;
-            background-color: #eff;
-            color: #000;
-        }
-        .entry-modal .form-group label {
-            display: block;
-        }
-        .entry-modal input {
-            width: 50%;
-        }
-        .entry-modal textarea {
+        #global-controls {
             width: 100%;
         }
-        .entry-modal .result-display {
-            padding: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            white-space: nowrap;
-            overflow-x: hidden;
-        }
-        .entry-modal .result-display.selected {
-            background-color: #ddf;
-            border-radius: 10px;
-        }
-        .entry-modal .result-display > span {
-            display: inline-block;
-            white-space: nowrap;
-            overflow-x: hidden;
-        }
-        .entry-modal .result-display > .result-name {
-            width: 40%;
-        }
-        .entry-modal .result-display > .result-description {
-        }
-        .entry-modal .tab-footer {
-            text-align: right;
-        }
-        .multiple-template {
-            display: none;
-        }
-
-
-        {{# The palette & diagram section where the user builds the relation graph }}
 
         #concept-wrapper {
             width: 100%;

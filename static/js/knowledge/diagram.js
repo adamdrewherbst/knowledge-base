@@ -48,7 +48,7 @@
             self.$wrapper.find('.concept-create-button').click(function(e) {
                 let concept = Page.createConcept();
                 concept.setHead(self.concept);
-                Page.updateConcept(concept);
+                concept.updateNodes();
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
                 let head = null;
@@ -112,14 +112,6 @@
             if(diagram) Page.clearDiagram(diagram);
         };
 
-        Explorer.prototype.updateConcept = function(concept) {
-            let diagram = this.getActiveDiagram();
-            if(diagram) concept.updateNode(diagram, this.mode == 'graph');
-        };
-
-        Explorer.prototype.addNode = function(concept, mode) {
-        };
-
         Explorer.prototype.getActiveDiagram = function() {
             return this.mode ? this.modes[this.mode].diagram : null;
         };
@@ -171,7 +163,7 @@
         Explorer.prototype.makeGraph = function($div) {
             let self = this;
 
-            let diagram = $$(go.Diagram, $div.attr('id'),  // must name or refer to the DIV HTML element
+            let graph = $$(go.Diagram, $div.attr('id'),  // must name or refer to the DIV HTML element
             {
                 position: new go.Point(0, -50),
 
@@ -224,55 +216,66 @@
             }
 
             // dragging a node invalidates the Diagram.layout, causing a layout during the drag
-            diagram.toolManager.draggingTool.doMouseMove = function() {
+            graph.toolManager.draggingTool.doMouseMove = function() {
                 go.DraggingTool.prototype.doMouseMove.call(this);
-                if (this.isActive) { diagram.layout.invalidateLayout(); }
+                if (this.isActive) { graph.layout.invalidateLayout(); }
             }
 
             // when the diagram is modified, add a "*" to the page title in the browser, and enable the "Save" button
-            diagram.addDiagramListener("Modified", function(e) {
+            graph.addDiagramListener("Modified", function(e) {
                 console.log('diagram modified');
                 var button = document.getElementById("graph-save-button");
-                if (button) button.disabled = !diagram.isModified;
+                if (button) button.disabled = !graph.isModified;
                 var idx = document.title.indexOf("*");
-                if (diagram.isModified) {
+                if (graph.isModified) {
                     if (idx < 0) document.title += "*";
                 } else {
                     if (idx >= 0) document.title = document.title.substr(0, idx);
                 }
             });
 
-            let editListener = function(e) {
-                console.log('diagram edited: ' + e.name);
-                switch(e.name) {
-                    case 'TextEdited':
-                        let node = e.subject.part;
-                        if(node instanceof go.Node) {
-                            console.log('node is now ' + node.getDocumentBounds().width + ' wide');
+            graph.addDiagramListener('SelectionDeleted', function(e) {
+                let it = e.subject.iterator;
+                while(it.next()) {
+                    let part = it.value;
+                    if(part instanceof go.Node) {
+                        let concept = Page.getConcept(part);
+                        if(concept) {
+                            concept.delete();
                         }
-                        break;
-                    case 'SelectionDeleted':
-                        let it = e.subject.iterator;
-                        while(it.next()) {
-                            let part = it.value;
-                            if(part instanceof go.Node) {
-                                let concept = Page.getConcept(part);
-                                if(concept) {
-                                    concept.delete();
-                                }
-                            }
+                    }
+                    else if(part instanceof go.Link) {
+                        if(part.fromPortId === 'B') {
+                            let concept = Page.getConcept(part.toNode);
+                            if(concept) concept.setHead(null);
+                        } else if(part.fromPortId === 'T') {
+                            let concept = Page.getConcept(part.fromNode);
+                            if(concept) concept.setReference(null);
                         }
-                        break;
-                    default: break;
+                    }
                 }
-            };
-            diagram.addDiagramListener('TextEdited', editListener);
-            diagram.addDiagramListener('SelectionDeleted', editListener);
+            });
 
-            diagram.addDiagramListener('LayoutCompleted', function(e) {
+            function storeLink(e) {
+                let link = e.subject, c1 = Page.getConcept(link.fromNode), c2 = Page.getConcept(link.toNode);
+                if(!c1 || !c2) return;
+                if(link.fromPortId == 'B') {
+                    c2.setHead(c1);
+                } else {
+                    c1.setReference(c2);
+                }
+            }
+            graph.addDiagramListener('LinkDrawn', storeLink);
+            graph.addDiagramListener('LinkRelinked', storeLink);
+
+            graph.addDiagramListener('LayoutCompleted', function(e) {
                 console.log('LAYOUTED');
                 let concept = Page.currentConcept;
                 if(concept) concept.layoutTree();
+            });
+
+            graph.addDiagramListener('ViewportBoundsChanged', function(e) {
+                graph.position = new go.Point(-graph.viewportBounds.width/2, -50);
             });
 
             // called in the node template below to create the top and bottom 'port' on each node;
@@ -369,7 +372,7 @@
                 Also, GoJS stores a data object for each node, and the display of the node may change depending on
                 its data values.  This happens through the Bindings you see in this template.
             */
-            diagram.nodeTemplate = $$(go.Node, "Spot",
+            graph.nodeTemplate = $$(go.Node, "Spot",
                 {
                     // if you set the "loc" key in the node data (see the binding below these brackets),
                     // that determines where the center of the node will appear in the diagram
@@ -427,15 +430,7 @@
                     },
                     // we use a function to determine what text the node will display
                     new go.Binding('text', '', function(data, node) {
-                        if(node.diagram === Page.palette) {
-                            return data.name;
-                        } else {
-                            return data.name + ' [' + data.id + ']';
-                        }
-                    }).makeTwoWay(function(text, data, model) {
-                        model.setDataProperty(data, 'name', text);
-                        let concept = Page.getConcept(data.id);
-                        if(concept) concept.set('name', text);
+                        return data.name + ' [' + data.id + ']';
                     }))
                 ),
                 // the port on top has an incoming link from my head node, and an outgoing link to my reference node
@@ -452,7 +447,7 @@
             );
 
             // GoJS also needs a template to specify how links between nodes will appear
-            diagram.linkTemplate =
+            graph.linkTemplate =
                 $$(go.Link,
                   $$(go.Shape,
                     new go.Binding("stroke", "color"),
@@ -465,14 +460,16 @@
                     })
                 ));
 
-            diagram.model = $$(go.GraphLinksModel,
+            graph.model = $$(go.GraphLinksModel,
             {
                 nodeKeyProperty: 'id',
                 linkFromPortIdProperty: 'fromPort',
                 linkToPortIdProperty: 'toPort',
             });
 
-            return diagram;
+            self.postprocessDiagram(graph);
+
+            return graph;
         };
 
 
@@ -512,12 +509,35 @@
                 nodeKeyProperty: 'id'
             });
 
+            self.postprocessDiagram(palette);
+
             return palette;
+        };
+
+        Explorer.prototype.postprocessDiagram = function(diagram) {
+            diagram.addDiagramListener('TextEdited', function(e) {
+                let block = e.subject, node = block.part;
+                if(node instanceof go.Node) {
+                    let concept = Page.getConcept(node);
+                    if(concept) {
+                        concept.set('name', block.text);
+                        concept.updateNodes();
+                    }
+                }
+            });
         };
 
 
 
         Page.explorers = {};
+
+        Page.getExplorer = function(e) {
+            return Page.explorers[e];
+        }
+
+        Page.getActiveDiagram = function(e) {
+            return Page.explorers[e].getActiveDiagram();
+        }
 
         Page.clearDiagram = function(diagram) {
             Page.eachNode(diagram, function(node) {
@@ -534,12 +554,12 @@
             }
         };
 
-        Page.updateConcept = function(concept) {
-            concept = Page.getConcept(concept);
-            if(!concept) return;
-            for(let id in Page.explorers) {
-                let explorer = Page.explorers[id];
-                explorer.updateConcept(concept);
+        Page.eachActiveDiagram = function(callback) {
+            for(let e in Page.explorers) {
+                let explorer = Page.explorers[e],
+                    diagram = explorer.getActiveDiagram();
+                if(!diagram) continue;
+                callback.call(diagram, diagram, e);
             }
         };
 
@@ -567,6 +587,8 @@
         Concept.prototype.getNode = function(diagram) {
             return diagram.findNodeForKey(this.getId());
         };
+
+        function n(c, e) { return Page.getConcept(c).getNode(Page.getActiveDiagram(e)); }
 
         Concept.prototype.addNodeData = function(diagram, drawLinks) {
             let self = this;
@@ -596,16 +618,27 @@
             return diagram.model.findNodeDataForKey(self.id);
         };
 
+        Concept.prototype.updateNodes = function() {
+            let self = this;
+            Page.eachActiveDiagram(function(d, e) {
+                console.log('concept ' + self.id + ' updating explorer ' + e);
+                self.updateNode(d, !(d instanceof go.Palette));
+            });
+        };
+
         Concept.prototype.updateNode = function(diagram, drawLinks) {
             let self = this;
             if(self.deleted) self.delete(diagram);
             let data = self.getNodeData(diagram);
             if(!data) data = self.addNodeData(diagram, drawLinks);
-            diagram.model.set(data, {
+            let newData = {
                 name: self.name,
                 head: self.head,
                 reference: self.ref
-            });
+            };
+            console.log('node: ' + self.getNode(diagram).__gohashid)
+            console.log(newData);
+            for(let k in newData) diagram.model.set(data, k, newData[k]);
             diagram.updateAllTargetBindings();
         };
 
@@ -627,6 +660,9 @@
                 }
             }
         };
+
+        function nd(c, e, k) { return Page.getConcept(c).getNodeData(Page.explorers[e].getActiveDiagram(), k); }
+        function snd(c, e, k, v) { Page.getConcept(c).setNodeData(Page.explorers[e].getActiveDiagram(), k, v); }
 
         Concept.prototype.getTreeCount = function() {
             let self = this, count = 1;

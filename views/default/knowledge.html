@@ -76,6 +76,9 @@
         # plugin and used mainly in diagram.js
         # }}
 
+        <div id="global-controls">
+            <button id="save-button btn btn-primary" type="button">Save All Changes</button>
+        </div>
         <div id="concept-wrapper">
             <div id="concept-explorer-template" class="concept-explorer">
                 <div class="concept-mode diagram-wrapper" mode="graph">
@@ -190,7 +193,7 @@
         // the URLs we will need in other JavaScript files when making server calls
 
         Page.loadConceptURL = "{{=URL('default', 'loadRecord', extension='json')}}";
-        Page.saveConceptURL = "{{=URL('default', 'saveRecord', extension='json')}}";
+        Page.saveConceptURL = "{{=URL('default', 'saveRecords', extension='json')}}";
 
     </script>
 
@@ -230,11 +233,15 @@
             canvas.height = window.innerHeight;
             Page.canvas = canvas.getContext('2d');
 
+            $('#save-button').click(function(e) {
+                console.log('saving');
+                Page.saveChanges();
+            });
+
             Page.loadConcept(1, function() {
                 let explorer = new Explorer();
                 explorer.open(1);
             });
-
         });
     </script>
     {{end page_js}}
