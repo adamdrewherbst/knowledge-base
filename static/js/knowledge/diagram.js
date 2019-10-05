@@ -234,28 +234,6 @@
                 }
             });
 
-            graph.addDiagramListener('SelectionDeleted', function(e) {
-                let it = e.subject.iterator;
-                while(it.next()) {
-                    let part = it.value;
-                    if(part instanceof go.Node) {
-                        let concept = Page.getConcept(part);
-                        if(concept) {
-                            concept.delete();
-                        }
-                    }
-                    else if(part instanceof go.Link) {
-                        if(part.fromPortId === 'B') {
-                            let concept = Page.getConcept(part.toNode);
-                            if(concept) concept.setHead(null);
-                        } else if(part.fromPortId === 'T') {
-                            let concept = Page.getConcept(part.fromNode);
-                            if(concept) concept.setReference(null);
-                        }
-                    }
-                }
-            });
-
             function storeLink(e) {
                 let link = e.subject, c1 = Page.getConcept(link.fromNode), c2 = Page.getConcept(link.toNode);
                 if(!c1 || !c2) return;
@@ -525,6 +503,27 @@
                     }
                 }
             });
+            diagram.addDiagramListener('SelectionDeleted', function(e) {
+                let it = e.subject.iterator;
+                while(it.next()) {
+                    let part = it.value;
+                    if(part instanceof go.Node) {
+                        let concept = Page.getConcept(part);
+                        if(concept) {
+                            concept.delete();
+                        }
+                    }
+                    else if(part instanceof go.Link) {
+                        if(part.fromPortId === 'B') {
+                            let concept = Page.getConcept(part.toNode);
+                            if(concept) concept.setHead(null);
+                        } else if(part.fromPortId === 'T') {
+                            let concept = Page.getConcept(part.fromNode);
+                            if(concept) concept.setReference(null);
+                        }
+                    }
+                }
+            });
         };
 
 
@@ -577,11 +576,12 @@
         };
 
         Concept.prototype.delete = function(diagram) {
-            this.removeFromDiagram(diagram);
-            this.deleted = true;
+            if(this.deleted) return;
+            Record.prototype.delete.call(this);
             this.getHeadOf().forEach(function(child) {
-                child.delete(diagram);
+                child.delete();
             });
+            this.updateNodes();
         };
 
         Concept.prototype.getNode = function(diagram) {
@@ -628,7 +628,10 @@
 
         Concept.prototype.updateNode = function(diagram, drawLinks) {
             let self = this;
-            if(self.deleted) self.delete(diagram);
+            if(self.deleted) {
+                self.removeFromDiagram(diagram);
+                return;
+            }
             let data = self.getNodeData(diagram);
             if(!data) data = self.addNodeData(diagram, drawLinks);
             let newData = {

@@ -223,17 +223,22 @@
         Page.saveChanges = function() {
             let data = {records: {concept: {}}};
             Page.eachConcept(function(concept) {
-                data.records.concept[concept.id] = {
-                    name: concept.getName(),
-                    description: concept.getDescription(),
-                    head: concept.getHeadId(),
-                    reference: concept.getReferenceId()
-                };
+                if(concept.deleted) {
+                    data.records.concept[concept.id] = {deleted: true};
+                } else {
+                    data.records.concept[concept.id] = {
+                        name: concept.getName(),
+                        description: concept.getDescription(),
+                        head: concept.getHeadId(),
+                        reference: concept.getReferenceId()
+                    };
+                }
             });
             $.ajax({
                 url: Page.saveConceptURL,
+                type: 'post',
                 dataType: 'json',
-                data: data,
+                data: JSON.stringify(data),
                 success: function(data) {
                     Page.storeRecords(data);
                 }
@@ -311,8 +316,14 @@
             if(typeof desc.type === 'function') {
                 let table = desc.type.table;
                 if(typeof value === 'object' && !(value instanceof Record)) {
-                    for(let id in value) values.push(table.findRecord(id));
-                } else values.push(table.findRecord(value));
+                    for(let id in value) {
+                        let record = table.findRecord(id);
+                        if(record) values.push(record);
+                    }
+                } else {
+                    let record = table.findRecord(value);
+                    if(record) values.push(record);
+                }
             } else if(desc.type === 'number') {
                 values.push(parseFloat(value));
             } else {
@@ -350,13 +361,52 @@
             return this.constructor.fields[field] || {};
         };
 
+        Record.prototype.eachValue = function(field, callback) {
+            let self = this, desc = self.getFieldDescription(field),
+                value = self[field];
+            if(desc.multiple)
+                for(let k in value)
+                    if(value[k]) callback.call(self, value[k]);
+            else if(value) callback.call(self, value);
+        };
+
+        Record.prototype.delete = function() {
+            let self = this;
+            self.deleted = true;
+            self.saved = {};
+            for(let field in self) {
+                self.saved[field] = self[field];
+                self.clear(field);
+            }
+        };
+
+        Record.prototype.clear = function(field) {
+            let self = this;
+            let desc = self.getFieldDescription(field);
+            if(!desc) return;
+            if(desc.complement) {
+                self.eachValue(field, function(val) {
+                    if(val instanceof Record)
+                        val.unset(desc.complement, self);
+                });
+            }
+        };
+
+        Record.prototype.unset = function(field, entry) {
+            let self = this, desc = self.getFieldDescription(field),
+                value = self[field];
+            if(desc.multiple) {
+                for(let k in value) if(value[k] === entry) {
+                    if(Array.isArray(value)) value.splice(k, 1);
+                    else delete self[field][value];
+                }
+            } else if(value === entry) self[field] = null;
+        };
+
 
         function Concept() {
             Record.constructor.call(this);
             this.predicates = {};
-            this.nodeWidth = {};
-            this.childTreeWidth = {};
-            this.treeWidth = {};
         }
         Concept.prototype = Object.create(Record.prototype);
         Concept.prototype.constructor = Concept;

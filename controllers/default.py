@@ -72,18 +72,21 @@ def loadRecordHelper(table, record, records):
     rec['head_of'] = {}
     rec['reference_of'] = {}
 
-#    for dep in db(concept_instance_of.concept == record.id).iterselect():
-#        loadRecord('concept', db['concept'][dep.instance_of], records)
-#        rec['instance_of'][dep.instance_of] = True
+    for con in db(db.concept.head == record.id).iterselect():
+        loadRecordHelper('concept', con, records)
+        rec['head_of'][con.id] = True
 
-#    for dep in db(concept_instance_of.instance_of == record.id).iterselect():
-#        loadRecord('concept', db['concept'][dep.concept], records)
-#        rec['instance'][dep.concept] = True
+    for con in db(db.concept.reference == record.id).iterselect():
+        loadRecordHelper('concept', con, records)
+        rec['reference_of'][con.id] = True
 
-#    for con in db(concept.head == record.id).iterselect():
-#        rec['head_of'][con.id] = True
-#    for con in db(concept.reference == record.id).iterselect():
-#        rec['reference_of'][con.id] = True
+    for dep in db(db.concept_instance_of.concept == record.id).iterselect():
+        loadRecordHelper('concept', db['concept'][dep.instance_of], records)
+        rec['instance_of'][dep.instance_of] = True
+
+    for dep in db(db.concept_instance_of.instance_of == record.id).iterselect():
+        loadRecordHelper('concept', db['concept'][dep.concept], records)
+        rec['instance'][dep.concept] = True
 
     records[table][record.id] = rec
 
@@ -100,13 +103,27 @@ def saveRecords():
 
     for table in records:
         newRecords[table] = {}
-        for record in records[table]:
-            existing = db[table][record['id']]
+        for rid in records[table]:
+            record = records[table][rid]
+
+            if 'deleted' in record:
+                db(db[table].id == rid).delete()
+                continue
+
+            existing = None
+            try:
+                if int(rid) > 0:
+                    existing = db[table][rid]
+            except ValueError:
+                pass
+
             if existing:
                 existing.update_record(**record)
             else:
                 newId = db[table].insert(**record)
-                newRecords[table][newId] = {'oldId': record['id']}
+                newRecords[table][newId] = {'oldId': rid}
+
+        db.executesql('alter table {} auto_increment=1'.format(table))
 
     return response.json(newRecords)
 
