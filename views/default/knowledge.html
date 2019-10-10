@@ -81,34 +81,46 @@
         </div>
         <div id="concept-wrapper">
             <div id="concept-explorer-template" class="concept-explorer">
-                <div class="concept-mode diagram-wrapper" mode="graph">
-                    <div class="diagram-controls explorer-controls">
+                <div class="graph-wrapper concept-mode" mode="graph">
+                    <div class="graph-controls explorer-controls">
                         <div class="controls-left">
 
                         </div>
                         <div class="controls-right">
                             <button class="explorer-mode-button btn btn-primary" mode="palette" type="button">Palette</button>
+                            <button class="explorer-close-button btn btn-primary" type="button">X</button>
                         </div>
                         <div class="clear"></div>
                     </div>
-                    <div class="concept-diagram gojs-diagram"></div>
+                    <div class="concept-graph gojs-diagram"></div>
                     <div id="node-info" style="display: inline-block; vertical-align: top;">
                         <h3 id="node-title"></h3>
                         <p id="node-description"></p>
                     </div>
                 </div>
-                <div class="concept-mode palette-wrapper" mode="palette">
-                    <div class="diagram-controls explorer-controls">
+                <div class="palette-wrapper concept-mode" mode="palette">
+                    <div class="palette-controls explorer-controls">
                         <div class="controls-left">
                             <button class="concept-create-button btn btn-primary" type="button">New Concept</button>
                             <button class="concept-level-up-button btn btn-primary" type="button">Up A Level</button>
                         </div>
                         <div class="controls-right">
                             <button class="explorer-mode-button btn btn-primary" mode="graph" type="button">Graph</button>
+                            <button class="explorer-close-button btn btn-primary" type="button">X</button>
                         </div>
                         <div class="clear"></div>
                     </div>
                     <div class="concept-palette gojs-diagram"></div>
+                </div>
+                <div class="explorer-new-left explorer-new">
+                    <button class="explorer-new-left-button explorer-new-button btn btn-primary" type="button">
+                        +
+                    </button>
+                </div>
+                <div class="explorer-new-right explorer-new">
+                    <button class="explorer-new-right-button explorer-new-button btn btn-primary" type="button">
+                        +
+                    </button>
                 </div>
             </div>
         </div>

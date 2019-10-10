@@ -31,6 +31,7 @@
         .concept-explorer {
             height: 100%;
             flex-grow: 1;
+            position: relative;
         }
 
         .concept-mode {
@@ -49,13 +50,13 @@
             flex-grow: 1;
         }
 
-        .diagram-wrapper {
+        .graph-wrapper {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
         }
 
-        .concept-diagram {
+        .concept-graph {
             flex-grow: 1;
             display: block;
             border: 1px solid black;
@@ -70,6 +71,21 @@
         }
         .controls-right {
             float: right;
+        }
+
+        .explorer-close-button {
+            background-color: #b22;
+        }
+        .explorer-new {
+            position: absolute;
+            z-index: 10;
+            top: 50%;
+        }
+        .explorer-new-left {
+            left: 0%;
+        }
+        .explorer-new-right {
+            right: 0%;
         }
 
         .node-info {

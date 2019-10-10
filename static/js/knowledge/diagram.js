@@ -27,7 +27,10 @@
         function Explorer() {
             let self = this;
 
-            self.id = Explorer.nextId++;
+            let i = 1;
+            while(Page.explorers.hasOwnProperty(i)) i++;
+            self.id = i;
+
             self.concept = null;
 
             self.$wrapper = $('#concept-explorer-template').clone().attr('id', 'concept-explorer-' + this.id).appendTo('#concept-wrapper');
@@ -45,6 +48,15 @@
             self.$wrapper.find('.explorer-mode-button').click(function(e) {
                 self.setMode($(this).attr('mode'));
             });
+            self.$wrapper.find('.explorer-close-button').click(function(e) {
+                self.exit();
+            });
+
+            self.$wrapper.find('.explorer-new-button').click(function(e) {
+                let left = $(this).hasClass('explorer-new-left-button');
+                self.openInNew(self.concept, left);
+            });
+
             self.$wrapper.find('.concept-create-button').click(function(e) {
                 let concept = Page.createConcept();
                 concept.setHead(self.concept);
@@ -56,16 +68,24 @@
                 if(head) self.open(head);
             });
 
-            Page.explorers[self.id] = self;
+            Page.addExplorer(this);
         }
-        Explorer.nextId = 0;
 
         function e(id) { return Page.explorers[id]; }
         function d(id) { return Page.explorers[id].getActiveDiagram(); }
 
+        Explorer.prototype.getId = function() {
+            return this.id;
+        };
+
         Explorer.prototype.open = function(concept, mode) {
             this.concept = Page.getConcept(concept);
             this.setMode(mode || this.mode || 'palette');
+        };
+
+        Explorer.prototype.exit = function() {
+            this.$wrapper.remove();
+            Page.removeExplorer(this);
         };
 
         Explorer.prototype.update = function() {
@@ -83,6 +103,12 @@
             }
         };
 
+        Explorer.prototype.toggleCloseButtons = function(show) {
+            let $buttons = this.$wrapper.find('.explorer-close-button');
+            if(show) $buttons.show();
+            else $buttons.hide();
+        };
+
         Explorer.prototype.setMode = function(mode) {
             if(mode !== this.mode) {
                 let obj = this.modes[mode];
@@ -93,6 +119,7 @@
             }
 
             this.update();
+            Page.updateExplorers();
         };
 
         Explorer.prototype.setPosition = function(explorer, before) {
@@ -498,7 +525,8 @@
                 if(node instanceof go.Node) {
                     let concept = Page.getConcept(node);
                     if(concept) {
-                        concept.set('name', block.text);
+                        let name = block.text.replace(/\s+\[\d+\]$/, '');
+                        concept.set('name', name);
                         concept.updateNodes();
                     }
                 }
@@ -553,6 +581,12 @@
             }
         };
 
+        Page.eachExplorer = function(callback) {
+            for(let e in Page.explorers) {
+                callback.call(Page.explorers[e], Page.explorers[e], e);
+            }
+        };
+
         Page.eachActiveDiagram = function(callback) {
             for(let e in Page.explorers) {
                 let explorer = Page.explorers[e],
@@ -560,6 +594,25 @@
                 if(!diagram) continue;
                 callback.call(diagram, diagram, e);
             }
+        };
+
+        Page.addExplorer = function(explorer) {
+            Page.explorers[explorer.getId()] = explorer;
+            Page.updateExplorers();
+        };
+
+        Page.removeExplorer = function(explorer) {
+            delete Page.explorers[explorer.getId()];
+            Page.updateExplorers();
+        };
+
+        Page.updateExplorers = function() {
+            let show = Object.keys(Page.explorers).length > 1;
+            Page.eachExplorer(function(explorer) {
+                explorer.toggleCloseButtons(show);
+                let diagram = explorer.getActiveDiagram();
+                if(diagram) diagram.requestUpdate();
+            });
         };
 
 
@@ -585,7 +638,9 @@
         };
 
         Concept.prototype.getNode = function(diagram) {
-            return diagram.findNodeForKey(this.getId());
+            let node = diagram.findNodeForKey(this.getId());
+            if(!node && this.oldId) node = diagram.findNodeForKey(this.oldId);
+            return node;
         };
 
         function n(c, e) { return Page.getConcept(c).getNode(Page.getActiveDiagram(e)); }
@@ -635,6 +690,7 @@
             let data = self.getNodeData(diagram);
             if(!data) data = self.addNodeData(diagram, drawLinks);
             let newData = {
+                id: self.id,
                 name: self.name,
                 head: self.head,
                 reference: self.ref
@@ -647,12 +703,13 @@
 
         Concept.prototype.getNodeData = function(diagram, key) {
             let data = diagram.model.findNodeDataForKey(this.getId());
+            if(!data && this.oldId) data = diagram.model.findNodeDataForKey(this.oldId);
             if(data) return key === undefined ? data : data[key];
             return undefined;
         };
 
         Concept.prototype.setNodeData = function(diagram, key, value) {
-            let data = diagram.model.findNodeDataForKey(this.getId());
+            let data = this.getNodeData(diagram);
             if(data) {
                 if(typeof key === 'object') {
                     for(let k in key) {

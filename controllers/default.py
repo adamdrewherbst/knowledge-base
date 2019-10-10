@@ -99,33 +99,75 @@ def saveRecords():
     request_vars = json.loads(body)
     records = request_vars['records']
 
-    newRecords = {}
+    print('SAVING RECORDS')
 
     for table in records:
-        newRecords[table] = {}
+        for rid in records[table]:
+            saveConcept(records[table], rid)
         for rid in records[table]:
             record = records[table][rid]
-
-            if 'deleted' in record:
-                db(db[table].id == rid).delete()
-                continue
-
-            existing = None
-            try:
-                if int(rid) > 0:
-                    existing = db[table][rid]
-            except ValueError:
-                pass
-
-            if existing:
-                existing.update_record(**record)
-            else:
-                newId = db[table].insert(**record)
-                newRecords[table][newId] = {'oldId': rid}
+            del record['saved']
 
         db.executesql('alter table {} auto_increment=1'.format(table))
 
-    return response.json(newRecords)
+    return response.json(records)
+
+
+def saveConcept(records, rid):
+
+    rid = str(rid)
+    if rid not in records:
+        return rid
+
+    record = records[rid]
+    record['id'] = rid
+
+    if 'saved' in record:
+        return record['id']
+
+    record['saved'] = True
+
+    if 'deleted' in record:
+        db(db.concept.id == rid).delete()
+        return rid
+
+    #make sure the head and reference records are there first
+    if 'head' in record and isint(record['head']):
+        record['head'] = saveConcept(records, record['head'])
+    if 'reference' in record and isint(record['reference']):
+        record['reference'] = saveConcept(records, record['reference'])
+
+    instance_of = {}
+    if 'instance_of' in record:
+        instance_of = record['instance_of']
+        for cid in instance_of:
+            saveConcept(records, cid)
+        del record['instance_of']
+
+    if positive(rid):
+        db.concept[rid].update_record(**record)
+        record['id'] = rid
+    else:
+        record['id'] = db[table].insert(**record)
+
+    db(db.concept_instance_of.concept == rid).delete()
+    for cid in instance_of:
+        db.concept_instance_of.insert(concept = rid, instance_of = cid)
+
+    return record['id']
+
+
+def isint(val):
+    try:
+        int(val)
+        return True
+    except TypeError:
+        return False
+    except ValueError:
+        return False
+
+def positive(val):
+    return isint(val) and int(val) > 0
 
 
 #   This serves a test page I was using to learn how to display MathML.  Not needed by the main site

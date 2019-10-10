@@ -170,6 +170,13 @@
             return arr;
         };
 
+        Misc.booleanValues = function(obj) {
+            if(typeof obj !== 'object') return {};
+            let ret = obj;
+            for(let k in ret) ret[k] = true;
+            return ret;
+        };
+
 
         Page.getTable = function(name) {
             return Page.tables[name];
@@ -194,7 +201,7 @@
             for(let table in data) {
                 for(let id in data[table]) {
                     let record = data[table][id];
-                    Page.getTable(table).storeRecord(record);
+                    Page.getTable(table).storeRecord(record, id);
                 }
             }
         };
@@ -224,13 +231,15 @@
             let data = {records: {concept: {}}};
             Page.eachConcept(function(concept) {
                 if(concept.deleted) {
-                    data.records.concept[concept.id] = {deleted: true};
+                    if(concept.getId() > 0)
+                        data.records.concept[concept.id] = {deleted: true};
                 } else {
                     data.records.concept[concept.id] = {
                         name: concept.getName(),
                         description: concept.getDescription(),
                         head: concept.getHeadId(),
-                        reference: concept.getReferenceId()
+                        reference: concept.getReferenceId(),
+                        instance_of: Misc.booleanValues(concept.instance_of)
                     };
                 }
             });
@@ -252,15 +261,18 @@
             this.nextId = -1;
         }
 
-        Table.prototype.storeRecord = function(record) {
+        Table.prototype.storeRecord = function(record, id) {
             let self = this;
 
-            if(record.oldId && self.records[record.oldId]) {
-                self.records[record.id] = self.records[record.oldId];
-                delete self.records[record.oldId];
-                delete record.oldId;
+            if(record.deleted) {
+                self.deleteRecord(id, true);
+                return;
             }
-            else if(!self.records[record.id]) self.records[record.id] = new self.class();
+            if(id != record.id) {
+                self.records[record.id] = self.records[id];
+                delete self.records[id];
+            }
+            if(!self.records[record.id]) self.records[record.id] = new self.class();
 
             self.records[record.id].update(record);
         };
@@ -287,9 +299,22 @@
             }
         };
 
+        Table.prototype.deleteRecord = function(id, permanent) {
+            if(permanent) {
+                delete this.records[id];
+            } else {
+
+            }
+        };
+
 
         function Record() {
+            this.saved = {};
         }
+
+        Record.prototype.getTable = function() {
+            return this.constructor.table;
+        };
 
         Record.prototype.update = function(data) {
             let self = this;
@@ -364,32 +389,26 @@
         Record.prototype.eachValue = function(field, callback) {
             let self = this, desc = self.getFieldDescription(field),
                 value = self[field];
-            if(desc.multiple)
+            if(desc.multiple) {
                 for(let k in value)
                     if(value[k]) callback.call(self, value[k]);
-            else if(value) callback.call(self, value);
+            } else if(value) callback.call(self, value);
         };
 
         Record.prototype.delete = function() {
             let self = this;
+            if(self.deleted) return;
             self.deleted = true;
-            self.saved = {};
             for(let field in self) {
+                let desc = self.getFieldDescription(field);
+                if(!desc.complement) continue;
                 self.saved[field] = self[field];
-                self.clear(field);
-            }
-        };
-
-        Record.prototype.clear = function(field) {
-            let self = this;
-            let desc = self.getFieldDescription(field);
-            if(!desc) return;
-            if(desc.complement) {
                 self.eachValue(field, function(val) {
                     if(val instanceof Record)
                         val.unset(desc.complement, self);
                 });
             }
+            self.getTable().deleteRecord(self);
         };
 
         Record.prototype.unset = function(field, entry) {
@@ -398,14 +417,14 @@
             if(desc.multiple) {
                 for(let k in value) if(value[k] === entry) {
                     if(Array.isArray(value)) value.splice(k, 1);
-                    else delete self[field][value];
+                    else delete self[field][k];
                 }
             } else if(value === entry) self[field] = null;
         };
 
 
         function Concept() {
-            Record.constructor.call(this);
+            Record.prototype.constructor.call(this);
             this.predicates = {};
         }
         Concept.prototype = Object.create(Record.prototype);
@@ -461,6 +480,7 @@
         Concept.prototype.update = function(data) {
             Record.prototype.update.call(this, data);
             this.updateNodes();
+            delete this.oldId;
         };
 
         Concept.prototype.getName = function() {
