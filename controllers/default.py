@@ -33,7 +33,7 @@ def knowledge():
     db['concept'].update_or_insert(id=1, name='ROOT', description='root of the concept tree')
 
     #   also the 'relation' concept, which represents the root of a relation
-    db['concept'].update_or_insert(id=2, name='RELATION', description='a specific relation')
+    db['concept'].update_or_insert(id=2, name='LAW', description='a general law')
 
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
@@ -45,25 +45,30 @@ def knowledge():
 #   They load and save records from the database.
 
 
-def loadRecord():
+def loadConcepts():
 
-    table = request.vars.table
-    recordId = int(request.vars.id)
+    import json, urllib
+    body = request.body.read()
+    body = urllib.unquote(body).decode('utf8')
+    request_vars = json.loads(body)
 
     records = {}
 
-    loadRecordHelper(table, db[table][recordId], records)
+    for entry in request_vars['records']:
+        loadConcept(entry, records)
 
-    return response.json(records)
+    return response.json({'concept': records})
 
 
-def loadRecordHelper(table, record, records):
+def loadConcept(data, records):
 
-    if table not in records:
-        records[table] = {}
-
-    if record.id in records[table]:
-        return
+    record = None
+    if isinstance(data, int) or (isinstance(data, str) and isint(data)):
+        record = db.concept(data)
+    elif isinstance(data, str):
+        record = db.concept(db.concept.name == data)
+    else:
+        record = data
 
     rec = record.as_dict()
 
@@ -73,25 +78,25 @@ def loadRecordHelper(table, record, records):
     rec['reference_of'] = {}
 
     for con in db(db.concept.head == record.id).iterselect():
-        loadRecordHelper('concept', con, records)
+        loadConcept(con, records)
         rec['head_of'][con.id] = True
 
     for con in db(db.concept.reference == record.id).iterselect():
-        loadRecordHelper('concept', con, records)
+        loadConcept(con, records)
         rec['reference_of'][con.id] = True
 
     for dep in db(db.concept_instance_of.concept == record.id).iterselect():
-        loadRecordHelper('concept', db['concept'][dep.instance_of], records)
+        loadConcept(dep.instance_of, records)
         rec['instance_of'][dep.instance_of] = True
 
     for dep in db(db.concept_instance_of.instance_of == record.id).iterselect():
-        loadRecordHelper('concept', db['concept'][dep.concept], records)
+        loadConcept(dep.concept, records)
         rec['instance'][dep.concept] = True
 
-    records[table][record.id] = rec
+    records[record.id] = rec
 
 
-def saveRecords():
+def saveConcepts():
 
     import json, urllib
     body = request.body.read()
@@ -101,14 +106,12 @@ def saveRecords():
 
     print('SAVING RECORDS')
 
-    for table in records:
-        for rid in records[table]:
-            saveConcept(records[table], rid)
-        for rid in records[table]:
-            record = records[table][rid]
-            del record['saved']
+    for cid in records:
+        saveConcept(records, cid)
+    for cid in records:
+        del records[cid]['saved']
 
-        db.executesql('alter table {} auto_increment=1'.format(table))
+    db.executesql('alter table concept auto_increment=1')
 
     return response.json(records)
 

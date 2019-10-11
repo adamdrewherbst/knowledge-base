@@ -84,7 +84,7 @@
                 <div class="graph-wrapper concept-mode" mode="graph">
                     <div class="graph-controls explorer-controls">
                         <div class="controls-left">
-
+                            <button class="concept-level-up-button btn btn-primary" type="button">Up A Level</button>
                         </div>
                         <div class="controls-right">
                             <button class="explorer-mode-button btn btn-primary" mode="palette" type="button">Palette</button>
@@ -204,8 +204,8 @@
 
         // the URLs we will need in other JavaScript files when making server calls
 
-        Page.loadConceptURL = "{{=URL('default', 'loadRecord', extension='json')}}";
-        Page.saveConceptURL = "{{=URL('default', 'saveRecords', extension='json')}}";
+        Page.loadConceptURL = "{{=URL('default', 'loadConcepts', extension='json')}}";
+        Page.saveConceptURL = "{{=URL('default', 'saveConcepts', extension='json')}}";
 
     </script>
 
@@ -250,7 +250,7 @@
                 Page.saveChanges();
             });
 
-            Page.loadConcept(1, function() {
+            Page.loadConcepts([1,2], function() {
                 let explorer = new Explorer();
                 explorer.open(1);
             });

@@ -439,3 +439,7 @@ CREATE TABLE concept_predicate(
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
 success!
+timestamp: 2019-10-10T18:17:12.577089
+ALTER TABLE concept ADD predicate CHAR(1);
+success!
+success!

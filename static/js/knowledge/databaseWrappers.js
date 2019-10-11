@@ -9,11 +9,7 @@
     object, and its prototype has functions allowing it to perform actions specific to that table.  For example, the
     Concept prototype has an 'instanceOf' function to check whether that concept is an instance of another specified concept.
 
-    All table-specific wrapper classes inherit from the generic Entry class.  This defines basic functions like storing data
-    fields passed from the server, and adding event handlers to be fired when the record is updated in a certain way.
-
-    The short Misc library is also defined here since it is used several times by the wrapper classes, although it is used
-    in other files as well, especially nodeData.js.  It simplifies common operations on JavaScript objects like adding a
+    The short Misc library is also defined here since it is used several times by the wrapper classes.  It simplifies common operations on JavaScript objects like adding a
     key whose parent keys may or may not have been added already.
 */
 
@@ -182,14 +178,24 @@
             return Page.tables[name];
         };
 
-        Page.loadConcept = function(concept, callback) {
+        Page.loadConcepts = function(data, callback) {
+            let concepts = [];
+            switch(typeof data) {
+                case 'string':
+                case 'number':
+                    concepts.push(data);
+                    break;
+                case 'object':
+                    concepts = data;
+                    break;
+            }
             $.ajax({
                 url: Page.loadConceptURL,
+                type: 'post',
                 dataType: 'json',
-                data: {
-                    table: 'concept',
-                    id: concept
-                },
+                data: JSON.stringify({
+                    records: concepts
+                }),
                 success: function(data) {
                     Page.storeRecords(data);
                     if(typeof callback === 'function') callback.call(Page, data);
@@ -213,10 +219,7 @@
             if(info instanceof go.Node) {
                 info = info.data.id;
             }
-            if(!isNaN(info)) {
-                return Page.getTable('concept').findRecord(info);
-            }
-            return null;
+            return Page.getTable('concept').findRecord(info);
         };
 
         Page.createConcept = function() {
@@ -282,6 +285,12 @@
 
             if(info instanceof this.class) record = info;
             else if(!isNaN(info)) record = self.records[info] || null;
+            else if(typeof info === 'string') {
+                for(let id in self.records) if(self.records[id].get('name') === info) {
+                    record = self.records[id];
+                    break;
+                }
+            }
 
             return record;
         };
@@ -333,8 +342,9 @@
             return this.id;
         };
 
-        Record.prototype.set = function(field, value) {
-            let self = this;
+        Record.prototype.set = function(field, value, doSet) {
+            doSet = doSet || doSet === undefined;
+            let self = this, unset = !doSet;
 
             let desc = self.getFieldDescription(field), values = [];
 
@@ -358,27 +368,36 @@
             values.forEach(function(val) {
 
                 if(desc.multiple) {
-                    if(Array.isArray(self[field])) self[field].push(val);
+                    if(Array.isArray(self[field])) {
+                        let ind = self[field].indexOf(val);
+                        if((unset && ind<0) || (!unset && ind>=0)) return true;
+                        if(unset) self[field].splice(ind,1);
+                        else self[field].push(val);
+                    }
                     else {
                         if(!self[field]) self[field] = {};
-                        if(value instanceof Record) {
-                            if(self[field][val.getId()] === val) return true;
-                            self[field][val.getId()] = value;
+                        if(val instanceof Record) {
+                            let contains = self[field][val.getId()] === val;
+                            if((unset && !contains) || (!unset && contains)) return true;
+                            if(unset) delete self[field][val.getId()];
+                            else self[field][val.getId()] = value;
                         } else {
-                            if(self[field][val]) return true;
-                            self[field][val] = true;
+                            if((unset && !self[field][val]) || (!unset && self[field][val])) return true;
+                            if(unset) delete self[field][val];
+                            else self[field][val] = true;
                         }
                     }
                 } else {
-                    if(self[field] === val) return true;
-                    self[field] = val;
+                    let contains = self[field] === val;
+                    if((unset && !contains) || (!unset && contains)) return true;
+                    if(unset) delete self[field];
+                    else self[field] = val;
                 }
 
                 // see if this field is bound to a complement field of another record
                 if(val instanceof Record && desc.complement) {
-                    val.set(desc.complement, self);
+                    val.set(desc.complement, self, doSet);
                 }
-
             });
         };
 
@@ -425,7 +444,6 @@
 
         function Concept() {
             Record.prototype.constructor.call(this);
-            this.predicates = {};
         }
         Concept.prototype = Object.create(Record.prototype);
         Concept.prototype.constructor = Concept;
@@ -462,17 +480,12 @@
             class2.fields[field2].complement = field1;
         }
 
-        Concept.prototype.set = function(field, value) {
+        Concept.prototype.set = function(field, value, unset) {
             let self = this;
 
             switch(field) {
-                case 'predicate':
-                    value.split(',').forEach(function(predicate) {
-                        self.addToPredicate(predicate);
-                    });
-                    break;
                 default:
-                    Record.prototype.set.call(this, field, value);
+                    Record.prototype.set.call(this, field, value, unset);
                     break;
             }
         };
@@ -480,7 +493,6 @@
         Concept.prototype.update = function(data) {
             Record.prototype.update.call(this, data);
             this.updateNodes();
-            delete this.oldId;
         };
 
         Concept.prototype.getName = function() {
@@ -493,7 +505,7 @@
 
         Concept.prototype.getHead = function() {
             let head = this.get('head');
-            if(head && head.isRelation()) return null;
+            if(head && head.isLaw()) return null;
             return head;
         };
 
@@ -517,7 +529,7 @@
 
         Concept.prototype.getReference = function() {
             let reference = this.get('reference');
-            if(reference && reference.isRelation()) return null;
+            if(reference && reference.isLaw()) return null;
             return reference;
         };
 
@@ -559,20 +571,19 @@
             this.set('instance', concept);
         };
 
-        Concept.prototype.addToPredicate = function(predicate) {
-            let self = this;
-            self.predicates[predicate] = true;
+        Concept.prototype.isPredicate = function() {
+            return this.predicate;
         };
 
-        Concept.prototype.removeFromPredicate = function(predicate) {
-            let self = this;
-            delete self.predicates[predicate];
+        Concept.prototype.togglePredicate = function(include) {
+            this.predicate = include === undefined ? !this.predicate : include;
+            this.updateNodes();
         };
 
         Concept.prototype.updateMatches = function() {
             let self = this;
 
-            let predicates = {}, checked = {};
+            let checked = {};
             self.getAncestors().forEach(function(ancestor) {
                 ancestor.getInstances().forEach(function(instance) {
 
@@ -614,21 +625,35 @@
             concept = Page.getConcept(concept);
             if(!concept) return false;
 
-            if(concept.isPredicate()) {
-                return concept.getParents().every(function(parent) {
-                    return self.instanceOf(parent);
-                });
-            } else {
-                return self.getAncestors().indexOf(concept) >= 0;
+            if(self === concept) return true;
+
+            for(let id in self.instance_of) {
+                if(self.instance_of[id].instanceOf(concept)) return true;
             }
+            return false;
         };
 
-        Concept.prototype.isRelation = function() {
-            return this.instanceOf('RELATION');
+        Concept.prototype.isLaw = function() {
+            return this.instanceOf('LAW');
         };
 
-        Concept.prototype.isPredicate = function() {
-            return this.isPredicate;
+        Concept.prototype.setAsLaw = function(isLaw) {
+            let self = this;
+            self.set('instance_of', 'LAW', isLaw);
+            self.setLaw(self);
+            self.updateNodes();
+        };
+
+        Concept.prototype.getLaw = function() {
+            return this.isLaw() ? this : null;
+        };
+
+        Concept.prototype.setLaw = function(concept) {
+            let self = this;
+            self.set('law', concept);
+            self.getHeadOf().forEach(function(child) {
+                child.setLaw(concept);
+            });
         };
 
         Concept.prototype.sync = function() {
@@ -642,14 +667,6 @@
                 let ancestor = self.ancestor[id];
                 self.ancestors.push(ancestor);
             }
-        };
-
-        Concept.prototype.inPredicate = function() {
-            return this.predicates[Page.currentPredicate] ? true : false;
-        };
-
-        Concept.prototype.togglePredicate = function(include) {
-            this.predicates[Page.currentPredicate] = include;
         };
 
         Concept.prototype.getInfoString = function() {

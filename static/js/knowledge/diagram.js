@@ -80,7 +80,8 @@
 
         Explorer.prototype.open = function(concept, mode) {
             this.concept = Page.getConcept(concept);
-            this.setMode(mode || this.mode || 'palette');
+            let preferredMode = (this.concept && this.concept.isLaw()) ? 'graph' : 'palette';
+            this.setMode(mode || preferredMode);
         };
 
         Explorer.prototype.exit = function() {
@@ -101,6 +102,11 @@
                     break;
                 default: break;
             }
+        };
+
+        Explorer.prototype.updateLayout = function() {
+            if(!this.concept || this.mode !== 'graph') return;
+            this.concept.layoutTree(this.getGraph());
         };
 
         Explorer.prototype.toggleCloseButtons = function(show) {
@@ -154,11 +160,12 @@
         };
 
         Explorer.prototype.drawGraph = function(concept) {
-            let self = this, diagram = self.getGraph();
-            concept = concept || self.concept;
-
+            let self = this;
             if(self.drawingConceptTree) return;
             self.drawingConceptTree = true;
+
+            let diagram = self.getGraph();
+            concept = concept || self.concept;
 
             if(concept === self.concept) Page.clearDiagram(diagram);
 
@@ -325,7 +332,7 @@
             // here is the template that is used as the context menu for each node
             let partContextMenu =
               $$(go.Adornment, "Vertical",
-                    makeButton("Add Child",
+                    makeButton("Add child",
                         function(e, obj) {
                             let concept = Page.getConcept(obj.part.adornedPart),
                                 child = Page.createConcept();
@@ -336,40 +343,33 @@
                             let part = o.part.adornedPart;
                             return !(part.diagram instanceof go.Palette);
                         }),
-                    // add the node to the currently selected predicate set;
-                    // either this option or the 'Remove from Predicate' below will be displayed, but not both,
-                    // depending on whether the node is currently in the predicate set
-                    makeButton("Add to Predicate",
-                            function(e, obj) {
-                                let concept = Page.getConcept(obj.part.adornedPart);
-                                if(concept) concept.togglePredicate(true);
-                            },
-                            function(o) {
-                                let part = o.part.adornedPart;
-                                if(part.diagram instanceof go.Palette) return false;
-                                let concept = Page.getConcept(concept);
-                                return concept && !concept.inPredicate();
-                            }),
-                    makeButton("Remove from Predicate",
-                            function(e, obj) {
-                                let concept = Page.getConcept(obj.part.adornedPart);
-                                if(concept) concept.togglePredicate(false);
-                            },
-                            function(o) {
-                                let part = o.part.adornedPart;
-                                if(part.diagram instanceof go.Palette) return false;
-                                let concept = Page.getConcept(concept);
-                                return concept && concept.inPredicate();
-                            }),
-                    makeButton("Open Graph",
-                            function(e, obj) {
-                                let concept = Page.getConcept(obj.part.adornedPart);
-                                if(concept) new Explorer().open(concept, 'graph');
-                            },
-                            function(o) {
-                                let part = o.part.adornedPart;
-                                return part.diagram instanceof go.Palette;
-                            })
+                    makeButton('Make law',
+                        function(e, obj) {
+                            let concept = Page.getConcept(obj.part.adornedPart);
+                            concept.setAsLaw(true);
+                        },
+                        function(o) {
+                            let concept = Page.getConcept(o.part.adornedPart);
+                            return concept && !concept.getLaw();
+                        }),
+                    makeButton('Make normal concept',
+                        function(e, obj) {
+                            let concept = Page.getConcept(obj.part.adornedPart);
+                            concept.setAsLaw(false);
+                        },
+                        function(o) {
+                            let concept = Page.getConcept(o.part.adornedPart);
+                            return concept && concept.isLaw();
+                        }),
+                    makeButton("Open in new Explorer",
+                        function(e, obj) {
+                            let concept = Page.getConcept(obj.part.adornedPart);
+                            if(concept) self.openInNew(concept, false);
+                        },
+                        function(o) {
+                            let part = o.part.adornedPart;
+                            return part.diagram instanceof go.Palette;
+                        })
               );
 
             /*
@@ -418,11 +418,13 @@
                     $$(go.Shape, Page.nodeTemplates['default'].shape,  // default figure
                     {
                         cursor: "pointer",
-                        fill: Page.nodeTemplates['default'].fill,  // default color
-                        strokeWidth: 2
+                        strokeWidth: 2,
                     },
-                    new go.Binding("figure"),
-                    new go.Binding("fill")),
+                    new go.Binding('fill', 'isLaw', function(isLaw) {
+                        if(isLaw) return 'yellow';
+                        else return Page.nodeTemplates['default'].fill;
+                    }),
+                    new go.Binding("figure")),
 
                     // inside that is a text block displaying the node name if any, and the concept name
                     $$(go.TextBlock,
@@ -499,16 +501,6 @@
                 return 0;
             };
 
-            palette.addDiagramListener('ObjectDoubleClicked', function(e) {
-                let node = e.subject.part;
-                if(node instanceof go.Node) {
-                    let concept = Page.getConcept(node);
-                    if(!concept) return;
-                    if(concept.isRelation()) self.open(concept, 'graph');
-                    else self.open(concept, 'palette');
-                }
-            });
-
             palette.model = $$(go.GraphLinksModel,
             {
                 nodeKeyProperty: 'id'
@@ -520,9 +512,20 @@
         };
 
         Explorer.prototype.postprocessDiagram = function(diagram) {
+            let self = this;
+            diagram.conceptExplorerId = self.id;
+            diagram.addDiagramListener('ObjectDoubleClicked', function(e) {
+                let node = e.subject.part;
+                if(node instanceof go.Node) {
+                    let concept = Page.getConcept(node);
+                    if(!concept) return;
+                    self.open(concept);
+                }
+            });
             diagram.addDiagramListener('TextEdited', function(e) {
                 let block = e.subject, node = block.part;
                 if(node instanceof go.Node) {
+                    console.log('text edited, node is now ' + node.getDocumentBounds().width + ' wide');
                     let concept = Page.getConcept(node);
                     if(concept) {
                         let name = block.text.replace(/\s+\[\d+\]$/, '');
@@ -552,14 +555,33 @@
                     }
                 }
             });
+            diagram.addChangedListener(function(e) {
+                switch(e.change) {
+                    case go.ChangedEvent.Property:
+                        if(e.object instanceof go.Node) {
+                            let node = e.object, concept = Page.getConcept(node);
+                            if(concept && e.propertyName === 'position') {
+                                if(node.data.nodeWidth !== undefined &&
+                                  node.data.nodeWidth !== node.getDocumentBounds().width) {
+                                    console.log('node ' + concept.id + ' from ' + node.data.nodeWidth +
+                                        ' to ' + node.getDocumentBounds().width);
+                                    self.updateLayout();
+                                }
+                            }
+                        }
+                        break;
+                }
+            });
         };
 
 
 
         Page.explorers = {};
 
-        Page.getExplorer = function(e) {
-            return Page.explorers[e];
+        Page.getExplorer = function(data) {
+            if(data instanceof go.Diagram)
+                data = data.conceptExplorerId;
+            return Page.explorers[data];
         }
 
         Page.getActiveDiagram = function(e) {
@@ -625,6 +647,7 @@
                     let link = links.value;
                     diagram.model.removeLinkData(link.data);
                 }
+                Page.getExplorer(diagram).updateLayout();
             }
         };
 
@@ -645,14 +668,23 @@
 
         function n(c, e) { return Page.getConcept(c).getNode(Page.getActiveDiagram(e)); }
 
+        Concept.prototype.createNodeData = function() {
+            let self = this;
+            return {
+                id: self.id,
+                name: self.name,
+                head: self.getHeadId(),
+                reference: self.getReferenceId(),
+                isLaw: self.isLaw() ? true : false,
+            };
+        };
+
         Concept.prototype.addNodeData = function(diagram, drawLinks) {
             let self = this;
 
-            diagram.model.addNodeData({
-                id: self.id,
-                name: self.name,
-                loc: '0 0'
-            });
+            let data = self.createNodeData();
+            data.loc = '0 0';
+            diagram.model.addNodeData(data);
 
             if(drawLinks) {
                 let head = self.getHead(), ref = self.getReference();
@@ -689,16 +721,11 @@
             }
             let data = self.getNodeData(diagram);
             if(!data) data = self.addNodeData(diagram, drawLinks);
-            let newData = {
-                id: self.id,
-                name: self.name,
-                head: self.head,
-                reference: self.ref
-            };
-            console.log('node: ' + self.getNode(diagram).__gohashid)
-            console.log(newData);
+            let newData = self.createNodeData();
             for(let k in newData) diagram.model.set(data, k, newData[k]);
-            diagram.updateAllTargetBindings();
+
+            let node = self.getNode(diagram);
+            if(node) node.updateTargetBindings();
         };
 
         Concept.prototype.getNodeData = function(diagram, key) {
