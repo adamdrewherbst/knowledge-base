@@ -401,6 +401,22 @@
             });
         };
 
+        Record.prototype.unset = function(field, entry) {
+            let self = this, desc = self.getFieldDescription(field),
+                value = self[field];
+            if(desc.multiple) {
+                for(let k in value) if(value[k] === entry) {
+                    if(Array.isArray(value)) value.splice(k, 1);
+                    else delete self[field][k];
+                }
+            } else if(value === entry) self[field] = null;
+        };
+
+        Record.prototype.clear = function(field) {
+            let self = this;
+            self.set(field, self[field], false);
+        };
+
         Record.prototype.getFieldDescription = function(field) {
             return this.constructor.fields[field] || {};
         };
@@ -430,20 +446,10 @@
             self.getTable().deleteRecord(self);
         };
 
-        Record.prototype.unset = function(field, entry) {
-            let self = this, desc = self.getFieldDescription(field),
-                value = self[field];
-            if(desc.multiple) {
-                for(let k in value) if(value[k] === entry) {
-                    if(Array.isArray(value)) value.splice(k, 1);
-                    else delete self[field][k];
-                }
-            } else if(value === entry) self[field] = null;
-        };
-
 
         function Concept() {
             Record.prototype.constructor.call(this);
+            this.ancestors = {};
         }
         Concept.prototype = Object.create(Record.prototype);
         Concept.prototype.constructor = Concept;
@@ -480,13 +486,16 @@
             class2.fields[field2].complement = field1;
         }
 
-        Concept.prototype.set = function(field, value, unset) {
+        Concept.prototype.set = function(field, value, doSet) {
             let self = this;
 
+            Record.prototype.set.call(this, field, value, doSet);
             switch(field) {
-                default:
-                    Record.prototype.set.call(this, field, value, unset);
+                case 'instance_of':
+                    if(doSet) self.addAncestors(value);
+                    else self.computeAncestors();
                     break;
+                default: break;
             }
         };
 
@@ -551,24 +560,55 @@
             this.set('reference_child', concept);
         };
 
-        Concept.prototype.getInstanceOf = function() {
-            return Misc.toArray(this.instance_of);
-        };
-
-        Concept.prototype.getAllInstanceOf = function() {
-            return Misc.toArray(this.instance_of_all);
-        };
-
-        Concept.prototype.addInstanceOf = function(concept) {
-            this.set('instance_of', concept);
-        };
-
         Concept.prototype.getInstances = function() {
             return Misc.toArray(this.instance);
         };
 
         Concept.prototype.addInstance = function(concept) {
             this.set('instance', concept);
+        };
+
+        Concept.prototype.getInstanceOf = function() {
+            return Misc.toArray(this.instance_of);
+        };
+
+        Concept.prototype.addInstanceOf = function(concept) {
+            this.set('instance_of', concept);
+        };
+
+        Concept.prototype.getAncestors = function() {
+            return Misc.toArray(this.ancestors);
+        };
+
+        Concept.prototype.addAncestors = function(concept) {
+            concept = Page.getConcept(concept);
+            if(!concept) return;
+            let self = this, ancestors = concept.ancestors;
+            ancestors[concept.getId()] = concept;
+            self.set('ancestor', ancestors);
+            self.getInstances().forEach(function(instance) {
+                instance.addAncestors(concept);
+            });
+        };
+
+        Concept.prototype.computeAncestors = function() {
+            let self = this;
+            self.clear('ancestor');
+            self.getInstanceOf().forEach(function(instanceOf) {
+                self.addAncestors(instanceOf);
+            });
+            self.getInstances().forEach(function(instance) {
+                instance.computeAncestors();
+            });
+        };
+
+        Concept.prototype.instanceOf = function(concept) {
+            let self = this;
+
+            concept = Page.getConcept(concept);
+            if(!concept) return false;
+
+            return self === concept || self.ancestors[concept.getId()];
         };
 
         Concept.prototype.isPredicate = function() {
@@ -578,6 +618,29 @@
         Concept.prototype.togglePredicate = function(include) {
             this.predicate = include === undefined ? !this.predicate : include;
             this.updateNodes();
+        };
+
+        Concept.prototype.isLaw = function() {
+            return this.instanceOf('LAW');
+        };
+
+        Concept.prototype.setAsLaw = function(isLaw) {
+            let self = this;
+            self.set('instance_of', 'LAW', isLaw);
+            self.setLaw(self);
+            self.updateNodes();
+        };
+
+        Concept.prototype.getLaw = function() {
+            return this.isLaw() ? this : null;
+        };
+
+        Concept.prototype.setLaw = function(concept) {
+            let self = this;
+            self.set('law', concept);
+            self.getHeadOf().forEach(function(child) {
+                child.setLaw(concept);
+            });
         };
 
         Concept.prototype.updateMatches = function() {
@@ -617,56 +680,6 @@
 
         Concept.prototype.matched = function(concept) {
             return this.matches[concept.getId()] ? true : false;
-        };
-
-        Concept.prototype.instanceOf = function(concept) {
-            let self = this;
-
-            concept = Page.getConcept(concept);
-            if(!concept) return false;
-
-            if(self === concept) return true;
-
-            for(let id in self.instance_of) {
-                if(self.instance_of[id].instanceOf(concept)) return true;
-            }
-            return false;
-        };
-
-        Concept.prototype.isLaw = function() {
-            return this.instanceOf('LAW');
-        };
-
-        Concept.prototype.setAsLaw = function(isLaw) {
-            let self = this;
-            self.set('instance_of', 'LAW', isLaw);
-            self.setLaw(self);
-            self.updateNodes();
-        };
-
-        Concept.prototype.getLaw = function() {
-            return this.isLaw() ? this : null;
-        };
-
-        Concept.prototype.setLaw = function(concept) {
-            let self = this;
-            self.set('law', concept);
-            self.getHeadOf().forEach(function(child) {
-                child.setLaw(concept);
-            });
-        };
-
-        Concept.prototype.sync = function() {
-            let self = this;
-            for(let id in self.parent) {
-                let parent = self.parent[id];
-                self.parents.push(parent);
-                Object.assign(self.ancestor, parent.get('ancestor'));
-            }
-            for(let id in self.ancestor) {
-                let ancestor = self.ancestor[id];
-                self.ancestors.push(ancestor);
-            }
         };
 
         Concept.prototype.getInfoString = function() {

@@ -56,7 +56,8 @@
     #   Here we include CSS files which determine how elements are visually styled (margins, padding, colors, fonts, etc)
     #}}
     <head>
-        <link rel="stylesheet" href="{{=URL('static','css/bootstrap.min.css')}}"/>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+        <!--<link rel="stylesheet" href="{{=URL('static','css/bootstrap.min.css')}}"/>-->
         <link rel="stylesheet" href="{{=URL('static','css/web2py-bootstrap3.css')}}"/>
         <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/main.css')}}">
         <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/highlight.css')}}">
@@ -121,6 +122,21 @@
                     <button class="explorer-new-right-button explorer-new-button btn btn-primary" type="button">
                         +
                     </button>
+                </div>
+                <div class="explorer-edit-concept card">
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <input class="explorer-edit-name" type="text" placeholder="Concept Name..."/>
+                            </li>
+                            <li class="list-group-item">
+                                <textarea class="explorer-edit-description" rows="4" placeholder="Concept description..."></textarea>
+                            </li>
+                            <li class="list-group-item">
+                                <div class="explorer-edit-instance-of"></div>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>

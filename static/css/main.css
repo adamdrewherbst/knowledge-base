@@ -88,6 +88,16 @@
             right: 0%;
         }
 
+        .explorer-edit-concept {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            position: absolute;
+        }
+        .explorer-edit-instance-of {
+            min-height: 100px;
+        }
+
         .node-info {
             background-color: #8ff;
             color: #604;

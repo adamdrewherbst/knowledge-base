@@ -68,7 +68,13 @@
                 if(head) self.open(head);
             });
 
-            Page.addExplorer(this);
+            self.$card = self.$wrapper.find('.explorer-edit-concept');
+            self.$nameEdit = self.$card.find('.explorer-edit-name');
+            self.$descriptionEdit = self.$card.find('.explorer-edit-description');
+            self.$instanceOfEdit = self.$card.find('.explorer-edit-instance-of').attr('id', 'explorer-edit-instance-of-' + this.id);
+            self.instanceOfPalette = self.makePalette(self.$instanceOfEdit);
+
+            Page.addExplorer(self);
         }
 
         function e(id) { return Page.explorers[id]; }
@@ -281,13 +287,7 @@
             graph.addDiagramListener('LinkRelinked', storeLink);
 
             graph.addDiagramListener('LayoutCompleted', function(e) {
-                console.log('LAYOUTED');
-                let concept = Page.currentConcept;
-                if(concept) concept.layoutTree();
-            });
-
-            graph.addDiagramListener('ViewportBoundsChanged', function(e) {
-                graph.position = new go.Point(-graph.viewportBounds.width/2, -50);
+                if(self.concept) self.concept.layoutTree(graph);
             });
 
             // called in the node template below to create the top and bottom 'port' on each node;
@@ -447,9 +447,16 @@
                 makePort("B", go.Spot.Bottom, true, true),
                 // handle mouse enter/leave events to show/hide the ports
                 {
+                    contextMenu: partContextMenu,
                     mouseEnter: function(e, node) { showSmallPorts(node, true); },
                     mouseLeave: function(e, node) { showSmallPorts(node, false); },
-                    contextMenu: partContextMenu
+                    mouseDrop: function(e, node) {
+                        console.log('dropped:');
+                        let it = node.diagram.toolManager.draggingTool.copiedParts;
+                        while(it.next()) {
+                            console.log(it.value);
+                        }
+                    }
                 }
             );
 
@@ -478,7 +485,6 @@
 
             return graph;
         };
-
 
         Explorer.prototype.makePalette = function($div) {
             let self = this;
@@ -514,6 +520,96 @@
         Explorer.prototype.postprocessDiagram = function(diagram) {
             let self = this;
             diagram.conceptExplorerId = self.id;
+
+            let $div = $(diagram.div);
+
+            if($div.hasClass('explorer-edit-instance-of')) {
+                diagram.addDiagramListener('ExternalObjectsDropped', function(e) {
+                    let it = e.subject.iterator;
+                    console.log('dropped nodes');
+                    while(it.next()) {
+                        let node = it.value;
+                        if(!(node instanceof go.Node)) continue;
+                        console.log(node.data);
+                    }
+                });
+            } else {
+                diagram.addDiagramListener('ChangedSelection', function(e) {
+                    let it = e.subject.iterator, node = null;
+                    if(it.next()) node = it.value;
+                    let concept = Page.getConcept(node);
+                    if(!concept) return;
+                    self.$nameEdit.val(concept.get('name') || '');
+                    self.$descriptionEdit.val(concept.get('description') || '');
+                    Page.clearDiagram(self.instanceOfPalette);
+                    concept.getInstanceOf().forEach(function(instanceOf) {
+                        instanceOf.addNodeData(self.instanceOfPalette);
+                    });
+
+                    let viewport = diagram.viewportBounds,
+                        nodeBounds = node.getDocumentBounds(),
+                        cardWidth = self.$card.width(),
+                        cardLeft = (nodeBounds.x + nodeBounds.width/2) - cardWidth/2;
+                    cardLeft = Math.max(0, Math.min(cardLeft, viewport.width - cardWidth/2));
+                    self.$card.attr('top', '100px');
+                    self.$card.attr('left', cardLeft);
+                    self.$card.show();
+                });
+                diagram.addDiagramListener('TextEdited', function(e) {
+                    let block = e.subject, node = block.part;
+                    if(node instanceof go.Node) {
+                        console.log('text edited, node is now ' + node.getDocumentBounds().width + ' wide');
+                        let concept = Page.getConcept(node);
+                        if(concept) {
+                            let name = block.text.replace(/\s+\[\d+\]$/, '');
+                            concept.set('name', name);
+                            concept.updateNodes();
+                        }
+                    }
+                });
+                diagram.addDiagramListener('SelectionDeleted', function(e) {
+                    let it = e.subject.iterator;
+                    while(it.next()) {
+                        let part = it.value;
+                        if(part instanceof go.Node) {
+                            let concept = Page.getConcept(part);
+                            if(concept) {
+                                concept.delete();
+                            }
+                        }
+                        else if(part instanceof go.Link) {
+                            if(part.fromPortId === 'B') {
+                                let concept = Page.getConcept(part.toNode);
+                                if(concept) concept.setHead(null);
+                            } else if(part.fromPortId === 'T') {
+                                let concept = Page.getConcept(part.fromNode);
+                                if(concept) concept.setReference(null);
+                            }
+                        }
+                    }
+                });
+
+                if($div.hasClass('concept-graph')) {
+                    diagram.addChangedListener(function(e) {
+                        switch(e.change) {
+                            case go.ChangedEvent.Property:
+                                if(e.object instanceof go.Node) {
+                                    let node = e.object, concept = Page.getConcept(node);
+                                    if(concept && e.propertyName === 'position') {
+                                        if(node.data.nodeWidth !== undefined &&
+                                          node.data.nodeWidth !== node.getDocumentBounds().width) {
+                                            console.log('node ' + concept.id + ' from ' + node.data.nodeWidth +
+                                                ' to ' + node.getDocumentBounds().width);
+                                            self.updateLayout();
+                                        }
+                                    }
+                                }
+                                break;
+                        }
+                    });
+                }
+            }
+
             diagram.addDiagramListener('ObjectDoubleClicked', function(e) {
                 let node = e.subject.part;
                 if(node instanceof go.Node) {
@@ -522,55 +618,8 @@
                     self.open(concept);
                 }
             });
-            diagram.addDiagramListener('TextEdited', function(e) {
-                let block = e.subject, node = block.part;
-                if(node instanceof go.Node) {
-                    console.log('text edited, node is now ' + node.getDocumentBounds().width + ' wide');
-                    let concept = Page.getConcept(node);
-                    if(concept) {
-                        let name = block.text.replace(/\s+\[\d+\]$/, '');
-                        concept.set('name', name);
-                        concept.updateNodes();
-                    }
-                }
-            });
-            diagram.addDiagramListener('SelectionDeleted', function(e) {
-                let it = e.subject.iterator;
-                while(it.next()) {
-                    let part = it.value;
-                    if(part instanceof go.Node) {
-                        let concept = Page.getConcept(part);
-                        if(concept) {
-                            concept.delete();
-                        }
-                    }
-                    else if(part instanceof go.Link) {
-                        if(part.fromPortId === 'B') {
-                            let concept = Page.getConcept(part.toNode);
-                            if(concept) concept.setHead(null);
-                        } else if(part.fromPortId === 'T') {
-                            let concept = Page.getConcept(part.fromNode);
-                            if(concept) concept.setReference(null);
-                        }
-                    }
-                }
-            });
-            diagram.addChangedListener(function(e) {
-                switch(e.change) {
-                    case go.ChangedEvent.Property:
-                        if(e.object instanceof go.Node) {
-                            let node = e.object, concept = Page.getConcept(node);
-                            if(concept && e.propertyName === 'position') {
-                                if(node.data.nodeWidth !== undefined &&
-                                  node.data.nodeWidth !== node.getDocumentBounds().width) {
-                                    console.log('node ' + concept.id + ' from ' + node.data.nodeWidth +
-                                        ' to ' + node.getDocumentBounds().width);
-                                    self.updateLayout();
-                                }
-                            }
-                        }
-                        break;
-                }
+            diagram.addDiagramListener('ViewportBoundsChanged', function(e) {
+                diagram.position = new go.Point(-graph.viewportBounds.width/2, -50);
             });
         };
 
@@ -582,11 +631,11 @@
             if(data instanceof go.Diagram)
                 data = data.conceptExplorerId;
             return Page.explorers[data];
-        }
+        };
 
         Page.getActiveDiagram = function(e) {
             return Page.explorers[e].getActiveDiagram();
-        }
+        };
 
         Page.clearDiagram = function(diagram) {
             Page.eachNode(diagram, function(node) {
