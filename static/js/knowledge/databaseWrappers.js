@@ -568,12 +568,20 @@
             this.set('instance', concept);
         };
 
+        Concept.prototype.removeInstance = function(concept) {
+            this.set('instance', concept, false);
+        };
+
         Concept.prototype.getInstanceOf = function() {
             return Misc.toArray(this.instance_of);
         };
 
         Concept.prototype.addInstanceOf = function(concept) {
             this.set('instance_of', concept);
+        };
+
+        Concept.prototype.removeInstanceOf = function(concept) {
+            this.set('instance_of', concept, false);
         };
 
         Concept.prototype.getAncestors = function() {

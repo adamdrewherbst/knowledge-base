@@ -69,6 +69,7 @@
             });
 
             self.$card = self.$wrapper.find('.explorer-edit-concept');
+            self.$conceptEditId = self.$card.find('.explorer-edit-concept-id');
             self.$nameEdit = self.$card.find('.explorer-edit-name');
             self.$descriptionEdit = self.$card.find('.explorer-edit-description');
             self.$instanceOfEdit = self.$card.find('.explorer-edit-instance-of').attr('id', 'explorer-edit-instance-of-' + this.id);
@@ -85,6 +86,7 @@
         };
 
         Explorer.prototype.open = function(concept, mode) {
+            this.$card.hide();
             this.concept = Page.getConcept(concept);
             let preferredMode = (this.concept && this.concept.isLaw()) ? 'graph' : 'palette';
             this.setMode(mode || preferredMode);
@@ -383,7 +385,7 @@
                     // that determines where the center of the node will appear in the diagram
                     locationSpot: go.Spot.Center,
                     // this is what appears when you hover the mouse over the node
-                    toolTip:
+                    /*toolTip:
                       $$(go.Adornment, "Auto",
                         $$(go.Shape, { fill: "#EFEFCC" }),
                         $$(go.TextBlock, { margin: 4, width: 140 },
@@ -398,7 +400,7 @@
                                 }
                                 return msg;
                             }).ofObject())
-                      )
+                      )//*/
                 },
                 // the 'loc' data key is parsed into a go.Point object, and this determines the location of the node on screen;
                 // specifically, it determines the center of the node on screen, per the 'locationSpot' option above.  Also,
@@ -433,7 +435,7 @@
                         margin: 8,
                         maxSize: new go.Size(160, NaN),
                         wrap: go.TextBlock.WrapFit,
-                        editable: true
+                        editable: false
                     },
                     // we use a function to determine what text the node will display
                     new go.Binding('text', '', function(data, node) {
@@ -525,12 +527,25 @@
 
             if($div.hasClass('explorer-edit-instance-of')) {
                 diagram.addDiagramListener('ExternalObjectsDropped', function(e) {
+                    let editConcept = Page.getConcept(self.$conceptEditId.val());
+                    if(!editConcept) return;
                     let it = e.subject.iterator;
                     console.log('dropped nodes');
                     while(it.next()) {
                         let node = it.value;
                         if(!(node instanceof go.Node)) continue;
                         console.log(node.data);
+                        let concept = Page.getConcept(node);
+                        if(concept) editConcept.addInstanceOf(concept);
+                    }
+                });
+                diagram.addDiagramListener('SelectionDeleted', function(e) {
+                    let editConcept = Page.getConcept(self.$conceptEditId.val());
+                    if(!editConcept) return;
+                    let it = e.subject.iterator;
+                    while(it.next()) {
+                        let concept = Page.getConcept(it.value);
+                        if(concept) editConcept.removeInstanceOf(concept);
                     }
                 });
             } else {
@@ -538,22 +553,10 @@
                     let it = e.subject.iterator, node = null;
                     if(it.next()) node = it.value;
                     let concept = Page.getConcept(node);
-                    if(!concept) return;
-                    self.$nameEdit.val(concept.get('name') || '');
-                    self.$descriptionEdit.val(concept.get('description') || '');
-                    Page.clearDiagram(self.instanceOfPalette);
-                    concept.getInstanceOf().forEach(function(instanceOf) {
-                        instanceOf.addNodeData(self.instanceOfPalette);
-                    });
-
-                    let viewport = diagram.viewportBounds,
-                        nodeBounds = node.getDocumentBounds(),
-                        cardWidth = self.$card.width(),
-                        cardLeft = (nodeBounds.x + nodeBounds.width/2) - cardWidth/2;
-                    cardLeft = Math.max(0, Math.min(cardLeft, viewport.width - cardWidth/2));
-                    self.$card.attr('top', '100px');
-                    self.$card.attr('left', cardLeft);
-                    self.$card.show();
+                    if(!concept) {
+                        self.$card.hide();
+                        return;
+                    }
                 });
                 diagram.addDiagramListener('TextEdited', function(e) {
                     let block = e.subject, node = block.part;
@@ -608,18 +611,50 @@
                         }
                     });
                 }
+                diagram.addDiagramListener('ObjectSingleClicked', function(e) {
+                    let node = e.subject.part;
+                    if(node instanceof go.Node) {
+                        let concept = Page.getConcept(node);
+                        if(!concept) return;
+                        console.log('single click');
+                        console.log(concept);
+                        self.$conceptEditId.val('' + concept.getId());
+                        self.$nameEdit.val(concept.get('name') || '');
+                        self.$descriptionEdit.val(concept.get('description') || '');
+                        Page.clearDiagram(self.instanceOfPalette);
+                        concept.getInstanceOf().forEach(function(instanceOf) {
+                            instanceOf.addNodeData(self.instanceOfPalette);
+                        });
+
+                        let $diagram = $(diagram.div), $parent = $diagram.parents().has(self.$card).first(),
+                            diagramOffset = $diagram.offset(), parentOffset = $parent.offset();
+
+                        let viewport = diagram.viewportBounds,
+                            nodeBounds = node.getDocumentBounds(),
+                            cardWidth = self.$card.width(),
+                            x = nodeBounds.x + nodeBounds.width/2 - cardWidth/2 - viewport.x,
+                            y = nodeBounds.y + nodeBounds.height - viewport.y;
+                        x = Math.max(0, Math.min(x, viewport.width-cardWidth/2));
+                        x += diagramOffset.left - parentOffset.left;
+                        y += diagramOffset.top - parentOffset.top;
+
+                        self.$card.css('left', '' + x + 'px');
+                        self.$card.css('top', '' + y + 'px');
+                        self.$card.show();
+                    }
+                });
+                diagram.addDiagramListener('ObjectDoubleClicked', function(e) {
+                    let node = e.subject.part;
+                    if(node instanceof go.Node) {
+                        let concept = Page.getConcept(node);
+                        if(!concept) return;
+                        self.open(concept);
+                    }
+                });
             }
 
-            diagram.addDiagramListener('ObjectDoubleClicked', function(e) {
-                let node = e.subject.part;
-                if(node instanceof go.Node) {
-                    let concept = Page.getConcept(node);
-                    if(!concept) return;
-                    self.open(concept);
-                }
-            });
             diagram.addDiagramListener('ViewportBoundsChanged', function(e) {
-                diagram.position = new go.Point(-graph.viewportBounds.width/2, -50);
+                diagram.position = new go.Point(-diagram.viewportBounds.width/2, -50);
             });
         };
 

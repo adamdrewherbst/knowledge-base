@@ -151,7 +151,7 @@ def saveConcept(records, rid):
         db.concept[rid].update_record(**record)
         record['id'] = rid
     else:
-        record['id'] = db[table].insert(**record)
+        record['id'] = db.concept.insert(**record)
 
     db(db.concept_instance_of.concept == rid).delete()
     for cid in instance_of:
