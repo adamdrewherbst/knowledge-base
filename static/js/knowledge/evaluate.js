@@ -20,6 +20,69 @@
         */
 
 
+        Concept.prototype.evaluate = function() {
+            let self = this;
+
+            //find all laws whose 'top-left' predicate concept matches me
+            self.getAncestors().forEach(function(ancestor) {
+                Page.eachIndex('lawTop', ancestor.getId(), function(concept) {
+                    if(!self.instanceOf(concept)) return;
+                    let map = new Map();
+                    map.map()
+                });
+            });
+        };
+
+        Concept.prototype.evaluate = function(top) {
+            let self = this, head = self.getHead(), ref = self.getReference();
+
+            if(!top) {
+                if(head) head.evaluate();
+                if(ref) ref.evaluate();
+            }
+
+            let checked = {};
+            self.getAncestors().forEach(function(ancestor) {
+                ancestor.getInstances().forEach(function(instance) {
+
+                    // skip this concept if already checked
+                    if(checked[instance.getId()] || self.matched(instance)) return true;
+                    checked[instance.getId()] = true;
+
+                    // we want to match a concept within a law, so as to apply that law
+                    if(!instance.getLaw() || !self.instanceOf(instance)) return false;
+
+                    // make sure my parents match the concept's parents if it has any
+                    let head = self.getHead(),
+                        ref = self.getReference(),
+                        instanceHead = instance.getHeadInLaw(),
+                        instanceRef = instance.getReferenceInLaw();
+
+                    if( (!instanceHead || (head && head.matched(instanceHead)))
+                     && (!instanceRef || (ref && ref.matched(instanceRef))) )
+                    {
+                        // if it all checks out, mark this concept as a match
+                        self.addMatch(instance);
+                    }
+                });
+            });
+
+            self.getHeadOf().forEach(function(child) {
+                child.evaluate();
+            });
+        };
+
+        Concept.prototype.addMatch = function(concept) {
+            let self = this;
+            self.matches[concept.getId()] = concept;
+        };
+
+        Concept.prototype.matched = function(concept) {
+            return this.matches[concept.getId()] ? true : false;
+        };
+
+
+
         // perform the evaluation on our relation, to find out what if any laws can be applied to it
         Relation.prototype.evaluate = function(opts) {
 
@@ -68,21 +131,20 @@
         // and nodes from our relation
         function Map(law) {
             this.law = law;
-            this.relation = law.relation;
-            this.id = law.nextMapId;
+            this.id = Map.nextId++;
 
             this.idMap = {};
             this.deepPredicates = [];
             this.deepNodes = [];
-            this.valueMap = {};
             this.intersections = {};
         }
+        Map.nextId = 0;
 
         Map.prototype.toString = function() {
             let self = this, str = [];
-            self.deepPredicates.forEach(function(predicateId) {
-                let nodeId = self.idMap[predicateId];
-                str.push('' + nodeId + ' => ' + self.relation.findEntry('node', predicateId).toString());
+            self.deepPredicates.forEach(function(pid) {
+                let cid = self.idMap[pid];
+                str.push('' + cid + ' => ' + Page.getConcept(pid).toString());
             });
             return str.join(', ');
         };
@@ -91,33 +153,35 @@
         // because of the way matching is checked (see Node.prototype.updateMatches in databaseWrappers.js),
         // we also know that the node's parents match the predicate's parents, so we add those matching pairs
         // to the map recursively.
-        Map.prototype.addNode = function(node, predicate) {
+        Map.prototype.addConcept = function(concept, predicate) {
             let self = this;
-            if(!node || !predicate) return false;
+            if(!concept || !predicate) return false;
+
+            let cid = concept.getId(), pid = predicate.getId();
 
             // first see if this match has already been added to this map
-            if(self.idMap[node.id] === predicate.id && self.idMap[predicate.id] === node.id) return true;
+            if(self.idMap[cid] === pid && self.idMap[pid] === cid) return true;
 
-            console.log('adding node ' + node.id + ' to map ' + this.id + ' as ' + predicate.toString());
+            console.log('adding concept ' + cid + ' to map ' + this.id + ' as ' + predicate.toString());
 
             // mark the pair as matching
-            self.idMap[node.id] = predicate.id;
-            self.idMap[predicate.id] = node.id;
+            self.idMap[cid] = pid;
+            self.idMap[pid] = cid;
 
             // if any other maps already contain this matching pair, mark this map as intersecting
             // with those maps; later they will be checked to see if they fully intersect (see checkIntersection below)
-            if(!node.maps[predicate.id]) node.maps[predicate.id] = {};
-            for(let mapId in node.maps[predicate.id]) {
-                self.intersections[mapId] = node.maps[predicate.id][mapId];
+            if(!concept.maps[pid]) concept.maps[pid] = {};
+            for(let mapId in concept.maps[pid]) {
+                self.intersections[mapId] = concept.maps[pid][mapId];
             }
             // store in the node the match to this predicate node in this map
-            node.maps[predicate.id][self.id] = self;
+            concept.maps[pid][self.id] = self;
 
             // recursively add the matches between this node's parents and the predicate node's parents
             for(let i = 0; i < 2; i++) {
-                let nodeParent = node.getParent(i), predicateParent = predicate.getParent(i);
-                if(!predicateParent) continue;
-                if(!nodeParent || !self.addNode(nodeParent, predicateParent)) return false;
+                let parent = concept.getParent(i), predicateParent = predicate.getParent(i);
+                if(!parent || !predicateParent) continue;
+                if(!self.addConcept(parent, predicateParent)) return false;
             }
             return true;
         };
@@ -126,22 +190,15 @@
         // create a new map consisting of the union of these two maps
         Map.prototype.merge = function(other) {
             let self = this, map = new Map(self.law);
-            map.law = self.law;
-            map.predicateLaw = self.predicateLaw;
 
             for(let n in self.idMap) {
                 if(other.idMap.hasOwnProperty(n) && self.idMap[n] != other.idMap[n]) return false;
             }
+            map.idMap = Object.assign({}, self.idMap, other.idMap);
 
-            map.deepPredicates = [];
-            for(let i = 0; i < 2; i++) {
-                let currentMap = i == 0 ? self : other;
-                currentMap.deepPredicates.forEach(function(n) {
-                    if(map.deepPredicates.indexOf(n) < 0) map.deepPredicates.push(n);
-                    let node = self.relation.findEntry('node', currentMap.idMap[n]),
-                        predicate = self.relation.findEntry('node', n);
-                    map.addNode(node, predicate);
-                });
+            for(let cid in map.idMap) {
+                let concept = Page.getConcept(cid), predicate = Page.getConcept(map.idMap[cid]);
+                if(concept.getLaw() !== map.law) map.addConcept(concept, predicate);
             }
 
             // now that we've created the merged map, we don't need to re-check the intersection
@@ -170,24 +227,15 @@
             console.log('intersecting map ' + self.id + ' with ' + other.id);
             console.log('  ' + self.toString() + "\n  " + other.toString());
 
-            //make sure the two maps are for the same law, but their deep node sets are disjoint
-            if(self.predicateLaw !== other.predicateLaw) return false;
-            let disjoint = self.deepPredicates.every(function(n) {
-                    return other.deepPredicates.indexOf(n) < 0;
-                });
-            if(!disjoint) return false;
-
-            console.log('  have ' + JSON.stringify(self.deepPredicates) + ',' + JSON.stringify(other.deepPredicates)
-                + ' of ' + JSON.stringify(self.predicateLaw.predicateSets));
-
             //make sure there's no existing map that would be a duplicate of this intersection
+
             let predicates = {}, duplicates = {};
             for(let i = 0; i < 2; i++) {
                 let currentMap = i == 0 ? self : other;
                 currentMap.deepPredicates.forEach(function(n) {
-                    let node = self.relation.findEntry('node', currentMap.idMap[n]);
-                    for(let m in node.maps[n]) duplicates[m] = true;
-                    predicates[n] = node;
+                    let concept = Page.getConcept(currentMap.idMap[n]);
+                    for(let m in concept.maps[n]) duplicates[m] = true;
+                    predicates[n] = concept;
                 });
             }
             for(let d in duplicates) {
@@ -202,7 +250,7 @@
 
             //and that the joint deep node set is part of a set that satisfies the law
             let deepPredicates = self.deepPredicates.concat(other.deepPredicates), match = null;
-            let cannotCombine = self.predicateLaw.predicateSets.every(function(mset) {
+            let cannotCombine = self.law.predicateSets.every(function(mset) {
                 let isSubset = deepPredicates.every(function(n) {
                     return mset.indexOf(n) >= 0;
                 }), isMatch = false;

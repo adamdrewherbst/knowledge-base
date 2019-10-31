@@ -651,45 +651,6 @@
             });
         };
 
-        Concept.prototype.updateMatches = function() {
-            let self = this;
-
-            let checked = {};
-            self.getAncestors().forEach(function(ancestor) {
-                ancestor.getInstances().forEach(function(instance) {
-
-                    // skip this concept if already checked
-                    if(checked[instance.getId()] || self.matched(instance)) return true;
-                    checked[instance.getId()] = true;
-
-                    // make sure the concept is a predicate and I am an instance of it
-                    if(!instance.isPredicate() || !self.instanceOf(instance)) return false;
-
-                    // make sure my parents match the concept's parents if it has any
-                    let head = self.getHead(),
-                        ref = self.getReference(),
-                        instanceHead = instance.getHead(),
-                        instanceRef = instance.getReference();
-
-                    if( (!instanceHead || (head && head.matched(instanceHead)))
-                     && (!instanceRef || (ref && ref.matched(instanceRef))) )
-                    {
-                        // if it all checks out, mark this concept as a match
-                        self.addMatch(instance);
-                    }
-                });
-            });
-        };
-
-        Concept.prototype.addMatch = function(concept) {
-            let self = this;
-            self.matches[concept.getId()] = concept;
-        };
-
-        Concept.prototype.matched = function(concept) {
-            return this.matches[concept.getId()] ? true : false;
-        };
-
         Concept.prototype.getInfoString = function() {
             return '';
         };

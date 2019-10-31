@@ -45,22 +45,24 @@ def knowledge():
 #   They load and save records from the database.
 
 
-def loadConcepts():
+def load():
 
     import json, urllib
     body = request.body.read()
     body = urllib.unquote(body).decode('utf8')
     request_vars = json.loads(body)
 
-    records = {}
+    records = {'concept': {}, 'link': {}}
 
-    for entry in request_vars['records']:
-        loadConcept(entry, records)
+    loadConcept('ROOT', records)
 
-    return response.json({'concept': records})
+    return response.json(records)
 
 
-def loadConcept(data, records):
+def loadConcept(cid, records):
+
+    if cid in records['concept']:
+        return
 
     record = None
     if isinstance(data, int) or (isinstance(data, str) and isint(data)):
@@ -70,12 +72,7 @@ def loadConcept(data, records):
     else:
         record = data
 
-    rec = record.as_dict()
-
-    rec['instance_of'] = {}
-    rec['instance'] = {}
-    rec['head_of'] = {}
-    rec['reference_of'] = {}
+    records['concept'][cid] = record.as_dict()
 
     for con in db(db.concept.head == record.id).iterselect():
         loadConcept(con, records)
