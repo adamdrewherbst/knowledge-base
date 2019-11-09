@@ -35,6 +35,8 @@ def knowledge():
     #   also the 'relation' concept, which represents the root of a relation
     db['concept'].update_or_insert(id=2, name='LAW', description='a general law')
 
+    db['link'].update_or_insert(id=1, name='instance_of', description='', context=True)
+
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
     return dict()
@@ -51,10 +53,12 @@ def load():
     body = request.body.read()
     body = urllib.unquote(body).decode('utf8')
     request_vars = json.loads(body)
+    concepts = request_vars['concepts']
 
     records = {'concept': {}, 'link': {}}
 
-    loadConcept('ROOT', records)
+    loadConcept(1, records)
+    loadConcept(2, records)
 
     return response.json(records)
 
@@ -64,36 +68,25 @@ def loadConcept(cid, records):
     if cid in records['concept']:
         return
 
-    record = None
-    if isinstance(data, int) or (isinstance(data, str) and isint(data)):
-        record = db.concept(data)
-    elif isinstance(data, str):
-        record = db.concept(db.concept.name == data)
-    else:
-        record = data
-
+    record = db.concept(cid)
     records['concept'][cid] = record.as_dict()
 
-    for con in db(db.concept.head == record.id).iterselect():
-        loadConcept(con, records)
-        rec['head_of'][con.id] = True
-
-    for con in db(db.concept.reference == record.id).iterselect():
-        loadConcept(con, records)
-        rec['reference_of'][con.id] = True
-
-    for dep in db(db.concept_instance_of.concept == record.id).iterselect():
-        loadConcept(dep.instance_of, records)
-        rec['instance_of'][dep.instance_of] = True
-
-    for dep in db(db.concept_instance_of.instance_of == record.id).iterselect():
-        loadConcept(dep.concept, records)
-        rec['instance'][dep.concept] = True
-
-    records[record.id] = rec
+    for link in db(db.link.start == record.id or db.link.end == record.id).iterselect():
+        loadLink(link, records)
 
 
-def saveConcepts():
+def loadLink(link, records):
+
+    if link.id in records['link']:
+        return
+
+    records['link'][link.id] = link.as_dict()
+
+    loadConcept(link.start, records)
+    loadConcept(link.end, records)
+
+
+def save():
 
     import json, urllib
     body = request.body.read()
@@ -103,58 +96,26 @@ def saveConcepts():
 
     print('SAVING RECORDS')
 
-    for cid in records:
-        saveConcept(records, cid)
-    for cid in records:
-        del records[cid]['saved']
+    for cid in records['concept']:
+        saveRecord('concept', records['concept'][cid])
+    for lid in records['link']:
+        saveRecord('link', records['link'][lid])
 
     db.executesql('alter table concept auto_increment=1')
+    db.executesql('alter table link auto_increment=1')
 
     return response.json(records)
 
 
-def saveConcept(records, rid):
-
-    rid = str(rid)
-    if rid not in records:
-        return rid
-
-    record = records[rid]
-    record['id'] = rid
-
-    if 'saved' in record:
-        return record['id']
-
-    record['saved'] = True
+def saveRecord(table, record):
 
     if 'deleted' in record:
-        db(db.concept.id == rid).delete()
-        return rid
+        db(db[table].id == rid).delete()
 
-    #make sure the head and reference records are there first
-    if 'head' in record and isint(record['head']):
-        record['head'] = saveConcept(records, record['head'])
-    if 'reference' in record and isint(record['reference']):
-        record['reference'] = saveConcept(records, record['reference'])
-
-    instance_of = {}
-    if 'instance_of' in record:
-        instance_of = record['instance_of']
-        for cid in instance_of:
-            saveConcept(records, cid)
-        del record['instance_of']
-
-    if positive(rid):
-        db.concept[rid].update_record(**record)
-        record['id'] = rid
+    if 'id' in record:
+        db[table][record['id']].update_record(**record)
     else:
         record['id'] = db.concept.insert(**record)
-
-    db(db.concept_instance_of.concept == rid).delete()
-    for cid in instance_of:
-        db.concept_instance_of.insert(concept = rid, instance_of = cid)
-
-    return record['id']
 
 
 def isint(val):

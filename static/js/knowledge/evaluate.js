@@ -125,13 +125,8 @@
             });
         };
 
-        Concept.prototype.addMatch = function(concept) {
-            let self = this;
-            self.matches[concept.getId()] = concept;
-        };
-
         Concept.prototype.matched = function(concept) {
-            return this.matches[concept.getId()] ? true : false;
+            return this.maps[concept.getId()] ? true : false;
         };
 
 
@@ -177,7 +172,6 @@
             for(let mapId in concept.maps[pid]) {
                 self.intersections[mapId] = concept.maps[pid][mapId];
             }
-            // store in the node the match to this predicate node in this map
             concept.maps[pid][self.id] = self;
             return true;
         };

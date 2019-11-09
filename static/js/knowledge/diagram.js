@@ -87,7 +87,7 @@
 
         Explorer.prototype.open = function(concept, mode) {
             this.$card.hide();
-            this.concept = Page.getConcept(concept);
+            this.concept = Concept.get(concept);
             let preferredMode = (this.concept && this.concept.isLaw()) ? 'graph' : 'palette';
             this.setMode(mode || preferredMode);
         };
@@ -162,7 +162,7 @@
 
             Page.clearDiagram(diagram);
 
-            this.concept.getHeadOf().forEach(function(child) {
+            this.concept.getContextOf().forEach(function(child) {
                 child.addNodeData(diagram);
             });
         };
@@ -245,7 +245,7 @@
             // display information about a node when the user clicks on it, in a div to the right of the diagram
             function onSelectionChanged(e) {
                 let node = e.diagram.selection.first(),
-                    concept = Page.getConcept(node);
+                    concept = Concept.get(node);
                 if(!concept) return;
 
                 let title = document.getElementById('node-title'), description = document.getElementById('node-description');
@@ -443,7 +443,7 @@
                     }))
                 ),
                 // the port on top has an incoming link from my head node, and an outgoing link to my reference node
-                makePort("T", go.Spot.Top, true, true, 1, 1),
+                makePort("T", go.Spot.Top, true, true),
                 // port on the bottom has an outgoing arrow to nodes whose head I am,
                 // and an incoming arrow from nodes whose reference I am
                 makePort("B", go.Spot.Bottom, true, true),
@@ -738,7 +738,7 @@
         Concept.prototype.delete = function(diagram) {
             if(this.deleted) return;
             Record.prototype.delete.call(this);
-            this.getHeadOf().forEach(function(child) {
+            this.getContextOf().forEach(function(child) {
                 child.delete();
             });
             this.updateNodes();
@@ -757,8 +757,6 @@
             return {
                 id: self.id,
                 name: self.name,
-                head: self.getHeadId(),
-                reference: self.getReferenceId(),
                 isLaw: self.isLaw() ? true : false,
             };
         };
@@ -771,6 +769,9 @@
             diagram.model.addNodeData(data);
 
             if(drawLinks) {
+                self.getContext().forEach(function(concept) {
+
+                });
                 let head = self.getHead(), ref = self.getReference();
                 if(head) diagram.model.addLinkData({
                     from: head.getId(),

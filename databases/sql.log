@@ -443,3 +443,27 @@ timestamp: 2019-10-10T18:17:12.577089
 ALTER TABLE concept ADD predicate CHAR(1);
 success!
 success!
+timestamp: 2019-11-09T22:27:26.184578
+ALTER TABLE concept ADD other VARCHAR(512);
+success!
+timestamp: 2019-11-09T22:27:26.326391
+ALTER TABLE concept DROP COLUMN head;
+success!
+timestamp: 2019-11-09T22:27:26.403526
+ALTER TABLE concept DROP COLUMN reference;
+success!
+timestamp: 2019-11-09T22:27:26.457106
+ALTER TABLE concept DROP COLUMN predicate;
+success!
+timestamp: 2019-11-09T22:27:26.516125
+CREATE TABLE link(
+    id INT AUTO_INCREMENT NOT NULL,
+    name VARCHAR(512),
+    description VARCHAR(512),
+    start INT  , INDEX start__idx (start), FOREIGN KEY (start) REFERENCES concept (id) ON DELETE CASCADE,
+    end INT  , INDEX end__idx (end), FOREIGN KEY (end) REFERENCES concept (id) ON DELETE CASCADE,
+    context CHAR(1),
+    other VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!

@@ -221,8 +221,8 @@
 
         // the URLs we will need in other JavaScript files when making server calls
 
-        Page.loadConceptURL = "{{=URL('default', 'loadConcepts', extension='json')}}";
-        Page.saveConceptURL = "{{=URL('default', 'saveConcepts', extension='json')}}";
+        Page.loadURL = "{{=URL('default', 'load', extension='json')}}";
+        Page.saveURL = "{{=URL('default', 'save', extension='json')}}";
 
     </script>
 
@@ -247,13 +247,12 @@
 
         $(document).ready(function() {
 
-            Concept.setFields();
-            Concept.setBindings();
-
+            Concept.table = new Table('concept', Concept);
+            Link.table = new Table('link', Link);
             Page.tables = {
-                concept: new Table(Concept),
-            }
-            Concept.table = Page.tables.concept;
+                concept: Concept.table,
+                link: Link.table
+            };
 
             // below the diagram is the HTML5 canvas that will be used to visualize the relation
             // (the canvas is created in knowledge.html, and visualization happens in represent.js)
@@ -267,7 +266,7 @@
                 Page.saveChanges();
             });
 
-            Page.loadConcepts([1,2], function() {
+            Page.load([1, 2], function() {
                 let explorer = new Explorer();
                 explorer.open(1);
             });
