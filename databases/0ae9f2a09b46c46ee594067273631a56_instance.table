@@ -1,0 +1,58 @@
+(dp1
+S'concept'
+p2
+(dp3
+S'length'
+p4
+I512
+sS'unique'
+p5
+I00
+sS'sortable'
+p6
+I2
+sS'sql'
+p7
+S'INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE'
+p8
+sS'notnull'
+p9
+I00
+sS'type'
+p10
+S'reference concept'
+p11
+ssS'instance_of'
+p12
+(dp13
+g4
+I512
+sg5
+I00
+sg6
+I3
+sg7
+S'INT  , INDEX instance_of__idx (instance_of), FOREIGN KEY (instance_of) REFERENCES concept (id) ON DELETE CASCADE'
+p14
+sg9
+I00
+sg10
+S'reference concept'
+p15
+ssS'id'
+p16
+(dp17
+g4
+I512
+sg5
+I00
+sg6
+I1
+sg7
+S'INT AUTO_INCREMENT NOT NULL'
+p18
+sg9
+I00
+sg10
+g16
+ss.

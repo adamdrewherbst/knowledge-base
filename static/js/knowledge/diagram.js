@@ -58,8 +58,8 @@
             });
 
             self.$wrapper.find('.concept-create-button').click(function(e) {
-                let concept = Page.createConcept();
-                concept.setHead(self.concept);
+                let concept = Concept.create();
+                concept.makeContext(self.concept);
                 concept.updateNodes();
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
@@ -162,7 +162,7 @@
 
             Page.clearDiagram(diagram);
 
-            this.concept.getContextOf().forEach(function(child) {
+            this.concept.eachContextOf(function(child) {
                 child.addNodeData(diagram);
             });
         };
@@ -277,13 +277,13 @@
             });
 
             function storeLink(e) {
-                let link = e.subject, c1 = Page.getConcept(link.fromNode), c2 = Page.getConcept(link.toNode);
-                if(!c1 || !c2) return;
-                if(link.fromPortId == 'B') {
-                    c2.setHead(c1);
-                } else {
-                    c1.setReference(c2);
+                let c1 = Concept.get(e.subject.fromNode), c2 = Concept.get(e.subject.toNode);
+                if(e.parameter) {
+                    let portId = e.parameter.portId, cOld = Concept.get(e.parameter);
+                    if(portId === 'T') cOld.makeContext(c2, false);
+                    else if(portId === 'B') c1.makeContext(cOld, false);
                 }
+                if(c1 && c2) c1.makeContext(c2);
             }
             graph.addDiagramListener('LinkDrawn', storeLink);
             graph.addDiagramListener('LinkRelinked', storeLink);
@@ -738,7 +738,7 @@
         Concept.prototype.delete = function(diagram) {
             if(this.deleted) return;
             Record.prototype.delete.call(this);
-            this.getContextOf().forEach(function(child) {
+            this.eachContextOf(function(child) {
                 child.delete();
             });
             this.updateNodes();
@@ -748,6 +748,10 @@
             let node = diagram.findNodeForKey(this.getId());
             if(!node && this.oldId) node = diagram.findNodeForKey(this.oldId);
             return node;
+        };
+
+        Concept.prototype.inDiagram = function(diagram) {
+            return diagram.findNodeForKey(this.getId()) ? true : false;
         };
 
         function n(c, e) { return Page.getConcept(c).getNode(Page.getActiveDiagram(e)); }
@@ -855,51 +859,41 @@
         };
 
         Concept.prototype.layoutTree = function(diagram) {
-            this.calculateTreeWidth(diagram);
-            this.positionTree(diagram, 0, 0);
+            let map = {}, rows = [];
+            this.setGraphRow(diagram, map, rows);
+
+            rows.forEach(function(row, r) {
+                let n = row.length, y = 100 * r;
+                row.forEach(function(concept, i) {
+                    let x = 200 * (i - (n-1)/2);
+                    concept.setNodeData(diagram, 'loc', '' + x + ',' + y);
+                });
+            });
+
             diagram.updateAllTargetBindings();
         };
 
-        Concept.prototype.positionTree = function(diagram, x, y) {
-            let self = this, childTreeWidth = self.getNodeData(diagram, 'childTreeWidth');
+        Concept.prototype.setGraphRow = function(diagram, map, rows) {
+            let self = this;
+            if(!self.inDiagram(diagram)) return -1;
 
-            self.setNodeData(diagram, 'loc', '' + x + ' ' + y);
+            let row = map[self.getId()];
+            if(row > -1) return row;
 
-            let currentX = x - childTreeWidth / 2;
-
-            self.getHeadOf().forEach(function(child) {
-                let childWidth = child.getTreeWidth(diagram);
-                child.positionTree(diagram, currentX + childWidth/2, y + 100);
-                currentX += childWidth;
+            row = -1;
+            self.getContext().forEach(function(concept) {
+                let contextRow = concept.setGraphRow(diagram);
+                if(contextRow > row) row = contextRow;
             });
-        };
+            map[self.getId()] = ++row;
+            if(!rows[row]) rows[row] = [];
+            rows[row].push(self);
 
-        Concept.prototype.calculateTreeWidth = function(diagram) {
-            let self = this, node = self.getNode(diagram),
-                nodeWidth = 0, childTreeWidth = 0, treeWidth = 0;
-
-            if(node) nodeWidth = node.getDocumentBounds().width;
-
-            self.getHeadOf().forEach(function(child) {
-                childTreeWidth += child.calculateTreeWidth(diagram);
+            self.eachContextOf(function(child) {
+                child.setGraphRow(diagram);
             });
-
-            treeWidth = Math.max(nodeWidth > 0 ? nodeWidth + 30 : 0, childTreeWidth);
-
-            self.setNodeData(diagram, {
-                nodeWidth: nodeWidth,
-                childTreeWidth: childTreeWidth,
-                treeWidth: treeWidth
-            });
-
-            return treeWidth;
+            return row;
         };
-
-        Concept.prototype.getTreeWidth = function(diagram) {
-            return this.getNodeData(diagram, 'treeWidth');
-        };
-
-
 
 
 

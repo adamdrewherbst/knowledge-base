@@ -467,3 +467,67 @@ CREATE TABLE link(
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
 success!
+timestamp: 2019-11-10T21:14:17.253808
+ALTER TABLE link ADD concept INT  , ADD INDEX concept__idx (concept), ADD FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE;
+success!
+timestamp: 2019-11-10T21:14:17.385467
+ALTER TABLE link DROP COLUMN end;
+timestamp: 2019-11-10T21:16:25.720003
+ALTER TABLE link DROP COLUMN concept;
+timestamp: 2019-11-10T21:19:38.210335
+ALTER TABLE link DROP COLUMN concept;
+timestamp: 2019-11-10T21:20:51.968560
+ALTER TABLE link DROP COLUMN concept;
+success!
+timestamp: 2019-11-10T21:20:52.026551
+ALTER TABLE link DROP COLUMN description;
+timestamp: 2019-11-10T21:21:37.107881
+ALTER TABLE link DROP COLUMN description;
+success!
+timestamp: 2019-11-10T21:21:37.170734
+ALTER TABLE link DROP COLUMN other;
+timestamp: 2019-11-10T21:21:59.167889
+ALTER TABLE link DROP COLUMN name;
+success!
+timestamp: 2019-11-10T21:21:59.229290
+ALTER TABLE link DROP COLUMN other;
+success!
+timestamp: 2019-11-10T21:21:59.301596
+ALTER TABLE link DROP COLUMN context;
+timestamp: 2019-11-10T21:22:19.774156
+ALTER TABLE link DROP COLUMN context;
+success!
+timestamp: 2019-11-11T13:57:04.889131
+ALTER TABLE concept ADD predicate INT;
+success!
+timestamp: 2019-11-11T13:57:05.068802
+ALTER TABLE concept ADD group INT;
+timestamp: 2019-11-11T13:58:01.107732
+ALTER TABLE concept ADD group INT;
+timestamp: 2019-11-11T14:00:18.434664
+ALTER TABLE concept ADD group INT;
+timestamp: 2019-11-11T14:01:26.530067
+ALTER TABLE concept ADD singular CHAR(1);
+success!
+timestamp: 2019-11-11T14:01:26.681269
+ALTER TABLE concept ADD aggregator INT;
+success!
+timestamp: 2019-11-11T14:01:26.790659
+ALTER TABLE concept ADD link CHAR(1);
+success!
+timestamp: 2019-11-11T14:01:26.898465
+ALTER TABLE concept ADD type INT;
+success!
+timestamp: 2019-11-11T14:01:27.075016
+ALTER TABLE concept DROP COLUMN other;
+timestamp: 2019-11-11T14:01:59.619416
+ALTER TABLE concept DROP COLUMN other;
+success!
+timestamp: 2019-11-11T14:01:59.694712
+CREATE TABLE instance(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    instance_of INT  , INDEX instance_of__idx (instance_of), FOREIGN KEY (instance_of) REFERENCES concept (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!

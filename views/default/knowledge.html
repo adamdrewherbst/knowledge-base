@@ -248,10 +248,8 @@
         $(document).ready(function() {
 
             Concept.table = new Table('concept', Concept);
-            Link.table = new Table('link', Link);
             Page.tables = {
                 concept: Concept.table,
-                link: Link.table
             };
 
             // below the diagram is the HTML5 canvas that will be used to visualize the relation

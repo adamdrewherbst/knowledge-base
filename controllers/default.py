@@ -35,7 +35,7 @@ def knowledge():
     #   also the 'relation' concept, which represents the root of a relation
     db['concept'].update_or_insert(id=2, name='LAW', description='a general law')
 
-    db['link'].update_or_insert(id=1, name='instance_of', description='', context=True)
+    db['concept'].update_or_insert(id=3, name='is a', description='is an instance of')
 
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
@@ -74,6 +74,9 @@ def loadConcept(cid, records):
     for link in db(db.link.start == record.id or db.link.end == record.id).iterselect():
         loadLink(link, records)
 
+    for instance in db(db.instance.concept == record.id).iterselect():
+        loadInstance(instance, records)
+
 
 def loadLink(link, records):
 
@@ -86,6 +89,17 @@ def loadLink(link, records):
     loadConcept(link.end, records)
 
 
+def loadInstance(instance, records):
+
+    if instance.id in records['instance']:
+        return
+
+    records['instance'][instance.id] = instance.as_dict()
+
+    loadConcept(instance.concept, records)
+    loadConcept(instance.instance_of, records)
+
+
 def save():
 
     import json, urllib
@@ -96,13 +110,19 @@ def save():
 
     print('SAVING RECORDS')
 
+    db(db.link.id > 0).delete()
+    db(db.instance.id > 0).delete()
+    db.executesql('alter table link auto_increment=1')
+    db.executesql('alter table instance auto_increment=1')
+
     for cid in records['concept']:
         saveRecord('concept', records['concept'][cid])
     for lid in records['link']:
         saveRecord('link', records['link'][lid])
+    for iid in records['instance']:
+        saveRecord('instance', records['instance'][iid])
 
     db.executesql('alter table concept auto_increment=1')
-    db.executesql('alter table link auto_increment=1')
 
     return response.json(records)
 
@@ -115,7 +135,7 @@ def saveRecord(table, record):
     if 'id' in record:
         db[table][record['id']].update_record(**record)
     else:
-        record['id'] = db.concept.insert(**record)
+        record['id'] = db[table].insert(**record)
 
 
 def isint(val):
