@@ -405,7 +405,8 @@
         function Concept() {
             Record.prototype.constructor.call(this);
             this.context = {};
-            this.children = {};
+            this.context_of = {};
+            this.instance = {};
             this.instance_of = {};
             this.ancestors = {};
         }
@@ -433,7 +434,12 @@
             Record.prototype.set.call(this, field, value);
         };
 
+        Concept.prototype.getContext = function() {
+            return Misc.toArray(this.context);
+        };
+
         Concept.prototype.makeContext = function(concept, isContext) {
+            isContext = isContext === undefined || isContext;
             if(isContext) {
                 this.context[concept.getId()] = concept;
             } else {
@@ -450,6 +456,7 @@
         };
 
         Concept.prototype.makeContextOf = function(concept, isContextOf) {
+            isContextOf = isContextOf === undefined || isContextOf;
             if(isContextOf) {
                 this.context_of[concept.getId()] = concept;
             } else {
@@ -464,15 +471,32 @@
             return true;
         };
 
+        Concept.prototype.eachInTree = function(callback, tree) {
+            tree = tree || {};
+            let self = this;
+            if(tree[self.getId()]) return true;
+            tree[self.getId()] = self;
+            if(callback.call(self, self) === false) return false;
+            return self.eachContextOf(function(contextOf) {
+                return contextOf.eachInTree(callback, tree);
+            })
+        };
+
+        Concept.prototype.getTreeCount = function() {
+            let count = 0;
+            this.eachInTree(function() {
+                count++;
+            });
+            return count;
+        };
+
         Concept.prototype.instanceOf = function(concept) {
             concept = Concept.get(concept);
             return this.ancestors[concept.getId()] ? true : false;
         };
 
         Concept.prototype.makeInstanceOf = function(concept, isInstance) {
-            concept = Concept.get(concept);
-            isInstance = isInstance === undefined || isInstance;
-
+            isInstance = isInstance || isInstance === undefined;
             if(isInstance) {
                 this.instance_of[concept.getId()] = concept;
                 this.makeAncestor(concept, true);
@@ -493,6 +517,7 @@
         };
 
         Concept.prototype.makeAncestor = function(concept, isAncestor) {
+            isAncestor = isAncestor === undefined || isAncestor;
             let self = this;
             if(isAncestor) {
                 self.ancestor[concept.getId()] = concept;

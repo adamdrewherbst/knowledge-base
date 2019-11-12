@@ -63,9 +63,10 @@
                 concept.updateNodes();
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
-                let head = null;
-                if(self.concept) head = self.concept.getHead();
-                if(head) self.open(head);
+                if(self.concept) {
+                    let context = self.concept.getContext();
+                    if(context.length === 1) self.open(context[0]);
+                }
             });
 
             self.$card = self.$wrapper.find('.explorer-edit-concept');
@@ -336,10 +337,10 @@
               $$(go.Adornment, "Vertical",
                     makeButton("Add child",
                         function(e, obj) {
-                            let concept = Page.getConcept(obj.part.adornedPart),
-                                child = Page.createConcept();
-                            child.setHead(concept);
-                            self.drawGraph(child);
+                            let concept = Concept.get(obj.part.adornedPart),
+                                child = Concept.create();
+                            child.makeContext(concept);
+                            self.drawGraph();
                         },
                         function(o) {
                             let part = o.part.adornedPart;
@@ -347,25 +348,25 @@
                         }),
                     makeButton('Make law',
                         function(e, obj) {
-                            let concept = Page.getConcept(obj.part.adornedPart);
+                            let concept = Concept.get(obj.part.adornedPart);
                             concept.setAsLaw(true);
                         },
                         function(o) {
-                            let concept = Page.getConcept(o.part.adornedPart);
+                            let concept = Concept.get(o.part.adornedPart);
                             return concept && !concept.getLaw();
                         }),
                     makeButton('Make normal concept',
                         function(e, obj) {
-                            let concept = Page.getConcept(obj.part.adornedPart);
+                            let concept = Concept.get(obj.part.adornedPart);
                             concept.setAsLaw(false);
                         },
                         function(o) {
-                            let concept = Page.getConcept(o.part.adornedPart);
+                            let concept = Concept.get(o.part.adornedPart);
                             return concept && concept.isLaw();
                         }),
                     makeButton("Open in new Explorer",
                         function(e, obj) {
-                            let concept = Page.getConcept(obj.part.adornedPart);
+                            let concept = Concept.get(obj.part.adornedPart);
                             if(concept) self.openInNew(concept, false);
                         },
                         function(o) {
@@ -501,7 +502,7 @@
 
             // concepts in the palette will be displayed in alphabetical order
             palette.layout.comparer = function(a, b) {
-                let c1 = Page.getConcept(a), c2 = Page.getConcept(b);
+                let c1 = Concept.get(a), c2 = Concept.get(b);
                 if(c1 && c2) {
                     let n1 = c1.getName(), n2 = c2.getName();
                     if(n1 && n2) return n1.localeCompare(n2);
@@ -527,7 +528,7 @@
 
             if($div.hasClass('explorer-edit-instance-of')) {
                 diagram.addDiagramListener('ExternalObjectsDropped', function(e) {
-                    let editConcept = Page.getConcept(self.$conceptEditId.val());
+                    let editConcept = Concept.get(self.$conceptEditId.val());
                     if(!editConcept) return;
                     let it = e.subject.iterator;
                     console.log('dropped nodes');
@@ -535,16 +536,16 @@
                         let node = it.value;
                         if(!(node instanceof go.Node)) continue;
                         console.log(node.data);
-                        let concept = Page.getConcept(node);
+                        let concept = Concept.get(node);
                         if(concept) editConcept.addInstanceOf(concept);
                     }
                 });
                 diagram.addDiagramListener('SelectionDeleted', function(e) {
-                    let editConcept = Page.getConcept(self.$conceptEditId.val());
+                    let editConcept = Concept.get(self.$conceptEditId.val());
                     if(!editConcept) return;
                     let it = e.subject.iterator;
                     while(it.next()) {
-                        let concept = Page.getConcept(it.value);
+                        let concept = Concept.get(it.value);
                         if(concept) editConcept.removeInstanceOf(concept);
                     }
                 });
@@ -552,7 +553,7 @@
                 diagram.addDiagramListener('ChangedSelection', function(e) {
                     let it = e.subject.iterator, node = null;
                     if(it.next()) node = it.value;
-                    let concept = Page.getConcept(node);
+                    let concept = Concept.get(node);
                     if(!concept) {
                         self.$card.hide();
                         return;
@@ -562,7 +563,7 @@
                     let block = e.subject, node = block.part;
                     if(node instanceof go.Node) {
                         console.log('text edited, node is now ' + node.getDocumentBounds().width + ' wide');
-                        let concept = Page.getConcept(node);
+                        let concept = Concept.get(node);
                         if(concept) {
                             let name = block.text.replace(/\s+\[\d+\]$/, '');
                             concept.set('name', name);
@@ -575,17 +576,17 @@
                     while(it.next()) {
                         let part = it.value;
                         if(part instanceof go.Node) {
-                            let concept = Page.getConcept(part);
+                            let concept = Concept.get(part);
                             if(concept) {
                                 concept.delete();
                             }
                         }
                         else if(part instanceof go.Link) {
                             if(part.fromPortId === 'B') {
-                                let concept = Page.getConcept(part.toNode);
+                                let concept = Concept.get(part.toNode);
                                 if(concept) concept.setHead(null);
                             } else if(part.fromPortId === 'T') {
-                                let concept = Page.getConcept(part.fromNode);
+                                let concept = Concept.get(part.fromNode);
                                 if(concept) concept.setReference(null);
                             }
                         }
@@ -597,7 +598,7 @@
                         switch(e.change) {
                             case go.ChangedEvent.Property:
                                 if(e.object instanceof go.Node) {
-                                    let node = e.object, concept = Page.getConcept(node);
+                                    let node = e.object, concept = Concept.get(node);
                                     if(concept && e.propertyName === 'position') {
                                         if(node.data.nodeWidth !== undefined &&
                                           node.data.nodeWidth !== node.getDocumentBounds().width) {
@@ -614,7 +615,7 @@
                 diagram.addDiagramListener('ObjectSingleClicked', function(e) {
                     let node = e.subject.part;
                     if(node instanceof go.Node) {
-                        let concept = Page.getConcept(node);
+                        let concept = Concept.get(node);
                         if(!concept) return;
                         console.log('single click');
                         console.log(concept);
@@ -646,7 +647,7 @@
                 diagram.addDiagramListener('ObjectDoubleClicked', function(e) {
                     let node = e.subject.part;
                     if(node instanceof go.Node) {
-                        let concept = Page.getConcept(node);
+                        let concept = Concept.get(node);
                         if(!concept) return;
                         self.open(concept);
                     }
@@ -674,7 +675,7 @@
 
         Page.clearDiagram = function(diagram) {
             Page.eachNode(diagram, function(node) {
-                Page.getConcept(node).removeFromDiagram(diagram);
+                Concept.get(node).removeFromDiagram(diagram);
             });
             diagram.requestUpdate();
         };
@@ -754,7 +755,7 @@
             return diagram.findNodeForKey(this.getId()) ? true : false;
         };
 
-        function n(c, e) { return Page.getConcept(c).getNode(Page.getActiveDiagram(e)); }
+        function n(c, e) { return Concept.get(c).getNode(Page.getActiveDiagram(e)); }
 
         Concept.prototype.createNodeData = function() {
             let self = this;
@@ -768,30 +769,25 @@
         Concept.prototype.addNodeData = function(diagram, drawLinks) {
             let self = this;
 
-            let data = self.createNodeData();
+            let data = diagram.model.findNodeDataForKey(self.getId());
+            if(data) return data;
+
+            data = self.createNodeData();
             data.loc = '0 0';
             diagram.model.addNodeData(data);
 
             if(drawLinks) {
-                self.getContext().forEach(function(concept) {
-
-                });
-                let head = self.getHead(), ref = self.getReference();
-                if(head) diagram.model.addLinkData({
-                    from: head.getId(),
-                    to: self.id,
-                    fromPort: 'B',
-                    toPort: 'T'
-                });
-                if(ref) diagram.model.addLinkData({
-                    from: self.id,
-                    to: ref.getId(),
-                    fromPort: 'T',
-                    toPort: 'B'
+                self.eachContext(function(concept) {
+                    diagram.model.addLinkData({
+                        from: self.getId(),
+                        to: concept.getId(),
+                        fromPort: 'T',
+                        toPort: 'B'
+                    });
                 });
             }
 
-            return diagram.model.findNodeDataForKey(self.id);
+            return diagram.model.findNodeDataForKey(self.getId());
         };
 
         Concept.prototype.updateNodes = function() {
@@ -837,23 +833,15 @@
             }
         };
 
-        function nd(c, e, k) { return Page.getConcept(c).getNodeData(Page.explorers[e].getActiveDiagram(), k); }
-        function snd(c, e, k, v) { Page.getConcept(c).setNodeData(Page.explorers[e].getActiveDiagram(), k, v); }
-
-        Concept.prototype.getTreeCount = function() {
-            let self = this, count = 1;
-            self.getHeadOf().forEach(function(child) {
-                count += child.getTreeCount();
-            });
-            return count;
-        };
+        function nd(c, e, k) { return Concept.get(c).getNodeData(Page.explorers[e].getActiveDiagram(), k); }
+        function snd(c, e, k, v) { Concept.get(c).setNodeData(Page.explorers[e].getActiveDiagram(), k, v); }
 
         Concept.prototype.initTree = function(diagram) {
             let self = this;
 
             self.addNodeData(diagram, true);
 
-            self.getHeadOf().forEach(function(child) {
+            self.eachContextOf(function(child) {
                 child.initTree(diagram);
             });
         };
@@ -881,7 +869,7 @@
             if(row > -1) return row;
 
             row = -1;
-            self.getContext().forEach(function(concept) {
+            self.eachContext(function(concept) {
                 let contextRow = concept.setGraphRow(diagram);
                 if(contextRow > row) row = contextRow;
             });
