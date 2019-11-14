@@ -531,3 +531,36 @@ CREATE TABLE instance(
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
 success!
+timestamp: 2019-11-13T18:37:18.611054
+ALTER TABLE concept ADD islaw CHAR(1);
+success!
+timestamp: 2019-11-13T18:37:18.939566
+ALTER TABLE concept ADD issingular CHAR(1);
+success!
+timestamp: 2019-11-13T18:37:19.136320
+ALTER TABLE concept ADD islink CHAR(1);
+success!
+timestamp: 2019-11-13T18:37:19.280424
+ALTER TABLE concept DROP COLUMN singular;
+success!
+timestamp: 2019-11-13T18:37:19.442567
+ALTER TABLE concept DROP COLUMN link;
+success!
+timestamp: 2019-11-13T18:41:43.399216
+ALTER TABLE concept ADD is_law CHAR(1);
+success!
+timestamp: 2019-11-13T18:41:43.537453
+ALTER TABLE concept ADD is_link CHAR(1);
+success!
+timestamp: 2019-11-13T18:41:43.650431
+ALTER TABLE concept ADD is_singular CHAR(1);
+success!
+timestamp: 2019-11-13T18:41:43.793511
+ALTER TABLE concept DROP COLUMN islaw;
+success!
+timestamp: 2019-11-13T18:41:43.922316
+ALTER TABLE concept DROP COLUMN issingular;
+success!
+timestamp: 2019-11-13T18:41:44.027523
+ALTER TABLE concept DROP COLUMN islink;
+success!

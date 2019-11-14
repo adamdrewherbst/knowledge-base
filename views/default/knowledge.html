@@ -103,6 +103,7 @@
                     <div class="palette-controls explorer-controls">
                         <div class="controls-left">
                             <button class="concept-create-button btn btn-primary" type="button">New Concept</button>
+                            <button class="law-create-button btn btn-primary" type="button">New Law</button>
                             <button class="concept-level-up-button btn btn-primary" type="button">Up A Level</button>
                         </div>
                         <div class="controls-right">
@@ -247,11 +248,6 @@
 
         $(document).ready(function() {
 
-            Concept.table = new Table('concept', Concept);
-            Page.tables = {
-                concept: Concept.table,
-            };
-
             // below the diagram is the HTML5 canvas that will be used to visualize the relation
             // (the canvas is created in knowledge.html, and visualization happens in represent.js)
             let canvas = document.getElementById('visualization-canvas');
@@ -264,7 +260,7 @@
                 Page.saveChanges();
             });
 
-            Page.load([1, 2], function() {
+            Page.load(1, function() {
                 let explorer = new Explorer();
                 explorer.open(1);
             });

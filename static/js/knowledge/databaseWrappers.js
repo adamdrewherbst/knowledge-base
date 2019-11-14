@@ -174,9 +174,6 @@
         };
 
 
-        Page.getTable = function(name) {
-            return Page.tables[name];
-        };
 
         Page.load = function(data, callback) {
             let concepts = [];
@@ -215,21 +212,22 @@
             for(let id in data.instance) {
                 let instance = data.instance[id], concept = Concept.get(instance.concept),
                     instanceOf = Concept.get(instance.instance_of);
-                if(concept && instanceOf) concept.makeInstanceOf(instanceOf);
+                if(concept && instanceOf) concept.addInstanceOf(instanceOf);
             }
         };
 
         Page.saveChanges = function() {
-            let records = {concept: {}, link: [], instance: []}, lid = 0, iid = 0;
+            let records = {concept: {}, link: {}, instance: {}}, lid = 0, iid = 0;
             Concept.each(function(concept) {
                 records.concept[concept.getId()] = {
                     name: concept.name,
                     description: concept.description,
-                    link: concept.link,
-                    singular: concept.singular,
+                    is_link: concept.is_link,
+                    is_law: concept.is_law,
+                    is_singular: concept.is_singular,
                     predicate: concept.predicate,
                     aggregator: concept.aggregator,
-                    group: concept.group
+                    type: concept.type
                 };
                 concept.eachContext(function(context) {
                     records.link[lid++] = {
@@ -256,219 +254,194 @@
         };
 
 
-        function Table(name, constructor) {
-            this.name = name;
-            this.class = constructor;
-            this.records = {};
-            this.nextId = -1;
-        }
-
-        Table.prototype.getName = function() {
-            return this.name;
-        };
-
-        Table.prototype.storeRecord = function(record, id) {
-            let self = this;
-
-            if(record.deleted) {
-                self.deleteRecord(id, true);
-                return;
-            }
-            if(id != record.id) {
-                self.records[record.id] = self.records[id];
-                delete self.records[id];
-            }
-            if(!self.records[record.id]) self.records[record.id] = new self.class();
-
-            self.records[record.id].update(record);
-        };
-
-        Table.prototype.findRecord = function(info) {
-            let self = this, record = null;
-
-            if(info instanceof this.class) record = info;
-            else if(!isNaN(info)) record = self.records[info] || null;
-            else if(typeof info === 'string') {
-                for(let id in self.records) if(self.records[id].get('name') === info) {
-                    record = self.records[id];
-                    break;
-                }
-            }
-
-            return record;
-        };
-
-        Table.prototype.newRecord = function() {
-            let record = new this.class();
-            record.set('id', this.nextId--);
-            this.records[record.getId()] = record;
-            return record;
-        };
-
-        Table.prototype.eachRecord = function(callback) {
-            for(let id in this.records) {
-                callback.call(this.records[id], this.records[id], id);
-            }
-        };
-
-        Table.prototype.deleteRecord = function(id, permanent) {
-            if(permanent) {
-                delete this.records[id];
-            } else {
-
-            }
-        };
-
-
-        function Record() {
-            this.saved = {};
-        }
-
-        Record.prototype.getTable = function() {
-            return this.constructor.table;
-        };
-
-        Record.prototype.get = function(field) {
-            return this[field];
-        };
-
-        Record.prototype.getId = function() {
-            return this.id;
-        };
-
-        Record.prototype.getName = function() {
-            return this.get('name');
-        };
-
-        Record.prototype.getDescription = function() {
-            return this.get('description');
-        };
-
-        Record.prototype.set = function(field, value) {
-            this[field] = value;
-        };
-
-        Record.prototype.update = function(data) {
-            let self = this;
-            if(data.id) self.set('id', data.id);
-            for(let key in data) {
-                if(key == 'id') continue;
-                self.set(key, data[key]);
-            }
-            self.updatePage();
-        };
-
-        Record.prototype.updatePage = function() {
-            let self = this, table = self.getTable().getName();
-            Page.eachActiveDiagram(function(diagram) {
-                let part = null, newData = {
-                    id: self.getId(),
-                    name: self.get('name'),
-                    predicate: self.get('predicate')
-                };
-                switch(table) {
-                    case 'concept':
-                        part = diagram.findNodeForKey(self.getId());
-                        newData.aggregator = self.get('aggregator');
-                        break;
-                    case 'link':
-                        part = diagram.findLinkForKey(self.getId());
-                        newData.start = self.get('start');
-                        newData.end = self.get('end');
-                        break;
-                }
-                if(part && newData) {
-                    for(let k in newData)
-                        diagram.model.set(part.data, k, newData[k]);
-                    part.updateTargetBindings();
-                }
-            });
-        };
-
-        Record.prototype.delete = function() {
-            let self = this;
-            if(self.deleted) return;
-            self.deleted = true;
-            for(let field in self) {
-                let desc = self.getFieldDescription(field);
-                if(!desc.complement) continue;
-                self.saved[field] = self[field];
-                self.eachValue(field, function(val) {
-                    if(val instanceof Record)
-                        val.unset(desc.complement, self);
-                });
-            }
-            self.getTable().deleteRecord(self);
-        };
-
-
         function Concept() {
-            Record.prototype.constructor.call(this);
             this.context = {};
             this.context_of = {};
             this.instance = {};
             this.instance_of = {};
             this.ancestors = {};
+            this.saved = {};
         }
-        Concept.prototype = Object.create(Record.prototype);
-        Concept.prototype.constructor = Concept;
+        Concept.records = {};
+        Concept.nextId = -1;
+
+        Concept.references = ['instance', 'instance_of', 'context', 'context_of', 'ancestor'];
+        Concept.complements = { instance_of: 'instance', context: 'context_of', ancestor: 'instance'};
 
         Concept.get = function(data) {
-            return Concept.table.findRecord(data);
+            let record = null;
+            if(data instanceof Concept) {
+                record = data;
+            } else if(data instanceof go.GraphObject) {
+                let part = data.part ? data.part : data;
+                if(part instanceof go.Node) {
+                    let id = part.data ? part.data.id : null;
+                    if(id) record = Concept.records[id] || null;
+                }
+            } else if(!isNaN(data)) {
+                record = Concept.records[data] || null;
+            } else if(typeof data === 'string') {
+                for(let id in Concept.records) if(Concept.records[id].get('name') === data) {
+                    record = self.records[id];
+                    break;
+                }
+            }
+            return record;
         };
+
         Concept.create = function(data) {
-            return Concept.table.newRecord(data);
+            let record = new Concept();
+            record.set('id', Concept.nextId--);
+            Concept.records[record.getId()] = record;
+
+            if(typeof data === 'object') for(let key in data) {
+                Concept.set(key, data[key]);
+            }
+            return record;
         };
-        Concept.store = function(data) {
-            return Concept.table.storeRecord(data);
+
+        Concept.store = function(record, id) {
+
+            if(record.deleted) {
+                Concept.delete(id, true);
+                return;
+            }
+            if(id != record.id) {
+                Concept.records[record.id] = Concept.records[id];
+                delete Concept.records[id];
+            }
+            if(!Concept.records[record.id]) Concept.records[record.id] = new Concept();
+
+            Concept.records[record.id].update(record);
         };
+
         Concept.each = function(callback) {
-            return Concept.table.eachRecord(callback);
+            for(let id in Concept.records) {
+                if(callback.call(Concept.records[id], Concept.records[id], id) === false) return false;
+            }
+            return true;
+        };
+
+        Concept.delete = function(id, permanent) {
+            if(permanent) {
+                delete Concept.records[id];
+            } else {
+            }
         };
 
         function c(id) {
             return Concept.get(id);
         }
 
-        Concept.prototype.set = function(field, value, doSet) {
-            Record.prototype.set.call(this, field, value);
+
+        Concept.prototype.get = function(field) {
+            let value = this[field];
+            if(typeof value === 'object' && !Array.isArray(value)) return Misc.toArray(value);
+            return value;
         };
 
+        Concept.prototype.set = function(field, value, include) {
+
+            include = include === undefined || include;
+            let self = this;
+
+            if(Concept.references.includes(field)) {
+
+                let values = Array.isArray(value) ? value : [value];
+                values.forEach(function(val) {
+                    if((include && self[field][value.getId()]) || (!include && !self[field][value.getId()]))
+                        return;
+
+                    if(include) {
+                        self[field][value.getId()] = value;
+                    } else {
+                        delete self[field][value.getId()];
+                    }
+                    if(Concept.complements[field]) value.set(Concept.complements[field], self, include);
+                });
+            } else {
+                self[field] = value;
+            }
+
+            switch(field) {
+                case 'context':
+                    if(include) self.setLaw(value.getLaw());
+                    else {
+                        self.setLaw(null);
+                        self.eachContext(function(concept) {
+                            if(concept.inLaw()) {
+                                self.setLaw(concept.getLaw());
+                                return false;
+                            }
+                        });
+                    }
+                    break;
+                case 'instance_of':
+                    if(include) {
+                        self.set('ancestor', value);
+                        self.set('ancestor', value.get('ancestor'));
+                    } else {
+                        self.ancestor = {};
+                        self.eachInstanceOf(function(concept) {
+                            self.set('ancestor', concept.get('ancestor'));
+                        });
+                    }
+                    break;
+            }
+        };
+
+        Concept.prototype.each = function(field, callback) {
+            for(let id in this[field]) {
+                if(callback.call(this, this[field][id]) === false) return false;
+            }
+            return true;
+        };
+
+        Concept.prototype.update = function(data) {
+            let self = this;
+            if(data.id) self.set('id', data.id);
+            for(let key in data) {
+                if(key == 'id') continue;
+                self.set(key, data[key]);
+            }
+            self.updateNodes();
+        };
+
+        Concept.prototype.getId = function() {
+            return this.id;
+        };
+        Concept.prototype.getName = function() {
+            return this.get('name');
+        };
+        Concept.prototype.getDescription = function() {
+            return this.get('description');
+        };
         Concept.prototype.getContext = function() {
-            return Misc.toArray(this.context);
+            return this.get('context');
         };
-
-        Concept.prototype.makeContext = function(concept, isContext) {
-            isContext = isContext === undefined || isContext;
-            if(isContext) {
-                this.context[concept.getId()] = concept;
-            } else {
-                delete this.context[concept.getId()];
-            }
-            concept.makeContextOf(this, isContext);
+        Concept.prototype.addContext = function(concept) {
+            this.set('context', concept);
         };
-
+        Concept.prototype.removeContext = function(concept) {
+            this.set('context', concept, false);
+        };
         Concept.prototype.eachContext = function(callback) {
-            for(let c in this.context) {
-                if(callback.call(this, this.context[c]) === false) return false;
-            }
-            return true;
+            return this.each('context', callback);
         };
-
-        Concept.prototype.makeContextOf = function(concept, isContextOf) {
-            isContextOf = isContextOf === undefined || isContextOf;
-            if(isContextOf) {
-                this.context_of[concept.getId()] = concept;
-            } else {
-                delete this.context_of[concept.getId()];
-            }
-        };
-
         Concept.prototype.eachContextOf = function(callback) {
-            for(let c in this.context_of) {
-                if(callback.call(this, this.context_of[c]) === false) return false;
-            }
-            return true;
+            return this.each('context_of', callback);
+        };
+        Concept.prototype.addInstanceOf = function(concept) {
+            this.set('instance_of', concept);
+        };
+        Concept.prototype.removeInstanceOf = function(concept) {
+            this.set('instance_of', concept, false);
+        };
+        Concept.prototype.eachInstance = function(callback) {
+            return this.each('instance', callback);
+        };
+        Concept.prototype.eachInstanceOf = function(callback) {
+            return this.each('instance_of', callback);
         };
 
         Concept.prototype.eachInTree = function(callback, tree) {
@@ -495,81 +468,16 @@
             return this.ancestors[concept.getId()] ? true : false;
         };
 
-        Concept.prototype.makeInstanceOf = function(concept, isInstance) {
-            isInstance = isInstance || isInstance === undefined;
-            if(isInstance) {
-                this.instance_of[concept.getId()] = concept;
-                this.makeAncestor(concept, true);
-            } else {
-                delete this.instance_of[concept.getId()];
-                this.makeAncestor(concept, false);
-                for(let c in this.instance_of) {
-                    this.makeAncestor(this.instance_of[c], true);
-                }
-            }
-        };
-
-        Concept.prototype.eachInstanceOf = function(callback) {
-            for(let i in this.instance_of) {
-                if(callback.call(this, this.instance_of[i]) === false) return false;
-            }
-            return true;
-        };
-
-        Concept.prototype.makeAncestor = function(concept, isAncestor) {
-            isAncestor = isAncestor === undefined || isAncestor;
-            let self = this;
-            if(isAncestor) {
-                self.ancestor[concept.getId()] = concept;
-                concept.makeInstance(self, true);
-                concept.eachAncestor(function(ancestor) {
-                    self.ancestor[ancestor.getId()] = ancestor;
-                    ancestor.makeInstance(self, true);
-                });
-            } else {
-                delete self.ancestor[concept.getId()];
-                concept.makeInstance(self, false);
-                concept.eachAncestor(function(ancestor) {
-                    delete self.ancestor[ancestor.getId()];
-                    ancestor.makeInstance(self, false);
-                });
-            }
-        };
-
-        Concept.prototype.eachAncestor = function(callback) {
-            for(let a in this.ancestor) {
-                if(callback.call(this, this.ancestor[a]) === false) return false;
-            }
-            return true;
-        };
-
-        Concept.prototype.makeInstance = function(concept, isInstance) {
-            if(isInstance) this.instance[concept.getId()] = concept;
-            else delete this.instance[concept.getId()];
-        };
-
-        Concept.prototype.eachInstance = function(callback) {
-            for(let i in this.instance) {
-                if(callback.call(this, this.instance[i]) === false) return false;
-            }
-            return true;
-        };
-
         Concept.prototype.isLaw = function() {
-            return this.instanceOf('LAW');
-        };
-
-        Concept.prototype.makeLaw = function(doSet) {
-            this.makeInstanceOf('LAW', doSet);
+            return this.get('isLaw');
         };
 
         Concept.prototype.isPredicate = function() {
             return !isNaN(this.predicate);
         };
 
-        Concept.prototype.togglePredicate = function(include) {
-            this.predicate = include === undefined ? !this.predicate : include;
-            this.updateNodes();
+        Concept.prototype.makePredicate = function(predicate, isPredicate) {
+            this.predicate = isPredicate === undefined || isPredicate ? predicate : null;
         };
 
         Concept.prototype.getLaw = function() {
@@ -579,7 +487,7 @@
         Concept.prototype.setLaw = function(concept) {
             let self = this;
             self.set('law', concept);
-            self.getContextOf().forEach(function(child) {
+            self.eachContextOf(function(child) {
                 child.setLaw(concept);
             });
         };
@@ -592,5 +500,16 @@
             return '';
         };
 
+        Concept.prototype.delete = function() {
+            let self = this;
+            if(self.deleted) return;
+            self.deleted = true;
+            let unlink = ['instance_of', 'context'];
+            unlink.forEach(function(field) {
+                self.saved[field] = self[field];
+                self.set(field, self.get(field), false);
+            });
+            Concept.delete(self.getId());
+        };
 
 

@@ -59,7 +59,12 @@
 
             self.$wrapper.find('.concept-create-button').click(function(e) {
                 let concept = Concept.create();
-                concept.makeContext(self.concept);
+                concept.addContext(self.concept);
+                concept.updateNodes();
+            });
+            self.$wrapper.find('.law-create-button').click(function(e) {
+                let concept = Concept.create({isLaw: true});
+                concept.addContext(self.concept);
                 concept.updateNodes();
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
@@ -281,10 +286,10 @@
                 let c1 = Concept.get(e.subject.fromNode), c2 = Concept.get(e.subject.toNode);
                 if(e.parameter) {
                     let portId = e.parameter.portId, cOld = Concept.get(e.parameter);
-                    if(portId === 'T') cOld.makeContext(c2, false);
-                    else if(portId === 'B') c1.makeContext(cOld, false);
+                    if(portId === 'T') cOld.removeContext(c2);
+                    else if(portId === 'B') c1.removeContext(cOld);
                 }
-                if(c1 && c2) c1.makeContext(c2);
+                if(c1 && c2) c1.addContext(c2);
             }
             graph.addDiagramListener('LinkDrawn', storeLink);
             graph.addDiagramListener('LinkRelinked', storeLink);
@@ -339,30 +344,12 @@
                         function(e, obj) {
                             let concept = Concept.get(obj.part.adornedPart),
                                 child = Concept.create();
-                            child.makeContext(concept);
+                            child.addContext(concept);
                             self.drawGraph();
                         },
                         function(o) {
                             let part = o.part.adornedPart;
                             return !(part.diagram instanceof go.Palette);
-                        }),
-                    makeButton('Make law',
-                        function(e, obj) {
-                            let concept = Concept.get(obj.part.adornedPart);
-                            concept.setAsLaw(true);
-                        },
-                        function(o) {
-                            let concept = Concept.get(o.part.adornedPart);
-                            return concept && !concept.getLaw();
-                        }),
-                    makeButton('Make normal concept',
-                        function(e, obj) {
-                            let concept = Concept.get(obj.part.adornedPart);
-                            concept.setAsLaw(false);
-                        },
-                        function(o) {
-                            let concept = Concept.get(o.part.adornedPart);
-                            return concept && concept.isLaw();
                         }),
                     makeButton("Open in new Explorer",
                         function(e, obj) {
@@ -469,13 +456,15 @@
                   $$(go.Shape,
                     new go.Binding("stroke", "color"),
                     new go.Binding("strokeWidth", "width"),
-                    new go.Binding("strokeDashArray", "", function(data, link) {
+                    /*new go.Binding("strokeDashArray", "", function(data, link) {
                         // if this is a link from the top of a node to the bottom of another, then it is pointing
                         // from a node to its reference; to distinguish these from head links, we make them dashed lines
                         if(data.fromPort === 'T') return [4, 4];
                         else return null;
-                    })
-                ));
+                    })//*/
+                  ),
+                  $$(go.Shape, { toArrow: "standard", stroke: null })
+                );
 
             graph.model = $$(go.GraphLinksModel,
             {
@@ -848,20 +837,26 @@
 
         Concept.prototype.layoutTree = function(diagram) {
             let map = {}, rows = [];
-            this.setGraphRow(diagram, map, rows);
+            this.setGraphRow(diagram, map);
+
+            for(let id in map) {
+                let row = map[id];
+                if(!rows[row]) rows[row] = [];
+                rows[row].push(id);
+            }
 
             rows.forEach(function(row, r) {
                 let n = row.length, y = 100 * r;
-                row.forEach(function(concept, i) {
+                row.forEach(function(cid, i) {
                     let x = 200 * (i - (n-1)/2);
-                    concept.setNodeData(diagram, 'loc', '' + x + ',' + y);
+                    Concept.get(cid).setNodeData(diagram, 'loc', '' + x + ' ' + y);
                 });
             });
 
             diagram.updateAllTargetBindings();
         };
 
-        Concept.prototype.setGraphRow = function(diagram, map, rows) {
+        Concept.prototype.setGraphRow = function(diagram, map) {
             let self = this;
             if(!self.inDiagram(diagram)) return -1;
 
@@ -870,15 +865,13 @@
 
             row = -1;
             self.eachContext(function(concept) {
-                let contextRow = concept.setGraphRow(diagram);
+                let contextRow = concept.setGraphRow(diagram, map);
                 if(contextRow > row) row = contextRow;
             });
             map[self.getId()] = ++row;
-            if(!rows[row]) rows[row] = [];
-            rows[row].push(self);
 
             self.eachContextOf(function(child) {
-                child.setGraphRow(diagram);
+                child.setGraphRow(diagram, map);
             });
             return row;
         };

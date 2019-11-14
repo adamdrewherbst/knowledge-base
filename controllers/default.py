@@ -32,11 +32,6 @@ def knowledge():
     #   make sure the global ROOT concept exists; this is the root of the tree of all concepts
     db['concept'].update_or_insert(id=1, name='ROOT', description='root of the concept tree')
 
-    #   also the 'relation' concept, which represents the root of a relation
-    db['concept'].update_or_insert(id=2, name='LAW', description='a general law')
-
-    db['concept'].update_or_insert(id=3, name='is a', description='is an instance of')
-
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
     return dict()
@@ -58,7 +53,6 @@ def load():
     records = {'concept': {}, 'link': {}}
 
     loadConcept(1, records)
-    loadConcept(2, records)
 
     return response.json(records)
 
