@@ -265,8 +265,10 @@
         Concept.records = {};
         Concept.nextId = -1;
 
-        Concept.references = ['instance', 'instance_of', 'context', 'context_of', 'ancestor'];
-        Concept.complements = { instance_of: 'instance', context: 'context_of', ancestor: 'instance'};
+        Concept.references = ['instance', 'instance_of', 'context', 'context_of', 'ancestor', 'ancestor_of'];
+        Concept.getComplement = function(field) {
+            return field.indexOf('_of') ? field.substring(0, field.length-3) : field + '_of';
+        }
 
         Concept.get = function(data) {
             let record = null;
@@ -295,7 +297,7 @@
             Concept.records[record.getId()] = record;
 
             if(typeof data === 'object') for(let key in data) {
-                Concept.set(key, data[key]);
+                record.set(key, data[key]);
             }
             return record;
         };
@@ -336,13 +338,15 @@
 
         Concept.prototype.get = function(field) {
             let value = this[field];
-            if(typeof value === 'object' && !Array.isArray(value)) return Misc.toArray(value);
+            if(value && typeof value === 'object' && !Array.isArray(value))
+                return Misc.toArray(value);
             return value;
         };
 
-        Concept.prototype.set = function(field, value, include) {
+        Concept.prototype.set = function(field, value, include, postprocess) {
 
             include = include === undefined || include;
+            postprocess = postprocess === undefined || postprocess;
             let self = this;
 
             if(Concept.references.includes(field)) {
@@ -357,13 +361,15 @@
                     } else {
                         delete self[field][value.getId()];
                     }
-                    if(Concept.complements[field]) value.set(Concept.complements[field], self, include);
+                    if(postprocess) value.set(Concept.getComplement(field), self, include);
                 });
             } else {
-                self[field] = value;
+                if(include) {
+                    self[field] = value;
+                }
             }
 
-            switch(field) {
+            if(postprocess) switch(field) {
                 case 'context':
                     if(include) self.setLaw(value.getLaw());
                     else {
@@ -383,9 +389,15 @@
                     } else {
                         self.ancestor = {};
                         self.eachInstanceOf(function(concept) {
+                            self.set('ancestor', concept);
                             self.set('ancestor', concept.get('ancestor'));
                         });
                     }
+                    break;
+                case 'name':
+                case 'is_law':
+                case 'is_link':
+                    self.updateNodes();
                     break;
             }
         };
@@ -443,6 +455,12 @@
         Concept.prototype.eachInstanceOf = function(callback) {
             return this.each('instance_of', callback);
         };
+        Concept.prototype.eachAncestor = function(callback) {
+            return this.each('ancestor', callback);
+        };
+        Concept.prototype.eachAncestorOf = function(callback) {
+            return this.each('ancestor_of', callback);
+        };
 
         Concept.prototype.eachInTree = function(callback, tree) {
             tree = tree || {};
@@ -469,7 +487,11 @@
         };
 
         Concept.prototype.isLaw = function() {
-            return this.get('isLaw');
+            return this.get('is_law');
+        };
+
+        Concept.prototype.isLink = function() {
+            return this.get('is_link');
         };
 
         Concept.prototype.isPredicate = function() {
@@ -501,14 +523,25 @@
         };
 
         Concept.prototype.delete = function() {
+
             let self = this;
             if(self.deleted) return;
             self.deleted = true;
-            let unlink = ['instance_of', 'context'];
-            unlink.forEach(function(field) {
+
+            Concept.references.forEach(function(field) {
                 self.saved[field] = self[field];
-                self.set(field, self.get(field), false);
+                for(let id in self[field]) {
+                    self[field][id].set(Concept.getComplement(field), self, false, false);
+                }
+                self[field] = {};
             });
+
+            self.eachContextOf(function(child) {
+                if(child.getContext().length === 0) {
+                    child.delete();
+                }
+            });
+
             Concept.delete(self.getId());
         };
 

@@ -63,7 +63,7 @@
                 concept.updateNodes();
             });
             self.$wrapper.find('.law-create-button').click(function(e) {
-                let concept = Concept.create({isLaw: true});
+                let concept = Concept.create({is_law: true});
                 concept.addContext(self.concept);
                 concept.updateNodes();
             });
@@ -74,12 +74,19 @@
                 }
             });
 
+            self.editConcept = null;
             self.$card = self.$wrapper.find('.explorer-edit-concept');
-            self.$conceptEditId = self.$card.find('.explorer-edit-concept-id');
             self.$nameEdit = self.$card.find('.explorer-edit-name');
             self.$descriptionEdit = self.$card.find('.explorer-edit-description');
             self.$instanceOfEdit = self.$card.find('.explorer-edit-instance-of').attr('id', 'explorer-edit-instance-of-' + this.id);
             self.instanceOfPalette = self.makePalette(self.$instanceOfEdit);
+
+            self.$nameEdit.change(function(e) {
+                self.editConcept.set('name', self.$nameEdit.val());
+            });
+            self.$descriptionEdit.change(function(e) {
+                self.editConcept.set('name', self.$descriptionEdit.val());
+            });
 
             Page.addExplorer(self);
         }
@@ -410,9 +417,10 @@
                         cursor: "pointer",
                         strokeWidth: 2,
                     },
-                    new go.Binding('fill', 'isLaw', function(isLaw) {
-                        if(isLaw) return 'yellow';
-                        else return Page.nodeTemplates['default'].fill;
+                    new go.Binding('fill', '', function(data, node) {
+                        if(data.isLaw) return '#cccc33';
+                        else if(data.isLink) return '#cc33cc';
+                        else return '#6c6';
                     }),
                     new go.Binding("figure")),
 
@@ -427,7 +435,7 @@
                     },
                     // we use a function to determine what text the node will display
                     new go.Binding('text', '', function(data, node) {
-                        return data.name + ' [' + data.id + ']';
+                        return (data.name || '...') + ' [' + data.id + ']';
                     }))
                 ),
                 // the port on top has an incoming link from my head node, and an outgoing link to my reference node
@@ -517,8 +525,7 @@
 
             if($div.hasClass('explorer-edit-instance-of')) {
                 diagram.addDiagramListener('ExternalObjectsDropped', function(e) {
-                    let editConcept = Concept.get(self.$conceptEditId.val());
-                    if(!editConcept) return;
+                    if(!self.editConcept) return;
                     let it = e.subject.iterator;
                     console.log('dropped nodes');
                     while(it.next()) {
@@ -526,16 +533,15 @@
                         if(!(node instanceof go.Node)) continue;
                         console.log(node.data);
                         let concept = Concept.get(node);
-                        if(concept) editConcept.addInstanceOf(concept);
+                        if(concept) self.editConcept.addInstanceOf(concept);
                     }
                 });
                 diagram.addDiagramListener('SelectionDeleted', function(e) {
-                    let editConcept = Concept.get(self.$conceptEditId.val());
-                    if(!editConcept) return;
+                    if(!self.editConcept) return;
                     let it = e.subject.iterator;
                     while(it.next()) {
                         let concept = Concept.get(it.value);
-                        if(concept) editConcept.removeInstanceOf(concept);
+                        if(concept) self.editConcept.removeInstanceOf(concept);
                     }
                 });
             } else {
@@ -583,7 +589,7 @@
                 });
 
                 if($div.hasClass('concept-graph')) {
-                    diagram.addChangedListener(function(e) {
+                    /*diagram.addChangedListener(function(e) {
                         switch(e.change) {
                             case go.ChangedEvent.Property:
                                 if(e.object instanceof go.Node) {
@@ -599,20 +605,18 @@
                                 }
                                 break;
                         }
-                    });
+                    });//*/
                 }
                 diagram.addDiagramListener('ObjectSingleClicked', function(e) {
                     let node = e.subject.part;
                     if(node instanceof go.Node) {
                         let concept = Concept.get(node);
                         if(!concept) return;
-                        console.log('single click');
-                        console.log(concept);
-                        self.$conceptEditId.val('' + concept.getId());
+                        self.editConcept = concept;
                         self.$nameEdit.val(concept.get('name') || '');
                         self.$descriptionEdit.val(concept.get('description') || '');
                         Page.clearDiagram(self.instanceOfPalette);
-                        concept.getInstanceOf().forEach(function(instanceOf) {
+                        concept.eachInstanceOf(function(instanceOf) {
                             instanceOf.addNodeData(self.instanceOfPalette);
                         });
 
@@ -725,15 +729,6 @@
             }
         };
 
-        Concept.prototype.delete = function(diagram) {
-            if(this.deleted) return;
-            Record.prototype.delete.call(this);
-            this.eachContextOf(function(child) {
-                child.delete();
-            });
-            this.updateNodes();
-        };
-
         Concept.prototype.getNode = function(diagram) {
             let node = diagram.findNodeForKey(this.getId());
             if(!node && this.oldId) node = diagram.findNodeForKey(this.oldId);
@@ -752,6 +747,7 @@
                 id: self.id,
                 name: self.name,
                 isLaw: self.isLaw() ? true : false,
+                isLink: self.isLink() ? true : false
             };
         };
 

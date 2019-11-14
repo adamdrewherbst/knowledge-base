@@ -50,7 +50,7 @@ def load():
     request_vars = json.loads(body)
     concepts = request_vars['concepts']
 
-    records = {'concept': {}, 'link': {}}
+    records = {'concept': {}, 'link': {}, 'instance': {}}
 
     loadConcept(1, records)
 
