@@ -64,11 +64,14 @@ def loadConcept(cid, records):
 
     record = db.concept(cid)
     records['concept'][cid] = record.as_dict()
+    print('loading concept {}'.format(str(record.id)))
 
-    for link in db(db.link.start == record.id or db.link.end == record.id).iterselect():
+    for link in db((db.link.start == record.id) | (db.link.end == record.id)).iterselect():
+        print('loading link {}'.format(str(link.id)))
         loadLink(link, records)
 
     for instance in db(db.instance.concept == record.id).iterselect():
+        print('loading instance {}'.format(str(instance.id)))
         loadInstance(instance, records)
 
 
@@ -103,6 +106,7 @@ def save():
     records = request_vars['records']
 
     print('SAVING RECORDS')
+    print('{}'.format(records))
 
     db(db.link.id > 0).delete()
     db(db.instance.id > 0).delete()
@@ -134,9 +138,8 @@ def save():
 def saveRecord(table, record):
 
     if 'deleted' in record:
-        db(db[table].id == rid).delete()
-
-    if 'id' in record:
+        db(db[table].id == record['id']).delete()
+    elif 'id' in record:
         db[table][record['id']].update_record(**record)
     else:
         record['id'] = db[table].insert(**record)

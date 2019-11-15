@@ -219,29 +219,34 @@
         Page.saveChanges = function() {
             let records = {concept: {}, link: {}, instance: {}}, lid = 0, iid = 0;
             Concept.each(function(concept, id) {
-                records.concept[id] = {
-                    name: concept.name,
-                    description: concept.description,
-                    is_link: concept.is_link,
-                    is_law: concept.is_law,
-                    is_singular: concept.is_singular,
-                    predicate: concept.predicate,
-                    aggregator: concept.aggregator,
-                    type: concept.type
-                };
-                if(id > 0) records.concept[id].id = id;
-                concept.eachContext(function(context) {
-                    records.link[lid++] = {
-                        start: id,
-                        end: context.getId()
+                if(concept.deleted) {
+                    if(id > 0)
+                        records.concept[id] = { id: id, deleted: true };
+                } else {
+                    records.concept[id] = {
+                        name: concept.name,
+                        description: concept.description,
+                        is_link: concept.is_link,
+                        is_law: concept.is_law,
+                        is_singular: concept.is_singular,
+                        predicate: concept.predicate,
+                        aggregator: concept.aggregator,
+                        type: concept.type
                     };
-                });
-                concept.eachInstanceOf(function(instanceOf) {
-                    records.instance[iid++] = {
-                        concept: id,
-                        instance_of: instanceOf.getId()
-                    };
-                });
+                    if(id > 0) records.concept[id].id = id;
+                    concept.eachContext(function(context) {
+                        records.link[lid++] = {
+                            start: id,
+                            end: context.getId()
+                        };
+                    });
+                    concept.eachInstanceOf(function(instanceOf) {
+                        records.instance[iid++] = {
+                            concept: id,
+                            instance_of: instanceOf.getId()
+                        };
+                    });
+                }
             });
             $.ajax({
                 url: Page.saveURL,
@@ -465,6 +470,16 @@
             return this.each('ancestor_of', callback);
         };
 
+        Concept.prototype.has = function(field, concept) {
+            let self = this;
+            return !self.each(field, function(val) {
+                return val !== concept;
+            });
+        };
+        Concept.prototype.hasContext = function(concept) {
+            return this.has('context', concept);
+        };
+
         Concept.prototype.eachInTree = function(callback, tree) {
             tree = tree || {};
             let self = this;
@@ -503,6 +518,10 @@
 
         Concept.prototype.makePredicate = function(predicate, isPredicate) {
             this.predicate = isPredicate === undefined || isPredicate ? predicate : null;
+        };
+
+        Concept.prototype.inLaw = function() {
+            return this.get('law') ? true : false;
         };
 
         Concept.prototype.getLaw = function() {

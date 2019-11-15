@@ -98,6 +98,10 @@
             return this.id;
         };
 
+        Explorer.prototype.getConcept = function() {
+            return this.concept;
+        };
+
         Explorer.prototype.open = function(concept, mode) {
             this.$card.hide();
             this.concept = Concept.get(concept);
@@ -134,6 +138,10 @@
             let $buttons = this.$wrapper.find('.explorer-close-button');
             if(show) $buttons.show();
             else $buttons.hide();
+        };
+
+        Explorer.prototype.getMode = function() {
+            return this.mode;
         };
 
         Explorer.prototype.setMode = function(mode) {
@@ -345,7 +353,7 @@
 
 
             // here is the template that is used as the context menu for each node
-            let partContextMenu =
+            let nodeContextMenu =
               $$(go.Adornment, "Vertical",
                     makeButton("Add child",
                         function(e, obj) {
@@ -445,7 +453,7 @@
                 makePort("B", go.Spot.Bottom, true, true),
                 // handle mouse enter/leave events to show/hide the ports
                 {
-                    contextMenu: partContextMenu,
+                    contextMenu: nodeContextMenu,
                     mouseEnter: function(e, node) { showSmallPorts(node, true); },
                     mouseLeave: function(e, node) { showSmallPorts(node, false); },
                     mouseDrop: function(e, node) {
@@ -457,6 +465,25 @@
                     }
                 }
             );
+
+            let linkContextMenu =
+              $$(go.Adornment, "Vertical",
+                    makeButton("Make this link a concept",
+                        function(e, obj) {
+                            let link = obj.part.adornedPart;
+                            if(!(link instanceof go.Link)) return;
+                            let c1 = Concept.get(link.fromPort), c2 = Concept.get(link.toPort),
+                                linkConcept = Concept.create({ is_link: true });
+                            c1.removeContext(c2);
+                            linkConcept.addContext(c2);
+                            c1.addContext(linkConcept);
+                            self.drawGraph();
+                        },
+                        function(o) {
+                            let part = o.part.adornedPart;
+                            return !(part.diagram instanceof go.Palette);
+                        }),
+              );
 
             // GoJS also needs a template to specify how links between nodes will appear
             graph.linkTemplate =
@@ -471,7 +498,10 @@
                         else return null;
                     })//*/
                   ),
-                  $$(go.Shape, { toArrow: "standard", stroke: null })
+                  $$(go.Shape, { toArrow: "standard", stroke: null }),
+                  {
+                      contextMenu: linkContextMenu
+                  }
                 );
 
             graph.model = $$(go.GraphLinksModel,
@@ -777,20 +807,20 @@
 
         Concept.prototype.updateNodes = function() {
             let self = this;
-            Page.eachActiveDiagram(function(d, e) {
+            Page.eachExplorer(function(explorer, e) {
                 console.log('concept ' + self.id + ' updating explorer ' + e);
-                self.updateNode(d, !(d instanceof go.Palette));
+                self.updateNode(explorer);
             });
         };
 
-        Concept.prototype.updateNode = function(diagram, drawLinks) {
-            let self = this;
-            if(self.deleted) {
+        Concept.prototype.updateNode = function(explorer) {
+            let self = this, diagram = explorer.getActiveDiagram(), mode = explorer.getMode();
+            if(self.deleted || (mode === 'palette' && !self.hasContext(explorer.getConcept()))) {
                 self.removeFromDiagram(diagram);
                 return;
             }
             let data = self.getNodeData(diagram);
-            if(!data) data = self.addNodeData(diagram, drawLinks);
+            if(!data) data = self.addNodeData(diagram, mode === 'graph');
             let newData = self.createNodeData();
             for(let k in newData) diagram.model.set(data, k, newData[k]);
 
