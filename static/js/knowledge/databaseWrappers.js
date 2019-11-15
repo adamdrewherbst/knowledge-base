@@ -218,8 +218,8 @@
 
         Page.saveChanges = function() {
             let records = {concept: {}, link: {}, instance: {}}, lid = 0, iid = 0;
-            Concept.each(function(concept) {
-                records.concept[concept.getId()] = {
+            Concept.each(function(concept, id) {
+                records.concept[id] = {
                     name: concept.name,
                     description: concept.description,
                     is_link: concept.is_link,
@@ -229,15 +229,16 @@
                     aggregator: concept.aggregator,
                     type: concept.type
                 };
+                if(id > 0) records.concept[id].id = id;
                 concept.eachContext(function(context) {
                     records.link[lid++] = {
-                        start: concept.getId(),
+                        start: id,
                         end: context.getId()
                     };
                 });
                 concept.eachInstanceOf(function(instanceOf) {
                     records.instance[iid++] = {
-                        concept: concept.getId(),
+                        concept: id,
                         instance_of: instanceOf.getId()
                     };
                 });
@@ -267,7 +268,7 @@
 
         Concept.references = ['instance', 'instance_of', 'context', 'context_of', 'ancestor', 'ancestor_of'];
         Concept.getComplement = function(field) {
-            return field.indexOf('_of') ? field.substring(0, field.length-3) : field + '_of';
+            return field.indexOf('_of') >= 0 ? field.substring(0, field.length-3) : field + '_of';
         }
 
         Concept.get = function(data) {
@@ -309,6 +310,7 @@
                 return;
             }
             if(id != record.id) {
+                Concept.records[id].oldId = id;
                 Concept.records[record.id] = Concept.records[id];
                 delete Concept.records[id];
             }
@@ -353,15 +355,15 @@
 
                 let values = Array.isArray(value) ? value : [value];
                 values.forEach(function(val) {
-                    if((include && self[field][value.getId()]) || (!include && !self[field][value.getId()]))
+                    if((include && self[field][val.getId()]) || (!include && !self[field][val.getId()]))
                         return;
 
                     if(include) {
-                        self[field][value.getId()] = value;
+                        self[field][val.getId()] = val;
                     } else {
-                        delete self[field][value.getId()];
+                        delete self[field][val.getId()];
                     }
-                    if(postprocess) value.set(Concept.getComplement(field), self, include);
+                    if(postprocess) val.set(Concept.getComplement(field), self, include);
                 });
             } else {
                 if(include) {
@@ -417,6 +419,7 @@
                 self.set(key, data[key]);
             }
             self.updateNodes();
+            delete this.oldId;
         };
 
         Concept.prototype.getId = function() {

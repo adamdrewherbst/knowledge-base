@@ -352,7 +352,7 @@
                             let concept = Concept.get(obj.part.adornedPart),
                                 child = Concept.create();
                             child.addContext(concept);
-                            self.drawGraph();
+                            child.updateNodes();
                         },
                         function(o) {
                             let part = o.part.adornedPart;

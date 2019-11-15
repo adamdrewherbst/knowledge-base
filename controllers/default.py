@@ -112,8 +112,18 @@ def save():
     for cid in records['concept']:
         saveRecord('concept', records['concept'][cid])
     for lid in records['link']:
-        saveRecord('link', records['link'][lid])
+        link = records['link'][lid]
+        if link['start'] in records['concept']:
+            link['start'] = records['concept'][link['start']]['id']
+        if link['end'] in records['concept']:
+            link['end'] = records['concept'][link['end']]['id']
+        saveRecord('link', link)
     for iid in records['instance']:
+        instance = records['instance'][iid]
+        if instance['concept'] in records['concept']:
+            instance['concept'] = records['concept'][instance['concept']]['id']
+        if instance['instance_of'] in records['concept']:
+            instance['instance_of'] = records['concept'][instance['instance_of']]['id']
         saveRecord('instance', records['instance'][iid])
 
     db.executesql('alter table concept auto_increment=1')
