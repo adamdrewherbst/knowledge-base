@@ -32,6 +32,8 @@ def knowledge():
     #   make sure the global ROOT concept exists; this is the root of the tree of all concepts
     db['concept'].update_or_insert(id=1, name='ROOT', description='root of the concept tree')
 
+    db['concept'].update_or_insert(id=2, name='is a', description='is an instance of')
+
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
     return dict()
@@ -50,9 +52,10 @@ def load():
     request_vars = json.loads(body)
     concepts = request_vars['concepts']
 
-    records = {'concept': {}, 'link': {}, 'instance': {}}
+    records = {'concept': {}, 'link': {}}
 
     loadConcept(1, records)
+    loadConcept(2, records)
 
     return response.json(records)
 
@@ -64,15 +67,9 @@ def loadConcept(cid, records):
 
     record = db.concept(cid)
     records['concept'][cid] = record.as_dict()
-    print('loading concept {}'.format(str(record.id)))
 
     for link in db((db.link.start == record.id) | (db.link.end == record.id)).iterselect():
-        print('loading link {}'.format(str(link.id)))
         loadLink(link, records)
-
-    for instance in db(db.instance.concept == record.id).iterselect():
-        print('loading instance {}'.format(str(instance.id)))
-        loadInstance(instance, records)
 
 
 def loadLink(link, records):
@@ -84,17 +81,8 @@ def loadLink(link, records):
 
     loadConcept(link.start, records)
     loadConcept(link.end, records)
-
-
-def loadInstance(instance, records):
-
-    if instance.id in records['instance']:
-        return
-
-    records['instance'][instance.id] = instance.as_dict()
-
-    loadConcept(instance.concept, records)
-    loadConcept(instance.instance_of, records)
+    if link.concept is not None:
+        loadConcept(link.concept, records)
 
 
 def save():
@@ -108,29 +96,17 @@ def save():
     print('SAVING RECORDS')
     print('{}'.format(records))
 
-    db(db.link.id > 0).delete()
-    db(db.instance.id > 0).delete()
-    db.executesql('alter table link auto_increment=1')
-    db.executesql('alter table instance auto_increment=1')
-
     for cid in records['concept']:
         saveRecord('concept', records['concept'][cid])
     for lid in records['link']:
         link = records['link'][lid]
-        if link['start'] in records['concept']:
-            link['start'] = records['concept'][link['start']]['id']
-        if link['end'] in records['concept']:
-            link['end'] = records['concept'][link['end']]['id']
+        for field in link:
+            if link[field] in records['concept']:
+                link[field] = records['concept'][link[field]]['id']
         saveRecord('link', link)
-    for iid in records['instance']:
-        instance = records['instance'][iid]
-        if instance['concept'] in records['concept']:
-            instance['concept'] = records['concept'][instance['concept']]['id']
-        if instance['instance_of'] in records['concept']:
-            instance['instance_of'] = records['concept'][instance['instance_of']]['id']
-        saveRecord('instance', records['instance'][iid])
 
     db.executesql('alter table concept auto_increment=1')
+    db.executesql('alter table link auto_increment=1')
 
     return response.json(records)
 

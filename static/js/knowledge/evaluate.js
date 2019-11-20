@@ -20,66 +20,51 @@
         */
 
 
-        Concept.prototype.evaluate = function(top) {
-            let self = this, top = top || this;
+        Node.prototype.evaluate = function() {
+            let self = this;
             if(self.evaluated) return;
 
-            if(self !== top) {
-                self.eachContext(function(context) {
-                    context.evaluate(top);
-                });
-            }
+            // take the set of nodes R that are 'in' this concept
+            let R = self.getSubgraph();
 
-            //create a new map for each top-level law concept I match
-            self.eachInstanceOf(function(concept) {
-                concept.eachLawTop(function(instance) {
-                    if(self.instanceOf(instance)) {
-                        new Map().map(self, instance);
-                    }
-                });
-            });
+            // for each node and link of the subgraph
+            R.eachTopNode(function(part) {
+                let node = null;
+                if(part instanceof Node) node = part;
+                else if(part instanceof Link) node = R.getNode(part.getConcept());
 
-            // for every map my context concepts are part of,
-            // see if I can be added to that map
-            let newMaps = [];
-            self.eachContext(function(context) {
-                context.eachMap(function(map) {
-                    map.getMatch(context).eachContextOf(function(contextOf) {
-                        if(self.instanceOf(contextOf)) {
-                            let newMap = map.clone();
-                            newMap.map(self, contextOf);
-                            newMap.register();
-                            newMaps.push(newMap);
-                        }
-                    });
-                });
-            });
-            //then see if any of those maps can be combined with each other
-            while(newMaps.length > 0) {
-                let m1 = newMaps.pop();
-                newMaps.forEach(function(m2) {
-                    let merge = m1.clone().merge(m2);
-                    if(merge) {
-                        merge.register();
-                        newMaps.push(merge);
-                    }
-                });
-            }
-            self.evaluated = true;
+                // take every law predicate C is 'in'
+                node.eachOutLink('in', 'predicate', function(link, predicate) {
+                    // take the set P of nodes 'in' that predicate
+                    let P = predicate.getSubgraph();
 
-            self.eachContextOf(function(contextOf) {
-                contextOf.evaluate(top);
+                    // look for all matches to P within R
+                    let map = new Map();
+                    map.map(node, node);
+                    map.extend(node);
+                });
             });
         };
 
-        Concept.prototype.addMap = function(map) {
-            this.maps[map.getId()] = map;
+        Node.prototype.getSubgraph = function() {
+            let self = this, graph = new Graph();
+            self.eachInLink('in', function(link, node) {
+                let newNode = graph.addNode({
+                    concept: node.getConcept(),
+                    from: node
+                });
+                node.eachLink(function(link, neighbor) {
+                    let newNeighbor = graph.from(neighbor);
+                    if(newNeighbor) {
+                        newNode.addLink(link.getDirection(), link.getConcept(), newNeighbor);
+                    }
+                });
+            });
         };
 
 
         function Map() {
-            this.idMap = {};
-            this.from = {};
+            this.map = {};
         }
         Map.nextId = 1;
 
@@ -87,40 +72,39 @@
             return this.id;
         };
 
-        Map.prototype.register = function() {
-            let self = this;
-            self.id = Map.nextId++;
-            self.eachPair(function(concept, predicate) {
-                concept.addMap(self);
-            });
-        };
-
-        Map.prototype.map = function(concept, predicate) {
-            let self = this;
-            if(!concept || !predicate) return false;
-
-            let cid = concept.getId(), pid = predicate.getId();
+        Map.prototype.map = function(node, predicateNode) {
+            let self = this, nid = node.getId(), pid = predicateNode.getId();
 
             // make sure this concept hasn't already been matched to a different predicate
-            if(self.idMap.hasOwnProperty(cid) && self.idMap[cid] !== pid) return false;
+            if(self.idMap.hasOwnProperty(nid) && self.idMap[nid] !== pid) return false;
 
             // see if this match has already been added to this map
-            if(self.idMap[cid] === pid && self.idMap[pid] === cid) return true;
+            if(self.idMap[nid] === pid && self.idMap[pid] === nid) return true;
 
             // mark the pair as matching
-            self.idMap[cid] = pid;
+            self.map[nid] = pid;
             return true;
         };
 
-        Map.prototype.getMatch = function(concept) {
-            return Concept.get(this.idMap[concept.getId()]);
+        Map.prototype.getMatch = function(node) {
+            return this.map[node.getId()];
         };
 
-        Map.prototype.merge = function(other) {
-            let self = this;
-            if(self.from[other.getId()]) return false;
-            return other.eachPair(function(concept, predicate) {
-                return self.map(concept, predicate);
+        Map.prototype.extend = function(predicateNode) {
+            let self = this, node = self.getMatch(predicateNode);
+
+            // for each neighbor in the predicate graph
+            predicateNode.eachLink(function(pLink, pNeighbor) {
+                if(self.getMatch(pNeighbor)) return true;
+
+                // try all ways of adding a relation node that matches that neighbor
+                node.eachLink(function(link, neighbor) {
+                    if(link.getConcept() === pLink.getConcept()) {
+                        let newMap = self.clone();
+                        newMap.map(neighbor, pNeighbor);
+                        newMap.extend(pNeighbor);
+                    }
+                });
             });
         };
 
