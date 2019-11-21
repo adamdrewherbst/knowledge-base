@@ -24,47 +24,32 @@
             let self = this;
             if(self.evaluated) return;
 
-            // take the set of nodes R that are 'in' this concept
-            let R = self.getSubgraph();
+            // identify the top context nodes of this relation
+            let R = self.getInLinks('in').get('start');
+            let top = R.getTopNodes();
 
-            // for each node and link of the subgraph
-            R.eachTopNode(function(part) {
-                let node = null;
-                if(part instanceof Node) node = part;
-                else if(part instanceof Link) node = R.getNode(part.getConcept());
+            // for each such top node C
+            top.each(function(node) {
 
                 // take every law predicate C is 'in'
                 node.eachOutLink('in', 'predicate', function(link, predicate) {
-                    // take the set P of nodes 'in' that predicate
-                    let P = predicate.getSubgraph();
+
+                    // take the set P of nodes and links 'in' that predicate
+                    let P = predicate.getInLinks('in').get('start');
 
                     // look for all matches to P within R
-                    let map = new Map();
+                    let map = new Map(predicate);
                     map.map(node, node);
-                    map.extend(node);
-                });
-            });
-        };
-
-        Node.prototype.getSubgraph = function() {
-            let self = this, graph = new Graph();
-            self.eachInLink('in', function(link, node) {
-                let newNode = graph.addNode({
-                    concept: node.getConcept(),
-                    from: node
-                });
-                node.eachLink(function(link, neighbor) {
-                    let newNeighbor = graph.from(neighbor);
-                    if(newNeighbor) {
-                        newNode.addLink(link.getDirection(), link.getConcept(), newNeighbor);
-                    }
+                    map.extend();
                 });
             });
         };
 
 
-        function Map() {
+        function Map(predicate) {
+            this.predicate = predicate;
             this.map = {};
+            this.queue = [];
         }
         Map.nextId = 1;
 
@@ -72,40 +57,52 @@
             return this.id;
         };
 
-        Map.prototype.map = function(node, predicateNode) {
-            let self = this, nid = node.getId(), pid = predicateNode.getId();
+        Map.prototype.map = function(part, predicatePart) {
+            let self = this, id = part.getId(), pid = predicatePart.getId();
 
             // make sure this concept hasn't already been matched to a different predicate
-            if(self.idMap.hasOwnProperty(nid) && self.idMap[nid] !== pid) return false;
+            if(self.map.hasOwnProperty(id) && self.map[id] !== predicatePart) return false;
+            if(self.map.hasOwnProperty(pid) && self.map[pid] !== part) return false;
 
             // see if this match has already been added to this map
-            if(self.idMap[nid] === pid && self.idMap[pid] === nid) return true;
+            if(self.map[id] === predicatePart && self.map[pid] === part) return true;
 
             // mark the pair as matching
-            self.map[nid] = pid;
+            self.map[id] = predicatePart;
+            self.queue.push(predicatePart);
             return true;
         };
 
-        Map.prototype.getMatch = function(node) {
-            return this.map[node.getId()];
-        };
+        Map.prototype.extend = function() {
+            let self = this;
+            if(self.queue.length === 0) return true;
 
-        Map.prototype.extend = function(predicateNode) {
-            let self = this, node = self.getMatch(predicateNode);
+            // get the first node/link waiting to be extended - call it X, and its match in the predicate Xp
+            let predicatePart = self.queue.pop(), part = self.getMatch(predicatePart);
 
-            // for each neighbor in the predicate graph
-            predicateNode.eachLink(function(pLink, pNeighbor) {
-                if(self.getMatch(pNeighbor)) return true;
+            // for each of Xp's neighbors Np in the predicate graph
+            predicatePart.eachNeighbor(function(predicateNeighbor, predicateDirection) {
 
-                // try all ways of adding a relation node that matches that neighbor
-                node.eachLink(function(link, neighbor) {
-                    if(link.getConcept() === pLink.getConcept()) {
+                // if Np has already been matched to some part N, then
+                // N should connect to X in the same way that Np connects to Xp
+                let neighbor = self.getMatch(predicateNeighbor);
+                if(neighbor) return neighbor.isNeighbor(part, predicateDirection);
+
+                // otherwise, try all ways of adding a relation part N that matches Np
+                part.eachNeighbor(function(neighbor, direction) {
+                    let match = direction === predicateDirection &&
+                        (neighbor instanceof Node || neighbor.getConcept() === predicateNeighbor.getConcept());
+                    if(match) {
                         let newMap = self.clone();
-                        newMap.map(neighbor, pNeighbor);
-                        newMap.extend(pNeighbor);
+                        newMap.map(neighbor, predicateNeighbor);
+                        newMap.extend();
                     }
                 });
             });
+        };
+
+        Map.prototype.getMatch = function(part) {
+            return this.map[part.getId()];
         };
 
         Map.prototype.eachPair = function(callback) {
