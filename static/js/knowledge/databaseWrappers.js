@@ -568,3 +568,91 @@
         };
 
 
+        function Part(concept) {
+            this.concept = concept || null;
+            this.neighbors = {'incoming': {}, 'outgoing': {}};
+        }
+
+        Part.prototype.getConcept = function() {
+            return this.concept;
+        };
+
+        Part.prototype.isNeighbor = function(part, direction) {
+            return this.neighbors[direction][part.getId()] ? true : false;
+        };
+
+        Part.prototype.eachNeighbor = function(callback, directions) {
+            directions = directions || ['incoming', 'outgoing'];
+            for(let direction in directions) {
+                for(let id in this.neighbors[direction]) {
+                    if(callback.call(this.neighbors[id], this.neighbors[id], direction)) return false;
+                }
+            }
+            return true;
+        };
+
+        Part.prototype.getNeighborsViaLink = function(linkConcept, direction) {
+            let self = this, neighbors = [];
+            self.eachNeighbor(function(neighbor, dir) {
+                if(dir === direction && neighbor instanceof Link && neighbor.getConcept() === linkConcept)
+                    neighbors.push(neighbor.getEndpoint(direction));
+            });
+            return neighbors;
+        };
+
+
+        function Node(concept) {
+            Part.prototype.constructor.call(this, concept);
+        }
+        Node.prototype = Object.create(Part.prototype);
+        Node.constructor = Node;
+
+
+        function Link(concept) {
+            Part.prototype.constructor.call(this, concept);
+            this.start = null;
+            this.end = null;
+        }
+        Link.prototype = Object.create(Part.prototype);
+        Link.constructor = Link;
+
+        Link.prototype.getStart = function() {
+            return this.start;
+        };
+
+        Link.prototype.getEnd = function() {
+            return this.end;
+        };
+
+        Link.prototype.getEndpoint = function(direction) {
+            if(direction === 'incoming') return this.start;
+            if(direction === 'outgoing') return this.end;
+            return null;
+        };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

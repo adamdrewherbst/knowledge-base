@@ -25,17 +25,15 @@
             if(self.evaluated) return;
 
             // identify the top context nodes of this relation
-            let R = self.getInLinks('in').get('start');
-            let top = R.getTopNodes();
+            let R = self.getNeighborsViaLink('in', 'incoming');
+            let queue = R.getTopNodes();
 
             // for each such top node C
-            top.each(function(node) {
+            while(!queue.isEmpty()) {
 
+                let part = queue.first();
                 // take every law predicate C is 'in'
                 node.eachOutLink('in', 'predicate', function(link, predicate) {
-
-                    // take the set P of nodes and links 'in' that predicate
-                    let P = predicate.getInLinks('in').get('start');
 
                     // look for all matches to P within R
                     let map = new Map(predicate);
@@ -48,6 +46,8 @@
 
         function Map(predicate) {
             this.predicate = predicate;
+            this.predicateSet = predicate.getNeighborsViaLink('in', 'incoming');
+
             this.map = {};
             this.queue = [];
         }
@@ -57,48 +57,76 @@
             return this.id;
         };
 
+        Map.prototype.inPredicate = function(part) {
+            return this.predicateSet.contains(part);
+        };
+
         Map.prototype.map = function(part, predicatePart) {
-            let self = this, id = part.getId(), pid = predicatePart.getId();
+            let self = this, pid = predicatePart.getId();
 
             // make sure this concept hasn't already been matched to a different predicate
-            if(self.map.hasOwnProperty(id) && self.map[id] !== predicatePart) return false;
             if(self.map.hasOwnProperty(pid) && self.map[pid] !== part) return false;
 
             // see if this match has already been added to this map
-            if(self.map[id] === predicatePart && self.map[pid] === part) return true;
+            if(self.map[pid] === part) return true;
 
             // mark the pair as matching
-            self.map[id] = predicatePart;
+            self.map[pid] = part;
             self.queue.push(predicatePart);
             return true;
         };
 
         Map.prototype.extend = function() {
             let self = this;
-            if(self.queue.length === 0) return true;
 
-            // get the first node/link waiting to be extended - call it X, and its match in the predicate Xp
-            let predicatePart = self.queue.pop(), part = self.getMatch(predicatePart);
-
-            // for each of Xp's neighbors Np in the predicate graph
-            predicatePart.eachNeighbor(function(predicateNeighbor, predicateDirection) {
-
-                // if Np has already been matched to some part N, then
-                // N should connect to X in the same way that Np connects to Xp
-                let neighbor = self.getMatch(predicateNeighbor);
-                if(neighbor) return neighbor.isNeighbor(part, predicateDirection);
-
-                // otherwise, try all ways of adding a relation part N that matches Np
-                part.eachNeighbor(function(neighbor, direction) {
-                    let match = direction === predicateDirection &&
-                        (neighbor instanceof Node || neighbor.getConcept() === predicateNeighbor.getConcept());
-                    if(match) {
-                        let newMap = self.clone();
-                        newMap.map(neighbor, predicateNeighbor);
-                        newMap.extend();
-                    }
-                });
+            // first see if this map is already complete
+            let complete = this.predicateSet.every(function(part) {
+                return self.getMatch(part.getId()) ? true : false;
             });
+            if(complete) {
+                //append the non-predicate nodes of the law to the relation
+            }
+
+            // otherwise try to extend the map from every waiting part
+            while(self.queue.length > 0) {
+
+                // get the first node/link waiting to be extended - call it X, and its match in the predicate Xp
+                let predicatePart = self.queue[0], part = self.getMatch(predicatePart);
+
+                // for each of Xp's neighbors Np in the predicate graph
+                let valid = predicatePart.eachNeighbor(function(predicateNeighbor, predicateDirection) {
+
+                    // if this is a link outside the predicate, make sure its other end is part of the predicate
+                    let neighborInPredicate = self.inPredicate(predicateNeighbor);
+                    if(predicateNeighbor instanceof Link && !neighborInPredicate
+                        && !self.inPredicate(predicateNeighbor.end(predicateDirection)))
+                            return;
+
+                    // if Np has already been matched to some part N, then
+                    // N should connect to X in the same way that Np connects to Xp
+                    let neighbor = self.getMatch(predicateNeighbor);
+                    if(neighbor) return neighbor.isNeighbor(part, predicateDirection);
+
+                    // otherwise, try all ways of adding a neighbor N that matches Np
+                    let found = false;
+                    part.eachNeighbor(function(neighbor, direction) {
+                        let match = direction === predicateDirection &&
+                            (neighbor instanceof Node || neighbor.getConcept() === predicateNeighbor.getConcept());
+                        if(match) {
+                            let newMap = self.clone();
+                            newMap.map(neighbor, predicateNeighbor);
+                            newMap.extend();
+                            found = true;
+                        }
+                    });
+
+                    // make sure we found a match for Np, unless it wasn't required by the predicate
+                    return found || !neighborInPredicate;
+                });
+                if(!valid) return false;
+
+                self.queue.shift();
+            }
         };
 
         Map.prototype.getMatch = function(part) {
