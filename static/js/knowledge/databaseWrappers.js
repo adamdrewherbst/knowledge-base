@@ -175,78 +175,43 @@
 
 
 
-        Page.load = function(data, callback) {
-            let concepts = [];
-            switch(typeof data) {
-                case 'string':
-                case 'number':
-                    concepts.push(data);
-                    break;
-                case 'object':
-                    concepts = data;
-                    break;
-            }
+        Page.load = function(callback) {
             $.ajax({
                 url: Page.loadURL,
                 type: 'post',
                 dataType: 'json',
-                data: JSON.stringify({
-                    concepts: concepts
-                }),
+                data: JSON.stringify({}),
                 success: function(data) {
-                    Page.storeRecords(data);
+                    Page.store(data);
                     if(typeof callback === 'function') callback.call(Page, data);
                 }
             });
         };
 
-        Page.storeRecords = function(data) {
-            for(let id in data.concept) {
-                let concept = data.concept[id];
-                Concept.store(concept, id);
-            }
-            for(let id in data.link) {
-                let link = data.link[id], start = Concept.get(link.start), end = Concept.get(link.end);
-                if(start && end) start.addContext(end);
-            }
-            for(let id in data.instance) {
-                let instance = data.instance[id], concept = Concept.get(instance.concept),
-                    instanceOf = Concept.get(instance.instance_of);
-                if(concept && instanceOf) concept.addInstanceOf(instanceOf);
-            }
-        };
-
-        Page.saveChanges = function() {
-            let records = {concept: {}, link: {}, instance: {}}, lid = 0, iid = 0;
-            Concept.each(function(concept, id) {
-                if(concept.deleted) {
-                    if(id > 0)
-                        records.concept[id] = { id: id, deleted: true };
-                } else {
-                    records.concept[id] = {
-                        name: concept.name,
-                        description: concept.description,
-                        is_link: concept.is_link,
-                        is_law: concept.is_law,
-                        is_singular: concept.is_singular,
-                        predicate: concept.predicate,
-                        aggregator: concept.aggregator,
-                        type: concept.type
-                    };
-                    if(id > 0) records.concept[id].id = id;
-                    concept.eachContext(function(context) {
-                        records.link[lid++] = {
-                            start: id,
-                            end: context.getId()
-                        };
-                    });
-                    concept.eachInstanceOf(function(instanceOf) {
-                        records.instance[iid++] = {
-                            concept: id,
-                            instance_of: instanceOf.getId()
-                        };
-                    });
-                }
+        Page.save = function() {
+            let records = {};
+            Page.eachTable(function(table, name) {
+                table.eachRecord(function(record, id) {
+                    if(record.deleted) {
+                        if(id > 0) records[table][id] = { id: id, deleted: true };
+                    } else {
+                        if(record instanceof Concept) {
+                            records.concept[id] = {
+                                name: record.name,
+                                description: record.description,
+                            };
+                        } else if(record instanceof Part) {
+                            records.part[id] = {
+                                concept: record.getConcept()
+                            };
+                            if(part instanceof Link) {
+                                records.part[id].start = record.getStart().getId();
+                                records.part[id].end = record.getEnd().getId();
+                            }
+                        }
+                        if(id > 0) records[name][id].id = id;
+                    }
+                });
             });
             $.ajax({
                 url: Page.saveURL,
@@ -254,42 +219,49 @@
                 dataType: 'json',
                 data: JSON.stringify({records: records}),
                 success: function(data) {
-                    Page.storeRecords(data);
+                    Page.store(data);
+                }
+            });
+        };
+
+        Page.eachTable = function(callback) {
+            for(let name in Page.tables) {
+                let table = Page.tables[name];
+                if(callback.call(table, table, name) === false) return false;
+            }
+            return true;
+        };
+
+        Page.store = function(data) {
+            Page.eachTable(function(table, name) {
+                if(!data[name]) return;
+                for(let id in data[name]) {
+                    table.store(data[name][id], id);
                 }
             });
         };
 
 
-        function Concept() {
-            this.context = {};
-            this.context_of = {};
-            this.instance = {};
-            this.instance_of = {};
-            this.ancestors = {};
-            this.saved = {};
-        }
-        Concept.records = {};
-        Concept.nextId = -1;
-
-        Concept.references = ['instance', 'instance_of', 'context', 'context_of', 'ancestor', 'ancestor_of'];
-        Concept.getComplement = function(field) {
-            return field.indexOf('_of') >= 0 ? field.substring(0, field.length-3) : field + '_of';
+        function Table(type) {
+            this.type = type;
+            this.records = {};
+            this.nextId = -1;
         }
 
-        Concept.get = function(data) {
+        Table.prototype.get = function(data) {
             let record = null;
-            if(data instanceof Concept) {
+            if(data instanceof this.type) {
                 record = data;
             } else if(data instanceof go.GraphObject) {
                 let part = data.part ? data.part : data;
                 if(part instanceof go.Node) {
                     let id = part.data ? part.data.id : null;
-                    if(id) record = Concept.records[id] || null;
+                    if(id) record = this.records[id] || null;
                 }
             } else if(!isNaN(data)) {
-                record = Concept.records[data] || null;
+                record = this.records[data] || null;
             } else if(typeof data === 'string') {
-                for(let id in Concept.records) if(Concept.records[id].get('name') === data) {
+                for(let id in this.records) if(this.records[id].get('name') === data) {
                     record = self.records[id];
                     break;
                 }
@@ -297,10 +269,32 @@
             return record;
         };
 
-        Concept.create = function(data) {
-            let record = new Concept();
-            record.set('id', Concept.nextId--);
-            Concept.records[record.getId()] = record;
+        Table.prototype.store = function(record, id) {
+            if(record.deleted) {
+                delete this.records[id];
+            }
+            if(id != record.id) {
+                this.records[id].oldId = id;
+                this.records[record.id] = this.records[id];
+                delete this.records[id];
+            }
+            if(!this.records[record.id]) this.records[record.id] = new this.type();
+
+            this.records[record.id].update(record);
+        };
+
+        Table.prototype.each = function(callback) {
+            for(let id in this.records) {
+                if(callback.call(this.records[id], this.records[id], id) === false) return false;
+            }
+            return true;
+        };
+
+        Table.prototype.create = function(data, type) {
+            type = type || this.type;
+            let record = new type();
+            record.set('id', this.nextId--);
+            this.records[record.getId()] = record;
 
             if(typeof data === 'object') for(let key in data) {
                 record.set(key, data[key]);
@@ -308,267 +302,79 @@
             return record;
         };
 
-        Concept.store = function(record, id) {
-
-            if(record.deleted) {
-                Concept.delete(id, true);
-                return;
-            }
-            if(id != record.id) {
-                Concept.records[id].oldId = id;
-                Concept.records[record.id] = Concept.records[id];
-                delete Concept.records[id];
-            }
-            if(!Concept.records[record.id]) Concept.records[record.id] = new Concept();
-
-            Concept.records[record.id].update(record);
-        };
-
-        Concept.each = function(callback) {
-            for(let id in Concept.records) {
-                if(callback.call(Concept.records[id], Concept.records[id], id) === false) return false;
-            }
-            return true;
-        };
-
-        Concept.delete = function(id, permanent) {
+        Table.prototype.delete = function(id, permanent) {
             if(permanent) {
-                delete Concept.records[id];
+                delete this.records[id];
             } else {
             }
         };
 
-        function c(id) {
-            return Concept.get(id);
+
+        function Record() {
         }
 
-
-        Concept.prototype.get = function(field) {
-            let value = this[field];
-            if(value && typeof value === 'object' && !Array.isArray(value))
-                return Misc.toArray(value);
-            return value;
+        Record.prototype.getId = function() {
+            return this.id;
         };
 
-        Concept.prototype.set = function(field, value, include, postprocess) {
-
-            include = include === undefined || include;
-            postprocess = postprocess === undefined || postprocess;
-            let self = this;
-
-            if(Concept.references.includes(field)) {
-
-                let values = Array.isArray(value) ? value : [value];
-                values.forEach(function(val) {
-                    if((include && self[field][val.getId()]) || (!include && !self[field][val.getId()]))
-                        return;
-
-                    if(include) {
-                        self[field][val.getId()] = val;
-                    } else {
-                        delete self[field][val.getId()];
-                    }
-                    if(postprocess) val.set(Concept.getComplement(field), self, include);
-                });
-            } else {
-                if(include) {
-                    self[field] = value;
-                }
-            }
-
-            if(postprocess) switch(field) {
-                case 'context':
-                    if(include) self.setLaw(value.getLaw());
-                    else {
-                        self.setLaw(null);
-                        self.eachContext(function(concept) {
-                            if(concept.inLaw()) {
-                                self.setLaw(concept.getLaw());
-                                return false;
-                            }
-                        });
-                    }
-                    break;
-                case 'instance_of':
-                    if(include) {
-                        self.set('ancestor', value);
-                        self.set('ancestor', value.get('ancestor'));
-                    } else {
-                        self.ancestor = {};
-                        self.eachInstanceOf(function(concept) {
-                            self.set('ancestor', concept);
-                            self.set('ancestor', concept.get('ancestor'));
-                        });
-                    }
-                    break;
-                case 'name':
-                case 'is_law':
-                case 'is_link':
-                    self.updateNodes();
-                    break;
-            }
+        Record.prototype.get = function(key) {
+            return this[key];
         };
 
-        Concept.prototype.each = function(field, callback) {
+        Record.prototype.set = function(key, value) {
+            this[key] = value;
+        };
+
+        Record.prototype.each = function(field, callback) {
             for(let id in this[field]) {
                 if(callback.call(this, this[field][id]) === false) return false;
             }
             return true;
-        };
+        }
 
-        Concept.prototype.update = function(data) {
+        Record.prototype.update = function(data) {
             let self = this;
             if(data.id) self.set('id', data.id);
             for(let key in data) {
                 if(key == 'id') continue;
                 self.set(key, data[key]);
             }
-            self.updateNodes();
+            self.updatePage();
             delete this.oldId;
         };
 
-        Concept.prototype.getId = function() {
-            return this.id;
+        Record.prototype.updatePage = function() {
         };
+
+        Record.prototype.delete = function() {
+            if(this.deleted) return;
+            this.deleted = true;
+            this.table.delete(this.id);
+        };
+
+
+        function Concept() {
+            Record.prototype.constructor.call(this);
+            this.table = Concept.table;
+        }
+        Concept.prototype = Object.create(Record.prototype);
+        Concept.constructor = Concept;
+
+        function c(data) {
+            return Concept.table.get(data);
+        }
+
         Concept.prototype.getName = function() {
             return this.get('name');
         };
         Concept.prototype.getDescription = function() {
             return this.get('description');
         };
-        Concept.prototype.getContext = function() {
-            return this.get('context');
-        };
-        Concept.prototype.addContext = function(concept) {
-            this.set('context', concept);
-        };
-        Concept.prototype.removeContext = function(concept) {
-            this.set('context', concept, false);
-        };
-        Concept.prototype.eachContext = function(callback) {
-            return this.each('context', callback);
-        };
-        Concept.prototype.eachContextOf = function(callback) {
-            return this.each('context_of', callback);
-        };
-        Concept.prototype.addInstanceOf = function(concept) {
-            this.set('instance_of', concept);
-        };
-        Concept.prototype.removeInstanceOf = function(concept) {
-            this.set('instance_of', concept, false);
-        };
-        Concept.prototype.eachInstance = function(callback) {
-            return this.each('instance', callback);
-        };
-        Concept.prototype.eachInstanceOf = function(callback) {
-            return this.each('instance_of', callback);
-        };
-        Concept.prototype.eachAncestor = function(callback) {
-            return this.each('ancestor', callback);
-        };
-        Concept.prototype.eachAncestorOf = function(callback) {
-            return this.each('ancestor_of', callback);
-        };
-
-        Concept.prototype.has = function(field, concept) {
-            let self = this;
-            return !self.each(field, function(val) {
-                return val !== concept;
-            });
-        };
-        Concept.prototype.hasContext = function(concept) {
-            return this.has('context', concept);
-        };
-
-        Concept.prototype.eachInTree = function(callback, tree) {
-            tree = tree || {};
-            let self = this;
-            if(tree[self.getId()]) return true;
-            tree[self.getId()] = self;
-            if(callback.call(self, self) === false) return false;
-            return self.eachContextOf(function(contextOf) {
-                return contextOf.eachInTree(callback, tree);
-            })
-        };
-
-        Concept.prototype.getTreeCount = function() {
-            let count = 0;
-            this.eachInTree(function() {
-                count++;
-            });
-            return count;
-        };
-
-        Concept.prototype.instanceOf = function(concept) {
-            concept = Concept.get(concept);
-            return this.ancestors[concept.getId()] ? true : false;
-        };
-
-        Concept.prototype.isLaw = function() {
-            return this.get('is_law');
-        };
-
-        Concept.prototype.isLink = function() {
-            return this.get('is_link');
-        };
-
-        Concept.prototype.isPredicate = function() {
-            return !isNaN(this.predicate);
-        };
-
-        Concept.prototype.makePredicate = function(predicate, isPredicate) {
-            this.predicate = isPredicate === undefined || isPredicate ? predicate : null;
-        };
-
-        Concept.prototype.inLaw = function() {
-            return this.get('law') ? true : false;
-        };
-
-        Concept.prototype.getLaw = function() {
-            return this.get('law');
-        };
-
-        Concept.prototype.setLaw = function(concept) {
-            let self = this;
-            self.set('law', concept);
-            self.eachContextOf(function(child) {
-                child.setLaw(concept);
-            });
-        };
-
-        Concept.prototype.getInfoString = function() {
-            return '';
-        };
-
-        Concept.prototype.getSymbol = function() {
-            return '';
-        };
-
-        Concept.prototype.delete = function() {
-
-            let self = this;
-            if(self.deleted) return;
-            self.deleted = true;
-
-            Concept.references.forEach(function(field) {
-                self.saved[field] = self[field];
-                for(let id in self[field]) {
-                    self[field][id].set(Concept.getComplement(field), self, false, false);
-                }
-                self[field] = {};
-            });
-
-            self.eachContextOf(function(child) {
-                if(child.getContext().length === 0) {
-                    child.delete();
-                }
-            });
-
-            Concept.delete(self.getId());
-        };
 
 
         function Part(concept) {
+            Record.prototype.constructor.call(this);
+            this.table = Part.table;
             this.concept = concept || null;
             this.neighbors = {'incoming': {}, 'outgoing': {}};
         }
