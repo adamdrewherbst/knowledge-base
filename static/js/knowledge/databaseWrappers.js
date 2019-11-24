@@ -312,10 +312,7 @@
             let record = new this.type();
             record.set('id', this.nextId--);
             this.records[record.getId()] = record;
-
-            if(typeof data === 'object') for(let key in data) {
-                record.set(key, data[key]);
-            }
+            record.update(data);
             return record;
         };
 
@@ -351,10 +348,12 @@
 
         Record.prototype.update = function(data) {
             let self = this;
-            if(data.id) self.set('id', data.id);
-            for(let key in data) {
-                if(key == 'id') continue;
-                self.set(key, data[key]);
+            if(typeof data === 'object') {
+                if(data.id) self.set('id', data.id);
+                for(let key in data) {
+                    if(key == 'id') continue;
+                    self.set(key, data[key]);
+                }
             }
             self.updatePage();
             delete this.oldId;
@@ -367,6 +366,7 @@
             if(this.deleted) return;
             this.deleted = true;
             this.table.delete(this.id);
+            this.updatePage();
         };
 
 
@@ -394,8 +394,53 @@
             return this.get('description');
         };
 
-        Concept.getNode = function() {
+        Concept.prototype.getNode = function() {
             return this.node;
+        };
+
+        Concept.prototype.getLinks = function() {
+            let self = this, links = [];
+            Part.table.each(function(part) {
+                if(part.isLink() && part.getConcept() === self) links.push(part);
+            });
+            return links;
+        };
+
+        Concept.prototype.getParts = function() {
+            let self = this, parts = [];
+            Part.table.each(function(part) {
+                if(part.getConcept() === self) parts.push(part);
+            });
+            return parts;
+        };
+
+        Concept.prototype.eachPart = function(callback) {
+            let self = this;
+            Part.table.each(function(part) {
+                if(part.getConcept() === this) {
+                    if(callback.call(part, part) === false) return false;
+                }
+            });
+            return true;
+        };
+
+        Concept.prototype.updatePage = function() {
+            let self = this;
+
+            if(self.node) {
+                Page.eachExplorer(function(e) {
+                    let node = e.getNode();
+                    if(!node) return;
+                    let included = self.node.hasLink('in', node);
+                    if(included) myNode.updateGoNode(e);
+                    else myNode.removeGoNode(e);
+                });
+            }
+            self.eachLink(function(link) {
+                link.eachGoPart(function(goPart) {
+                    link.updateGoPart(goPart);
+                });
+            });
         };
 
 
@@ -431,6 +476,9 @@
                     break;
                 case 'start':
                 case 'end':
+                    let current = this[key];
+                    if(current instanceof Part)
+                        this.setNeighbor(current, key === 'start' ? 'incoming' : 'outgoing', false);
                     value = Part.get(value);
                     break;
             }
@@ -476,19 +524,31 @@
         Part.prototype.getStart = function() {
             return this.start;
         };
+        Part.prototype.getStartId = function() {
+            return this.start ? this.start.getId() : null;
+        };
         Part.prototype.getEnd = function() {
             return this.end;
         };
-        Part.prototype.getEndPoint = function(direction) {
+        Part.prototype.getEndId = function() {
+            return this.end ? this.end.getId() : null;
+        };
+        Part.prototype.getEndpoint = function(direction) {
             if(direction === 'incoming') return this.start;
             if(direction === 'outgoing') return this.end;
             return null;
         };
+        Part.prototype.setEndpoints = function(start, end) {
+            this.set('start', start);
+            this.set('end', end);
+        };
 
-        Part.prototype.setNeighbor = function(part, direction) {
-            if(this.isNeighbor(part, direction)) return true;
-            this.neighbors[direction][part.getId()] = part;
-            part.setNeighbor(this, Part.opposite(direction));
+        Part.prototype.setNeighbor = function(part, direction, include) {
+            include = include === undefined || include;
+            if(this.isNeighbor(part, direction) == include) return true;
+            if(include) this.neighbors[direction][part.getId()] = part;
+            else delete this.neighbors[direction][part.getId()];
+            part.setNeighbor(this, Part.opposite(direction), include);
         };
 
         Part.prototype.isNeighbor = function(part, direction) {
@@ -553,6 +613,10 @@
             return this.getEndpoints('incoming', chain);
         };
 
+        Part.prototype.getChildren = function() {
+            return this.getEndpoints('incoming', 'in', '*');
+        };
+
         Part.prototype.getOutgoing = function(...chain) {
             return this.getEndpoints('outgoing', chain);
         };
@@ -563,6 +627,80 @@
 
         Part.prototype.eachOutgoing = function(...chain, callback) {
             return this.eachEndpoint('outgoing', ...chain, callback);
+        };
+
+        Part.prototype.hasLink = function(link, node) {
+            return this.hasEndpoint(link, node);
+        };
+
+        Part.prototype.addLink = function(link, node) {
+            let self = this;
+            if(self.hasLink(link, node)) return true;
+            node = Part.get(node);
+            if(!node) return false;
+            let link = Part.create({
+                concept: link,
+                start: self,
+                end: node
+            });
+            link.updatePage();
+        };
+
+        Part.prototype.removeLink = function(link, node) {
+            let self = this;
+            for(let id in self.neighbors.outgoing) {
+                let neighbor = self.neighbors.outgoing[id];
+                if(neighbor.isLink() && neighbor.matches(link) && neighbor.getEnd().matches(node)) {
+                    neighbor.delete();
+                }
+            }
+        };
+
+        Part.prototype.updatePage = function() {
+            let self = this;
+            Page.eachExplorer(function(e) {
+                let diagram = e.getActiveDiagram();
+                if(self.deleted) self.removeGoPart(diagram);
+                else {
+                    let data = self.getGoData(diagram);
+                    if(data) {
+
+                    } else {
+                        self.addGoData(diagram);
+                    }
+                }
+            });
+        };
+
+        Part.prototype.getGoData = function(diagram, key) {
+            let data = null;
+            if(this.isLink())
+                data = diagram.model.findLinkDataForKey(this.getId());
+            else
+                data = diagram.model.findNodeDataForKey(this.getId());
+            if(data && key) return data[key];
+            return data;
+        };
+
+        Part.prototype.setGoData = function(diagram, key, value) {
+            let data = this.getGoData(diagram);
+            if(data) {
+                if(typeof key === 'object') {
+                    for(let k in key) {
+                        diagram.model.set(data, k, key[k]);
+                    }
+                }
+                else diagram.model.set(data, key, value);
+            }
+        };
+
+        Part.prototype.getGoPart = function(diagram) {
+            return diagram.findPartForKey(this.getId());
+        };
+
+        Part.prototype.removeGoPart = function(diagram) {
+            let goPart = this.getGoPart(diagram);
+            if(goPart) diagram.removeParts([goPart]);
         };
 
 

@@ -60,13 +60,11 @@
             self.$wrapper.find('.concept-create-button').click(function(e) {
                 let node = Part.create();
                 node.addLink('in', self.concept);
-                node.updatePage();
             });
             self.$wrapper.find('.law-create-button').click(function(e) {
                 let node = Part.create();
                 node.addLink('is a', 'law');
                 node.addLink('in', self.node);
-                node.updatePage();
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
                 if(self.node) {
@@ -116,7 +114,7 @@
         };
 
         Explorer.prototype.update = function() {
-            if(!this.concept) return;
+            if(!this.node) return;
 
             let diagram = this.getActiveDiagram();
             if(diagram) switch(this.mode) {
@@ -131,8 +129,8 @@
         };
 
         Explorer.prototype.updateLayout = function() {
-            if(!this.concept || this.mode !== 'graph') return;
-            this.concept.layoutTree(this.getGraph());
+            if(!this.node || this.mode !== 'graph') return;
+            this.node.layoutTree(this.getGraph());
         };
 
         Explorer.prototype.toggleCloseButtons = function(show) {
@@ -163,9 +161,9 @@
             else this.$wrapper.insertAfter(explorer.$wrapper);
         };
 
-        Explorer.prototype.openInNew = function(concept, before) {
+        Explorer.prototype.openInNew = function(node, before) {
             let explorer = new Explorer();
-            explorer.open(concept);
+            explorer.open(node);
             explorer.setPosition(this, before);
         };
 
@@ -184,36 +182,37 @@
 
             Page.clearDiagram(diagram);
 
-            this.concept.eachContextOf(function(child) {
+            this.node.eachIncoming('in', '*', function(child) {
                 child.addNodeData(diagram);
             });
         };
 
-        Explorer.prototype.drawGraph = function(concept) {
-            let self = this;
-            if(self.drawingConceptTree) return;
-            self.drawingConceptTree = true;
+        Explorer.prototype.drawGraph = function() {
+            let self = this, nodes = self.node.getChildren(), diagram = self.getGraph(), drawn = {};
 
-            let diagram = self.getGraph();
-            concept = concept || self.concept;
+            // add a visual node for each node in the relation
+            nodes.forEach(function(node) {
 
-            if(concept === self.concept) Page.clearDiagram(diagram);
+                // don't draw nodes that are only included by virtue of something being an instance of them
+                let isTop = node.eachNeighbor(function(neighbor, direction) {
+                    if(!neighbor.isLink() || !nodes.includes(neighbor.getEnd())) return;
+                    return direction === 'incoming' && neighbor.matches('is a') && !neighbor.hasOutgoing('in', 'predicate');
+                });
+                if(isTop) return;
 
-            let nodeCount = diagram.nodes.count,
-                treeCount = concept.getTreeCount(),
-                listener = function(e) {
-                    console.log('laid out ' + diagram.nodes.count + ' nodes');
-                    if(diagram.nodes.count == nodeCount + treeCount) {
-                        console.log('drawing tree for ' + treeCount + ' nodes');
-                        console.log('graph height: ' + diagram.viewportBounds.height);
-                        self.concept.layoutTree(diagram);
-                        diagram.removeDiagramListener('LayoutCompleted', listener);
-                        self.drawingConceptTree = false;
-                    }
-                };
-            diagram.addDiagramListener('LayoutCompleted', listener);
+                node.addGoNode(diagram);
+                drawn[node.getId()] = node;
+            });
 
-            concept.initTree(diagram);
+            for(let id in drawn) {
+                let node = drawn[id];
+                node.eachOutgoing(function(link) {
+                    if(draw[link.getEndId()])
+                        link.addGoLink(diagram);
+                });
+            }
+
+            diagram.updateLayout();
         };
 
         Explorer.prototype.getGraph = function() {
@@ -299,19 +298,23 @@
             });
 
             function storeLink(e) {
-                let c1 = Concept.get(e.subject.fromNode), c2 = Concept.get(e.subject.toNode);
-                if(e.parameter) {
-                    let portId = e.parameter.portId, cOld = Concept.get(e.parameter);
-                    if(portId === 'T') cOld.removeContext(c2);
-                    else if(portId === 'B') c1.removeContext(cOld);
+                let start = Part.get(e.subject.fromNode), end = Part.get(e.subject.toNode),
+                    link = Part.get(e.subject);
+                if(!start || !end) return;
+                if(link) link.setEndpoints(start, end);
+                else {
+                    let link = Part.create({
+                        concept: null,
+                        start: start,
+                        end: end
+                    });
+                    graph.model.set(e.subject.data, 'id', link.getId());
                 }
-                if(c1 && c2) c1.addContext(c2);
             }
             graph.addDiagramListener('LinkDrawn', storeLink);
             graph.addDiagramListener('LinkRelinked', storeLink);
 
             graph.addDiagramListener('LayoutCompleted', function(e) {
-                if(self.concept) self.concept.layoutTree(graph);
             });
 
             // called in the node template below to create the top and bottom 'port' on each node;
@@ -358,19 +361,21 @@
               $$(go.Adornment, "Vertical",
                     makeButton("Add child",
                         function(e, obj) {
-                            let concept = Concept.get(obj.part.adornedPart),
-                                child = Concept.create();
-                            child.addContext(concept);
+                            let node = Part.get(obj.part.adornedPart),
+                                child = Part.create({
+                                    concept: Concept.create()
+                                });
+                            child.addLink('in', node);
                             child.updateNodes();
                         },
                         function(o) {
                             let part = o.part.adornedPart;
-                            return !(part.diagram instanceof go.Palette);
+                            return !(part.diagram instanceof go.Palette) && (part instanceof go.Node);
                         }),
                     makeButton("Open in new Explorer",
                         function(e, obj) {
-                            let concept = Concept.get(obj.part.adornedPart);
-                            if(concept) self.openInNew(concept, false);
+                            let node = Part.get(obj.part.adornedPart);
+                            if(node) self.openInNew(node, false);
                         },
                         function(o) {
                             let part = o.part.adornedPart;
@@ -427,8 +432,8 @@
                         strokeWidth: 2,
                     },
                     new go.Binding('fill', '', function(data, node) {
-                        if(data.isLaw) return '#cccc33';
-                        else if(data.isLink) return '#cc33cc';
+                        //if(data.isLaw) return '#cccc33';
+                        //else if(data.isLink) return '#cc33cc';
                         else return '#6c6';
                     }),
                     new go.Binding("figure")),
@@ -468,23 +473,7 @@
             );
 
             let linkContextMenu =
-              $$(go.Adornment, "Vertical",
-                    makeButton("Make this link a concept",
-                        function(e, obj) {
-                            let link = obj.part.adornedPart;
-                            if(!(link instanceof go.Link)) return;
-                            let c1 = Concept.get(link.fromPort), c2 = Concept.get(link.toPort),
-                                linkConcept = Concept.create({ is_link: true });
-                            c1.removeContext(c2);
-                            linkConcept.addContext(c2);
-                            c1.addContext(linkConcept);
-                            self.drawGraph();
-                        },
-                        function(o) {
-                            let part = o.part.adornedPart;
-                            return !(part.diagram instanceof go.Palette);
-                        }),
-              );
+              $$(go.Adornment, "Vertical");
 
             // GoJS also needs a template to specify how links between nodes will appear
             graph.linkTemplate =
@@ -556,31 +545,31 @@
 
             if($div.hasClass('explorer-edit-instance-of')) {
                 diagram.addDiagramListener('ExternalObjectsDropped', function(e) {
-                    if(!self.editConcept) return;
+                    if(!self.partEditing) return;
                     let it = e.subject.iterator;
                     console.log('dropped nodes');
                     while(it.next()) {
                         let node = it.value;
                         if(!(node instanceof go.Node)) continue;
                         console.log(node.data);
-                        let concept = Concept.get(node);
-                        if(concept) self.editConcept.addInstanceOf(concept);
+                        let otherPart = Part.get(node);
+                        if(otherPart) self.partEditing.addLink('is a', otherPart);
                     }
                 });
                 diagram.addDiagramListener('SelectionDeleted', function(e) {
-                    if(!self.editConcept) return;
+                    if(!self.partEditing) return;
                     let it = e.subject.iterator;
                     while(it.next()) {
-                        let concept = Concept.get(it.value);
-                        if(concept) self.editConcept.removeInstanceOf(concept);
+                        let otherPart = Part.get(it.value);
+                        if(otherPart) self.partEditing.removeLink('is a', otherPart);
                     }
                 });
             } else {
                 diagram.addDiagramListener('ChangedSelection', function(e) {
                     let it = e.subject.iterator, node = null;
                     if(it.next()) node = it.value;
-                    let concept = Concept.get(node);
-                    if(!concept) {
+                    let part = Part.get(node);
+                    if(!part) {
                         self.$card.hide();
                         return;
                     }
@@ -851,57 +840,6 @@
 
         function nd(c, e, k) { return Concept.get(c).getNodeData(Page.explorers[e].getActiveDiagram(), k); }
         function snd(c, e, k, v) { Concept.get(c).setNodeData(Page.explorers[e].getActiveDiagram(), k, v); }
-
-        Concept.prototype.initTree = function(diagram) {
-            let self = this;
-
-            self.addNodeData(diagram, true);
-
-            self.eachContextOf(function(child) {
-                child.initTree(diagram);
-            });
-        };
-
-        Concept.prototype.layoutTree = function(diagram) {
-            let map = {}, rows = [];
-            this.setGraphRow(diagram, map);
-
-            for(let id in map) {
-                let row = map[id];
-                if(!rows[row]) rows[row] = [];
-                rows[row].push(id);
-            }
-
-            rows.forEach(function(row, r) {
-                let n = row.length, y = 100 * r;
-                row.forEach(function(cid, i) {
-                    let x = 200 * (i - (n-1)/2);
-                    Concept.get(cid).setNodeData(diagram, 'loc', '' + x + ' ' + y);
-                });
-            });
-
-            diagram.updateAllTargetBindings();
-        };
-
-        Concept.prototype.setGraphRow = function(diagram, map) {
-            let self = this;
-            if(!self.inDiagram(diagram)) return -1;
-
-            let row = map[self.getId()];
-            if(row > -1) return row;
-
-            row = -1;
-            self.eachContext(function(concept) {
-                let contextRow = concept.setGraphRow(diagram, map);
-                if(contextRow > row) row = contextRow;
-            });
-            map[self.getId()] = ++row;
-
-            self.eachContextOf(function(child) {
-                child.setGraphRow(diagram, map);
-            });
-            return row;
-        };
 
 
 
