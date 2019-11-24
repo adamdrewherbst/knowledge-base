@@ -31,7 +31,7 @@
             while(Page.explorers.hasOwnProperty(i)) i++;
             self.id = i;
 
-            self.concept = null;
+            self.node = null;
 
             self.$wrapper = $('#concept-explorer-template').clone().attr('id', 'concept-explorer-' + this.id).appendTo('#concept-wrapper');
 
@@ -54,22 +54,23 @@
 
             self.$wrapper.find('.explorer-new-button').click(function(e) {
                 let left = $(this).hasClass('explorer-new-left-button');
-                self.openInNew(self.concept, left);
+                self.openInNew(self.node, left);
             });
 
             self.$wrapper.find('.concept-create-button').click(function(e) {
-                let concept = Concept.create();
-                concept.addContext(self.concept);
-                concept.updateNodes();
+                let node = Part.create();
+                node.addLink('in', self.concept);
+                node.updatePage();
             });
             self.$wrapper.find('.law-create-button').click(function(e) {
-                let concept = Concept.create({is_law: true});
-                concept.addContext(self.concept);
-                concept.updateNodes();
+                let node = Part.create();
+                node.addLink('is a', 'law');
+                node.addLink('in', self.node);
+                node.updatePage();
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
-                if(self.concept) {
-                    let context = self.concept.getContext();
+                if(self.node) {
+                    let context = self.node.getOutgoing('in', '*');
                     if(context.length === 1) self.open(context[0]);
                 }
             });
@@ -85,7 +86,7 @@
                 self.editConcept.set('name', self.$nameEdit.val());
             });
             self.$descriptionEdit.change(function(e) {
-                self.editConcept.set('name', self.$descriptionEdit.val());
+                self.editConcept.set('description', self.$descriptionEdit.val());
             });
 
             Page.addExplorer(self);
@@ -98,14 +99,14 @@
             return this.id;
         };
 
-        Explorer.prototype.getConcept = function() {
-            return this.concept;
+        Explorer.prototype.getNode = function() {
+            return this.node;
         };
 
-        Explorer.prototype.open = function(concept, mode) {
+        Explorer.prototype.open = function(node, mode) {
             this.$card.hide();
-            this.concept = Concept.get(concept);
-            let preferredMode = (this.concept && this.concept.isLaw()) ? 'graph' : 'palette';
+            this.node = Part.get(node);
+            let preferredMode = (this.node && this.node.hasLink('is a', 'law')) ? 'graph' : 'palette';
             this.setMode(mode || preferredMode);
         };
 

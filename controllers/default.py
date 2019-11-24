@@ -52,37 +52,36 @@ def load():
     request_vars = json.loads(body)
     concepts = request_vars['concepts']
 
-    records = {'concept': {}, 'link': {}}
+    records = {'concept': {}, 'part': {}}
 
-    loadConcept(1, records)
-    loadConcept(2, records)
+    loadPart(1, records)
 
     return response.json(records)
 
 
-def loadConcept(cid, records):
+def loadPart(partId, records):
 
-    if cid in records['concept']:
+    if partId in records['part']:
         return
 
-    record = db.concept(cid)
-    records['concept'][cid] = record.as_dict()
+    record = db.part(partId)
+    records['part'][partId] = part.as_dict()
 
-    for link in db((db.link.start == record.id) | (db.link.end == record.id)).iterselect():
-        loadLink(link, records)
+    loadPart(link.concept, records)
+    if part.start is not None:
+        loadPart(part.start, records)
+    if part.end is not None:
+        loadPart(part.end, records)
+    for part in db(db.part.start == partId | db.part.end == partId).iterselect():
+        loadPart(part, records)
 
 
-def loadLink(link, records):
+def loadConcept(concept, records):
 
-    if link.id in records['link']:
+    if concept.id in records['concept']:
         return
 
-    records['link'][link.id] = link.as_dict()
-
-    loadConcept(link.start, records)
-    loadConcept(link.end, records)
-    if link.concept is not None:
-        loadConcept(link.concept, records)
+    records['concept'][concept.id] = concept.as_dict()
 
 
 def save():

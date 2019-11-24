@@ -187,44 +187,6 @@
 
         *****************************************/
 
-        var Page = {};
-
-        Page.nodeTemplates = {
-            'default': {
-                shape: "RoundedRectangle",
-                fill: "#88AD5F"
-            },
-            'predicate': {
-                shape: "Rectangle",
-                fill: "yellow"
-            },
-            'appended': {
-                shape: 'RoundedRectangle',
-                fill: '#FF66AA'
-            },
-            'tentative': {
-                shape: 'RoundedRectangle',
-                fill: '#8888FF'
-            }
-        };
-
-        Page.currentConcept = null;
-        Page.currentPredicate = -1;
-
-        // options that control how evaluation is performed, and stats to keep track of how many nodes have been checked, etc.
-
-        Page.options = {
-            evaluate: {}
-        };
-        Page.stats = {
-            evaluate: {}
-        };
-
-        // the URLs we will need in other JavaScript files when making server calls
-
-        Page.loadURL = "{{=URL('default', 'load', extension='json')}}";
-        Page.saveURL = "{{=URL('default', 'save', extension='json')}}";
-
     </script>
 
 

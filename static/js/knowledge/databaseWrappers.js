@@ -174,6 +174,11 @@
         };
 
 
+        var Page = {
+            tables: {},
+            loadURL: "{{=URL('default', 'load', extension='json')}}",
+            saveURL: "{{=URL('default', 'save', extension='json')}}"
+        };
 
         Page.load = function(callback) {
             $.ajax({
@@ -202,12 +207,10 @@
                             };
                         } else if(record instanceof Part) {
                             records.part[id] = {
-                                concept: record.getConcept()
+                                concept: record.getConceptId(),
+                                start: record.getStartId(),
+                                end: record.getEndId()
                             };
-                            if(part instanceof Link) {
-                                records.part[id].start = record.getStart().getId();
-                                records.part[id].end = record.getEnd().getId();
-                            }
                         }
                         if(id > 0) records[name][id].id = id;
                     }
@@ -233,12 +236,8 @@
         };
 
         Page.store = function(data) {
-            Page.eachTable(function(table, name) {
-                if(!data[name]) return;
-                for(let id in data[name]) {
-                    table.store(data[name][id], id);
-                }
-            });
+            Concept.table.store(data.concept);
+            Part.table.store(data.part);
         };
 
 
@@ -246,6 +245,8 @@
             this.type = type;
             this.records = {};
             this.nextId = -1;
+
+            Page.tables[type.name] = this;
         }
 
         Table.prototype.get = function(data) {
@@ -269,10 +270,27 @@
             return record;
         };
 
-        Table.prototype.store = function(record, id) {
+        Table.prototype.store = function(records) {
+            for(let id in records) {
+                this.store(records, id);
+            }
+        };
+
+        Table.prototype.storeRecord = function(records, id) {
+            let record = records[id];
+
+            if(record.saved) return;
+            record.saved = true;
+
             if(record.deleted) {
                 delete this.records[id];
             }
+
+            if(this.type === Part) {
+                if(record.start) this.storeRecord(records, record.start);
+                if(record.end) this.storeRecord(records, record.end);
+            }
+
             if(id != record.id) {
                 this.records[id].oldId = id;
                 this.records[record.id] = this.records[id];
@@ -290,9 +308,8 @@
             return true;
         };
 
-        Table.prototype.create = function(data, type) {
-            type = type || this.type;
-            let record = new type();
+        Table.prototype.create = function(data) {
+            let record = new this.type();
             record.set('id', this.nextId--);
             this.records[record.getId()] = record;
 
@@ -356,10 +373,16 @@
         function Concept() {
             Record.prototype.constructor.call(this);
             this.table = Concept.table;
+            this.node = null;
         }
         Concept.prototype = Object.create(Record.prototype);
         Concept.constructor = Concept;
+        Concept.name = 'concept';
+        Concept.table = new Table(Concept);
 
+        Concept.get = function(data) {
+            return Concept.table.get(data);
+        };
         function c(data) {
             return Concept.table.get(data);
         }
@@ -371,6 +394,10 @@
             return this.get('description');
         };
 
+        Concept.getNode = function() {
+            return this.node;
+        };
+
 
         function Part(concept) {
             Record.prototype.constructor.call(this);
@@ -378,62 +405,164 @@
             this.concept = concept || null;
             this.neighbors = {'incoming': {}, 'outgoing': {}};
         }
+        Part.prototype = Object.create(Record.prototype);
+        Part.constructor = Part;
+        Part.name = 'part';
+        Part.table = new Table(Part);
+
+        Part.get = function(data) {
+            return Part.table.get(data);
+        };
+        function p(data) {
+            return Part.table.get(data);
+        }
+
+        Part.opposite = function(direction) {
+            if(direction === 'incoming') return 'outgoing';
+            if(direction === 'outgoing') return 'incoming';
+            return null;
+        }
+
+
+        Part.prototype.set = function(key, value) {
+            switch(key) {
+                case 'concept':
+                    value = Concept.get(value);
+                    break;
+                case 'start':
+                case 'end':
+                    value = Part.get(value);
+                    break;
+            }
+            Record.prototype.set(key, value);
+        };
+
+        Part.prototype.update = function(data) {
+            Record.prototype.update(data);
+            if(this.isNode()) {
+                if(this.concept) this.concept.setNode(this);
+            } else {
+                this.setNeighbor(this.start, 'incoming');
+                this.setNeighbor(this.end, 'outgoing')
+            }
+        };
 
         Part.prototype.getConcept = function() {
             return this.concept;
         };
 
-        Part.prototype.isNeighbor = function(part, direction) {
-            return this.neighbors[direction][part.getId()] ? true : false;
+        Part.prototype.getName = function() {
+            return this.concept.getName();
         };
 
-        Part.prototype.eachNeighbor = function(callback, directions) {
-            directions = directions || ['incoming', 'outgoing'];
+        Part.prototype.getDescription = function() {
+            return this.concept.getDescription();
+        };
+
+        Part.prototype.matches = function(data) {
+            if(data === '*') return true;
+            if(!isNaN(data)) return this.getId() == data;
+            if(typeof data === 'string') return this.getName() === data;
+            if(data instanceof Part) return this === data;
+            return false;
+        };
+
+        Part.prototype.isNode = function() {
+            return !this.start || !this.end;
+        };
+        Part.prototype.isLink = function() {
+            return this.start && this.end;
+        };
+        Part.prototype.getStart = function() {
+            return this.start;
+        };
+        Part.prototype.getEnd = function() {
+            return this.end;
+        };
+        Part.prototype.getEndPoint = function(direction) {
+            if(direction === 'incoming') return this.start;
+            if(direction === 'outgoing') return this.end;
+            return null;
+        };
+
+        Part.prototype.setNeighbor = function(part, direction) {
+            if(this.isNeighbor(part, direction)) return true;
+            this.neighbors[direction][part.getId()] = part;
+            part.setNeighbor(this, Part.opposite(direction));
+        };
+
+        Part.prototype.isNeighbor = function(part, direction) {
+            return this.neighbors[direction].hasOwnProperty(part.getId());
+        };
+
+        Part.prototype.eachNeighbor = function(directions, callback) {
+            if(callback === undefined) callback = directions;
+            let directions = typeof direction === 'string' ? [direction] : ['incoming', 'outgoing'];
             for(let direction in directions) {
                 for(let id in this.neighbors[direction]) {
-                    if(callback.call(this.neighbors[id], this.neighbors[id], direction)) return false;
+                    let neighbor = this.neighbors[direction][id];
+                    if(callback.call(neighbor, neighbor, direction)) return false;
                 }
             }
             return true;
         };
 
-        Part.prototype.getNeighborsViaLink = function(linkConcept, direction) {
-            let self = this, neighbors = [];
-            self.eachNeighbor(function(neighbor, dir) {
-                if(dir === direction && neighbor instanceof Link && neighbor.getConcept() === linkConcept)
-                    neighbors.push(neighbor.getEndpoint(direction));
+        Part.prototype.hasEndpoint = function(direction, ...chain) {
+            let self = this;
+            if(chain.length === 0) return true;
+            let data = chain.shift();
+            return !self.eachNeighbor(direction, function(neighbor) {
+                return !(neighbor.matches(data) && neighbor.hasEndpoint(direction, chain));
+            })
+        };
+
+        Part.prototype.getEndpoints = function(direction, ...chain) {
+            let parts = [this], neighbors = [];
+            chain.forEach(function(data) {
+                parts.forEach(function(part) {
+                    for(let id in part.neighbors[direction]) {
+                        let neighbor = part.neighbors[direction][id];
+                        if(neighbor.matches(data)) {
+                            neighbors.push(neighbor);
+                        }
+                    }
+                });
+                parts = neighbors;
+                neighbors = [];
             });
-            return neighbors;
+            return parts;
         };
 
-
-        function Node(concept) {
-            Part.prototype.constructor.call(this, concept);
-        }
-        Node.prototype = Object.create(Part.prototype);
-        Node.constructor = Node;
-
-
-        function Link(concept) {
-            Part.prototype.constructor.call(this, concept);
-            this.start = null;
-            this.end = null;
-        }
-        Link.prototype = Object.create(Part.prototype);
-        Link.constructor = Link;
-
-        Link.prototype.getStart = function() {
-            return this.start;
+        Part.prototype.eachEndpoint = function(direction, ...chain, callback) {
+            let parts = this.getEndpoints(direction, chain, callback);
+            parts.forEach(function(part) {
+                if(callback.call(part, part) === false) return false;
+            });
+            return true;
         };
 
-        Link.prototype.getEnd = function() {
-            return this.end;
+        Part.prototype.hasIncoming = function(...chain) {
+            return this.hasEndpoint('incoming', ...chain);
         };
 
-        Link.prototype.getEndpoint = function(direction) {
-            if(direction === 'incoming') return this.start;
-            if(direction === 'outgoing') return this.end;
-            return null;
+        Part.prototype.hasOutgoing = function(...chain) {
+            return this.hasEndpoint('outgoing', ...chain);
+        };
+
+        Part.prototype.getIncoming = function(...chain) {
+            return this.getEndpoints('incoming', chain);
+        };
+
+        Part.prototype.getOutgoing = function(...chain) {
+            return this.getEndpoints('outgoing', chain);
+        };
+
+        Part.prototype.eachIncoming = function(...chain, callback) {
+            return this.eachEndpoint('incoming', chain, callback);
+        };
+
+        Part.prototype.eachOutgoing = function(...chain, callback) {
+            return this.eachEndpoint('outgoing', ...chain, callback);
         };
 
 
