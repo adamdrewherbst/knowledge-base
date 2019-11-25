@@ -187,8 +187,13 @@
 
         *****************************************/
 
-    </script>
+        var Page = {
+            tables: {},
+            loadURL: "{{=URL('default', 'load', extension='json')}}",
+            saveURL: "{{=URL('default', 'save', extension='json')}}"
+        };
 
+    </script>
 
     {{# The rest of the JavaScript, which provides most of the page functionality }}
 
@@ -222,7 +227,7 @@
                 Page.saveChanges();
             });
 
-            Page.load(1, function() {
+            Page.load(function() {
                 let explorer = new Explorer();
                 explorer.open(1);
             });

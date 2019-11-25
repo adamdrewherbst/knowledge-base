@@ -31,8 +31,7 @@ def knowledge():
 
     #   make sure the global ROOT concept exists; this is the root of the tree of all concepts
     db['concept'].update_or_insert(id=1, name='ROOT', description='root of the concept tree')
-
-    db['concept'].update_or_insert(id=2, name='is a', description='is an instance of')
+    db['part'].update_or_insert(id=1, concept=1)
 
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
@@ -50,7 +49,6 @@ def load():
     body = request.body.read()
     body = urllib.unquote(body).decode('utf8')
     request_vars = json.loads(body)
-    concepts = request_vars['concepts']
 
     records = {'concept': {}, 'part': {}}
 
@@ -64,24 +62,25 @@ def loadPart(partId, records):
     if partId in records['part']:
         return
 
-    record = db.part(partId)
+    part = db.part(partId)
     records['part'][partId] = part.as_dict()
 
-    loadPart(link.concept, records)
+    loadConcept(part.concept, records)
     if part.start is not None:
         loadPart(part.start, records)
     if part.end is not None:
         loadPart(part.end, records)
-    for part in db(db.part.start == partId | db.part.end == partId).iterselect():
-        loadPart(part, records)
+    for part in db((db.part.start == partId) | (db.part.end == partId)).iterselect():
+        loadPart(part.id, records)
 
 
-def loadConcept(concept, records):
+def loadConcept(conceptId, records):
 
-    if concept.id in records['concept']:
+    if conceptId in records['concept']:
         return
 
-    records['concept'][concept.id] = concept.as_dict()
+    concept = db.concept(conceptId)
+    records['concept'][conceptId] = concept.as_dict()
 
 
 def save():

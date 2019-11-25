@@ -68,12 +68,12 @@
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
                 if(self.node) {
-                    let context = self.node.getOutgoing('in', '*');
+                    let context = self.node.getOutgoing(['in', '*']);
                     if(context.length === 1) self.open(context[0]);
                 }
             });
 
-            self.editConcept = null;
+            self.partEditing = null;
             self.$card = self.$wrapper.find('.explorer-edit-concept');
             self.$nameEdit = self.$card.find('.explorer-edit-name');
             self.$descriptionEdit = self.$card.find('.explorer-edit-description');
@@ -81,10 +81,10 @@
             self.instanceOfPalette = self.makePalette(self.$instanceOfEdit);
 
             self.$nameEdit.change(function(e) {
-                self.editConcept.set('name', self.$nameEdit.val());
+                self.partEditing.setName(self.$nameEdit.val());
             });
             self.$descriptionEdit.change(function(e) {
-                self.editConcept.set('description', self.$descriptionEdit.val());
+                self.partEditing.setDescription(self.$descriptionEdit.val());
             });
 
             Page.addExplorer(self);
@@ -182,7 +182,7 @@
 
             Page.clearDiagram(diagram);
 
-            this.node.eachIncoming('in', '*', function(child) {
+            this.node.eachIncoming(['in', '*'], function(child) {
                 child.addNodeData(diagram);
             });
         };
@@ -200,19 +200,22 @@
                 });
                 if(isTop) return;
 
-                node.addGoNode(diagram);
+                node.addGoData(diagram);
                 drawn[node.getId()] = node;
             });
 
             for(let id in drawn) {
                 let node = drawn[id];
-                node.eachOutgoing(function(link) {
-                    if(draw[link.getEndId()])
-                        link.addGoLink(diagram);
+                node.eachOutgoing(['*'], function(link) {
+                    if(drawn[link.getEndId()])
+                        link.addGoData(diagram);
+                    else if(link.matches('is a')) {
+                        node.setGoData('is_a_' + link.getEnd().getName(), true);
+                    }
                 });
             }
 
-            diagram.updateLayout();
+            diagram.requestUpdate();
         };
 
         Explorer.prototype.getGraph = function() {
@@ -426,7 +429,7 @@
                     new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
 
                     // the default shape will be a rounded rectangle (see the nodeTemplates member in knowledge.html)
-                    $$(go.Shape, Page.nodeTemplates['default'].shape,  // default figure
+                    $$(go.Shape, 'RoundedRectangle',  // default figure
                     {
                         cursor: "pointer",
                         strokeWidth: 2,
@@ -434,7 +437,7 @@
                     new go.Binding('fill', '', function(data, node) {
                         //if(data.isLaw) return '#cccc33';
                         //else if(data.isLink) return '#cc33cc';
-                        else return '#6c6';
+                        return '#6c6';
                     }),
                     new go.Binding("figure")),
 
@@ -575,36 +578,19 @@
                     }
                 });
                 diagram.addDiagramListener('TextEdited', function(e) {
-                    let block = e.subject, node = block.part;
-                    if(node instanceof go.Node) {
-                        console.log('text edited, node is now ' + node.getDocumentBounds().width + ' wide');
-                        let concept = Concept.get(node);
-                        if(concept) {
-                            let name = block.text.replace(/\s+\[\d+\]$/, '');
-                            concept.set('name', name);
-                            concept.updateNodes();
-                        }
-                    }
+                    let block = e.subject, goPart = block.part, part = Part.get(goPart);
+                    if(!part) return;
+                    let concept = part.getConcept();
+                    if(!concept) return;
+                    let name = block.text.replace(/\s+\[\d+\]$/, '');
+                    concept.set('name', name);
+                    concept.updatePage();
                 });
                 diagram.addDiagramListener('SelectionDeleted', function(e) {
                     let it = e.subject.iterator;
                     while(it.next()) {
-                        let part = it.value;
-                        if(part instanceof go.Node) {
-                            let concept = Concept.get(part);
-                            if(concept) {
-                                concept.delete();
-                            }
-                        }
-                        else if(part instanceof go.Link) {
-                            if(part.fromPortId === 'B') {
-                                let concept = Concept.get(part.toNode);
-                                if(concept) concept.setHead(null);
-                            } else if(part.fromPortId === 'T') {
-                                let concept = Concept.get(part.fromNode);
-                                if(concept) concept.setReference(null);
-                            }
-                        }
+                        let goPart = it.value, part = Part.get(goPart);
+                        if(part) part.delete();
                     }
                 });
 
@@ -687,10 +673,7 @@
         };
 
         Page.clearDiagram = function(diagram) {
-            Page.eachNode(diagram, function(node) {
-                Concept.get(node).removeFromDiagram(diagram);
-            });
-            diagram.requestUpdate();
+            diagram.clear();
         };
 
         Page.eachNode = function(diagram, callback) {
@@ -736,110 +719,9 @@
         };
 
 
-        Concept.prototype.removeFromDiagram = function(diagram) {
-            let node = this.getNode(diagram);
-            if(node) {
-                links = node.findLinksConnected();
-                diagram.model.removeNodeData(node.data);
-                while(links.next()) {
-                    let link = links.value;
-                    diagram.model.removeLinkData(link.data);
-                }
-                Page.getExplorer(diagram).updateLayout();
-            }
-        };
-
-        Concept.prototype.getNode = function(diagram) {
-            let node = diagram.findNodeForKey(this.getId());
-            if(!node && this.oldId) node = diagram.findNodeForKey(this.oldId);
-            return node;
-        };
-
-        Concept.prototype.inDiagram = function(diagram) {
-            return diagram.findNodeForKey(this.getId()) ? true : false;
-        };
-
-        function n(c, e) { return Concept.get(c).getNode(Page.getActiveDiagram(e)); }
-
-        Concept.prototype.createNodeData = function() {
-            let self = this;
-            return {
-                id: self.id,
-                name: self.name,
-                isLaw: self.isLaw() ? true : false,
-                isLink: self.isLink() ? true : false
-            };
-        };
-
-        Concept.prototype.addNodeData = function(diagram, drawLinks) {
-            let self = this;
-
-            let data = diagram.model.findNodeDataForKey(self.getId());
-            if(data) return data;
-
-            data = self.createNodeData();
-            data.loc = '0 0';
-            diagram.model.addNodeData(data);
-
-            if(drawLinks) {
-                self.eachContext(function(concept) {
-                    diagram.model.addLinkData({
-                        from: self.getId(),
-                        to: concept.getId(),
-                        fromPort: 'T',
-                        toPort: 'B'
-                    });
-                });
-            }
-
-            return diagram.model.findNodeDataForKey(self.getId());
-        };
-
-        Concept.prototype.updateNodes = function() {
-            let self = this;
-            Page.eachExplorer(function(explorer, e) {
-                console.log('concept ' + self.id + ' updating explorer ' + e);
-                self.updateNode(explorer);
-            });
-        };
-
-        Concept.prototype.updateNode = function(explorer) {
-            let self = this, diagram = explorer.getActiveDiagram(), mode = explorer.getMode();
-            if(self.deleted || (mode === 'palette' && !self.hasContext(explorer.getConcept()))) {
-                self.removeFromDiagram(diagram);
-                return;
-            }
-            let data = self.getNodeData(diagram);
-            if(!data) data = self.addNodeData(diagram, mode === 'graph');
-            let newData = self.createNodeData();
-            for(let k in newData) diagram.model.set(data, k, newData[k]);
-
-            let node = self.getNode(diagram);
-            if(node) node.updateTargetBindings();
-        };
-
-        Concept.prototype.getNodeData = function(diagram, key) {
-            let data = diagram.model.findNodeDataForKey(this.getId());
-            if(!data && this.oldId) data = diagram.model.findNodeDataForKey(this.oldId);
-            if(data) return key === undefined ? data : data[key];
-            return undefined;
-        };
-
-        Concept.prototype.setNodeData = function(diagram, key, value) {
-            let data = this.getNodeData(diagram);
-            if(data) {
-                if(typeof key === 'object') {
-                    for(let k in key) {
-                        diagram.model.set(data, k, key[k]);
-                    }
-                } else {
-                    diagram.model.set(data, key, value);
-                }
-            }
-        };
-
-        function nd(c, e, k) { return Concept.get(c).getNodeData(Page.explorers[e].getActiveDiagram(), k); }
-        function snd(c, e, k, v) { Concept.get(c).setNodeData(Page.explorers[e].getActiveDiagram(), k, v); }
+        function g(p, e) { return Part.get(p).getGoPart(Page.getActiveDiagram(e)); }
+        function gd(p, e, k) { return Part.get(p).getGoData(Page.explorers[e].getActiveDiagram(), k); }
+        function sgd(p, e, k, v) { Part.get(p).setGoData(Page.explorers[e].getActiveDiagram(), k, v); }
 
 
 

@@ -564,3 +564,33 @@ success!
 timestamp: 2019-11-13T18:41:44.027523
 ALTER TABLE concept DROP COLUMN islink;
 success!
+timestamp: 2019-11-25T13:56:36.252263
+ALTER TABLE concept ADD value VARCHAR(512);
+success!
+timestamp: 2019-11-25T13:56:36.535644
+ALTER TABLE concept DROP COLUMN predicate;
+success!
+timestamp: 2019-11-25T13:56:36.618974
+ALTER TABLE concept DROP COLUMN aggregator;
+success!
+timestamp: 2019-11-25T13:56:36.760422
+ALTER TABLE concept DROP COLUMN is_law;
+success!
+timestamp: 2019-11-25T13:56:36.818445
+ALTER TABLE concept DROP COLUMN is_link;
+success!
+timestamp: 2019-11-25T13:56:36.881090
+ALTER TABLE concept DROP COLUMN is_singular;
+success!
+timestamp: 2019-11-25T13:56:36.944360
+ALTER TABLE concept DROP COLUMN type;
+success!
+timestamp: 2019-11-25T13:56:37.011836
+CREATE TABLE part(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    start INT  , INDEX start__idx (start), FOREIGN KEY (start) REFERENCES part (id) ON DELETE CASCADE,
+    end INT  , INDEX end__idx (end), FOREIGN KEY (end) REFERENCES part (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
