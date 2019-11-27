@@ -188,10 +188,10 @@
         };
 
         Explorer.prototype.drawGraph = function() {
-            let self = this, nodes = self.node.getChildren(), diagram = self.getGraph(), drawn = {};
+            let self = this, nodes = self.node.getChildren(), diagram = self.getGraph(), drawn = {}, links = {};
 
             // add a visual node for each node in the relation
-            nodes.forEach(function(node) {
+            $.each(nodes, function(node) {
 
                 // don't draw nodes that are only included by virtue of something being an instance of them
                 let isTop = node.eachNeighbor(function(neighbor, direction) {
@@ -202,7 +202,13 @@
 
                 node.addGoData(diagram);
                 drawn[node.getId()] = node;
+
+                node.eachLink(function(link) {
+                    links[]
+                });
             });
+
+
 
             for(let id in drawn) {
                 let node = drawn[id];

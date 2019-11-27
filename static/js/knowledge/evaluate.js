@@ -24,18 +24,17 @@
             let self = this;
 
             // identify the top context nodes of this relation
-            let R = self.getNeighborsViaLink('in', 'incoming');
-            let queue = R.getTopNodes();
+            let queue = self.getTopNodes();
 
             // for each such top node C
             while(!queue.isEmpty()) {
 
                 let part = queue.first();
                 // take every law predicate C is 'in'
-                node.eachOutgoing('in', 'predicate', 'of', 'law', function(law) {
+                node.eachOutgoing(['in', 'predicate'], function(predicate) {
 
                     // look for all matches to P within R
-                    let map = new Map(self, law);
+                    let map = new Map(self, predicate);
                     map.map(node, node);
                     map.extend();
                 });
@@ -47,22 +46,18 @@
         };
 
 
-        function Map(relation, law) {
+        function Map(relation, predicate) {
 
             this.relation = relation;
-            this.law = law;
+            this.predicate = predicate;
 
-            this.lawSet = law.getIncoming('in', '*');
+            this.law = predicate.getOutgoing(['of', 'law'])[0];
+            this.lawSet = law.getIncoming(['in', '*']);
+            this.predicateSet = predicate.getIncoming(['in', '*']);
 
             this.map = {};
-            this.queue = [];
-            this.predicatePossible = {};
-
-            this.predicateSets = [];
-            this.law.eachIncoming('of', 'predicate', function(predicate) {
-                this.predicateSets.push(predicate.getIncoming('in', '*'));
-                this.predicatePossible[predicate.getId()] = true;
-            });
+            this.waiting = {};
+            this.predicateComplete = false;
         }
         Map.nextId = 1;
 
@@ -70,8 +65,11 @@
             return this.id;
         };
 
-        Map.prototype.inLaw = function(part) {
-            return this.lawSet.contains(part);
+        Map.prototype.inLaw = function(lawPart) {
+            return this.lawSet.includes(lawPart);
+        };
+        Map.prototype.inPredicate = function(lawPart) {
+            return this.predicateSet.includes(lawPart);
         };
 
         Map.prototype.map = function(part, lawPart) {
@@ -85,12 +83,56 @@
 
             // mark the pair as matching
             self.map[lid] = part;
-            self.queue.push(lawPart);
+
+            // prioritize which neighbors of the matched part should be matched next
+            lawPart.eachNeighbor(function(lawNeighbor, lawDirection) {
+
+                // only neighbors that are within the law
+                if(!self.inLaw(lawNeighbor)) return;
+
+                // if this neighbor is already matched, make sure the connection is mirrored in the relation
+                let neighbor = self.getMatch(lawNeighbor);
+                if(neighbor) return neighbor.isNeighbor(part, lawDirection);
+
+                let neighborInPredicate = predicateSet.includes(neighbor.getId()),
+                    neighborRequired = self.predicateComplete || neighborInPredicate,
+                    priority = -1;
+
+                // first, links between parts that have already been matched
+                if(lawNeighbor.isLink() && self.hasMatch(lawNeighbor.getEndpoint(lawDirection))) {
+                    priority = neighborRequired ? 0 : 1;
+                // then, neighbors that extend the current match
+                } else {
+                    priority = neighborInPredicate ? 2 : 3;
+                }
+
+                self.waiting[neighbor.getId()] = {
+                    part: lawNeighbor,
+                    priority: priority,
+                    from: lawPart,
+                    direction: lawDirection
+                };
+            });
             return true;
         };
 
         Map.prototype.extend = function() {
             let self = this;
+
+            // find the highest priority part waiting to be matched
+            let best = null;
+            $.each(self.waiting, function(entry) {
+                if(!best || entry.priority < best.priority) best = entry;
+            });
+
+            // if nothing left to match, register this map
+            if(!best) {
+                self.register();
+                return;
+            }
+
+            // try to find a match for this part
+            let part =
 
             // try to extend the map from every waiting part
             while(self.queue.length > 0) {
@@ -106,8 +148,6 @@
 
                     // if Np has already been matched to some part N, then
                     // N should connect to X in the same way that Nl connects to Xl
-                    let neighbor = self.getMatch(lawNeighbor);
-                    if(neighbor) return neighbor.isNeighbor(part, lawDirection);
 
                     // otherwise, try all ways of adding a neighbor N that matches Nl
                     let found = false;
