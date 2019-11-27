@@ -13,7 +13,20 @@
     key whose parent keys may or may not have been added already.
 */
 
-        var Misc = {};
+        var Misc = {
+
+            each: function(obj, callback) {
+                let ret = true;
+                $.each(obj, function(val) {
+                    if(callback.call(val, val) === false) {
+                        ret = false;
+                        return false;
+                    }
+                });
+                return ret;
+            }
+
+        };
 
         Misc.toArray = function(obj) {
             arr = [];
@@ -557,7 +570,7 @@
 
         Part.prototype.eachNeighbor = function(directions, callback) {
             if(callback === undefined) callback = directions;
-            directions = typeof directions === 'string' ? [directions] : ['incoming', 'outgoing'];
+            directions = typeof directions === 'string' ? [directions] : ['outgoing', 'incoming'];
             for(let direction in directions) {
                 for(let id in this.neighbors[direction]) {
                     let neighbor = this.neighbors[direction][id];
@@ -577,28 +590,25 @@
         };
 
         Part.prototype.getEndpoints = function(direction, chain) {
-            let parts = [this], neighbors = [];
-            chain.forEach(function(data) {
-                parts.forEach(function(part) {
+            let self = this, parts = {self.getId(): self}, neighbors = {};
+            $.each(chain, function(data) {
+                $.each(parts, (function(part) {
                     for(let id in part.neighbors[direction]) {
                         let neighbor = part.neighbors[direction][id];
                         if(neighbor.matches(data)) {
-                            neighbors.push(neighbor);
+                            neighbors[id] = neighbor;
                         }
                     }
                 });
                 parts = neighbors;
-                neighbors = [];
+                neighbors = {};
             });
             return parts;
         };
 
         Part.prototype.eachEndpoint = function(direction, chain, callback) {
-            let parts = this.getEndpoints(direction, chain, callback);
-            parts.forEach(function(part) {
-                if(callback.call(part, part) === false) return false;
-            });
-            return true;
+            let parts = this.getEndpoints(direction, chain);
+            return Misc.each(parts, callback);
         };
 
         Part.prototype.hasIncoming = function(chain) {
@@ -633,6 +643,13 @@
             return this.hasEndpoint('outgoing', [link, node]);
         };
 
+        Part.prototype.eachLink = function(directions, callback) {
+            return this.eachNeighbor(directions, function(neighbor, direction) {
+                if(!neighbor.isLink()) return;
+                return callback.call(neighbor, neighbor, direction);
+            });
+        };
+
         Part.prototype.addLink = function(linkName, node) {
             let self = this;
             if(self.hasLink(linkName, node)) return true;
@@ -660,10 +677,14 @@
         Part.prototype.updatePage = function() {
             let self = this;
             Page.eachExplorer(function(e) {
-                let diagram = e.getActiveDiagram();
-                if(self.deleted) self.removeGoPart(diagram);
-                else self.updateGoPart(diagram);
+                self.updateExplorer(e);
             });
+        };
+
+        Part.prototype.updateExplorer = function(e) {
+            let diagram = e.getActiveDiagram();
+            if(self.deleted) self.removeGoPart(diagram);
+            else self.updateGoPart(diagram);
         };
 
         Part.prototype.updateGoPart = function(diagram) {
@@ -735,6 +756,20 @@
                 }
             }
             else diagram.model.set(data, key, value);
+        };
+
+        Part.prototype.draw = function(diagram) {
+            let self = this;
+            if(self.isNode()) {
+                self.addGoData(diagram);
+            } else if(self.isLink()) {
+                let goStart = self.start.getGoPart(diagram);
+                if(!goStart) return;
+                let goEnd = self.end.getGoPart(diagram);
+                if(goEnd) self.addGoData(diagram);
+                else {
+                }
+            }
         };
 
 

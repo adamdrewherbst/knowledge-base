@@ -188,38 +188,34 @@
         };
 
         Explorer.prototype.drawGraph = function() {
-            let self = this, nodes = self.node.getChildren(), diagram = self.getGraph(), drawn = {}, links = {};
+            let self = this, nodes = self.node.getExclusiveChildren(), diagram = self.getGraph(),
+                links = {}, linkLinks = {};
 
             // add a visual node for each node in the relation
             $.each(nodes, function(node) {
-
-                // don't draw nodes that are only included by virtue of something being an instance of them
-                let isTop = node.eachNeighbor(function(neighbor, direction) {
-                    if(!neighbor.isLink() || !nodes.includes(neighbor.getEnd())) return;
-                    return direction === 'incoming' && neighbor.matches('is a') && !neighbor.hasOutgoing('in', 'predicate');
-                });
-                if(isTop) return;
-
-                node.addGoData(diagram);
-                drawn[node.getId()] = node;
-
+                node.draw(diagram);
                 node.eachLink(function(link) {
-                    links[]
+                    links[link.getId()] = link;
                 });
             });
 
+            // any links from links will be parsed as well
+            $.each(links, function(link) {
+                if(nodes.hasOwnProperty(link.getStartId()) && nodes.hasOwnProperty(link.getEndId())) {
+                    link.eachLink(function(linkLink) {
+                        linkLinks[linkLink.getId()] = linkLink;
+                    });
+                }
+            });
 
-
-            for(let id in drawn) {
-                let node = drawn[id];
-                node.eachOutgoing(['*'], function(link) {
-                    if(drawn[link.getEndId()])
-                        link.addGoData(diagram);
-                    else if(link.matches('is a')) {
-                        node.setGoData('is_a_' + link.getEnd().getName(), true);
-                    }
-                });
-            }
+            // draw any links between nodes of this relation,
+            // and use visual cues to represent links to external concepts
+            $.each(links, function(link) {
+                link.draw(diagram);
+            });
+            $.each(linkLinks, function(linkLink) {
+                linkLink.draw(diagram);
+            });
 
             diagram.requestUpdate();
         };

@@ -39,7 +39,7 @@
                     map.extend();
                 });
 
-                part.eachIncoming('is a', function(link) {
+                part.eachIncoming(['is a'], function(link) {
                     queue.push(link);
                 });
             });
@@ -50,26 +50,32 @@
 
             this.relation = relation;
             this.predicate = predicate;
-
             this.law = predicate.getOutgoing(['of', 'law'])[0];
-            this.lawSet = law.getIncoming(['in', '*']);
-            this.predicateSet = predicate.getIncoming(['in', '*']);
+
+            this.relationSet = this.relation.getChildren();
+            this.predicateSet = this.predicate.getChildren();
+            this.lawSet = this.law.getChildren();
 
             this.map = {};
             this.waiting = {};
             this.predicateComplete = false;
         }
+
+        Map.map = {};
         Map.nextId = 1;
 
         Map.prototype.getId = function() {
             return this.id;
         };
 
-        Map.prototype.inLaw = function(lawPart) {
-            return this.lawSet.includes(lawPart);
+        Map.prototype.inRelation = function(part) {
+            return this.relationSet.hasOwnProperty(part.getId());
         };
         Map.prototype.inPredicate = function(lawPart) {
-            return this.predicateSet.includes(lawPart);
+            return this.predicateSet.hasOwnProperty(lawPart.getId());
+        };
+        Map.prototype.inLaw = function(lawPart) {
+            return this.lawSet.hasOwnProperty(lawPart.getId());
         };
 
         Map.prototype.map = function(part, lawPart) {
@@ -84,107 +90,86 @@
             // mark the pair as matching
             self.map[lid] = part;
 
-            // prioritize which neighbors of the matched part should be matched next
-            lawPart.eachNeighbor(function(lawNeighbor, lawDirection) {
+            // prioritize which links of the matched part should be matched next
+            let valid = lawPart.eachLink(function(lawLink, lawDirection) {
 
                 // only neighbors that are within the law
+                let lawNeighbor = lawLink.getEndpoint(lawDirection);
                 if(!self.inLaw(lawNeighbor)) return;
 
-                // if this neighbor is already matched, make sure the connection is mirrored in the relation
-                let neighbor = self.getMatch(lawNeighbor);
-                if(neighbor) return neighbor.isNeighbor(part, lawDirection);
+                // if this link is already matched, make sure its connection to the matched part is mirrored in the relation
+                let link = self.getMatch(lawLink);
+                if(link) return link.isNeighbor(part, lawDirection);
 
-                let neighborInPredicate = predicateSet.includes(neighbor.getId()),
-                    neighborRequired = self.predicateComplete || neighborInPredicate,
+                let linkInPredicate = predicateSet.hasOwnProperty(lawLink.getId()),
+                    neighborInPredicate = predicateSet.hasOwnProperty(lawNeighbor.getId()),
+                    linkRequired = self.predicateComplete || linkInPredicate,
                     priority = -1;
 
                 // first, links between parts that have already been matched
                 if(lawNeighbor.isLink() && self.hasMatch(lawNeighbor.getEndpoint(lawDirection))) {
-                    priority = neighborRequired ? 0 : 1;
-                // then, neighbors that extend the current match
+                    priority = linkRequired ? 0 : 1;
+                // then, links that extend the current match
                 } else {
-                    priority = neighborInPredicate ? 2 : 3;
+                    priority = linkInPredicate || neighborInPredicate ? 2 : 3;
                 }
 
-                self.waiting[neighbor.getId()] = {
-                    part: lawNeighbor,
-                    priority: priority,
-                    from: lawPart,
-                    direction: lawDirection
-                };
+                let id = lawLink.getId();
+                if(!self.waiting[id]) self.waiting[id] = {};
+                self.waiting[id].part = lawNeighbor;
+                self.waiting[id].from = lawPart;
+                self.waiting[id].direction = lawDirection;
+                self.waiting[id].priority = priority;
             });
+
+            if(!valid) return false;
+            if(lawPart.isLink()) {
+                if(!self.map(part.getStart(), lawPart.getStart())) return false;
+                if(!self.map(part.getEnd(), lawPart.getEnd())) return false;
+            }
+
+            delete self.waiting[lawPart.getId()];
+
+            self.predicateComplete = Misc.each(self.predicateSet, function(part) {
+                return self.hasMatch(part);
+            });
+
             return true;
         };
 
         Map.prototype.extend = function() {
             let self = this;
 
-            // find the highest priority part waiting to be matched
+            // find the highest priority link waiting to be matched
             let best = null;
             $.each(self.waiting, function(entry) {
-                if(!best || entry.priority < best.priority) best = entry;
+                if(!best || (entry.priority >= 0 && entry.priority < best.priority)) best = entry;
             });
 
             // if nothing left to match, register this map
-            if(!best) {
+            if(!best && self.predicateComplete) {
                 self.register();
                 return;
             }
 
-            // try to find a match for this part
-            let part =
+            // try to find a match for the link
+            let lawPart = best.from, lawLink = best.part, lawDirection = best.direction,
+                part = self.getMatch(lawPart);
 
-            // try to extend the map from every waiting part
-            while(self.queue.length > 0) {
-
-                // get the first node/link waiting to be extended - call it X, and its match in the law Xl
-                let lawPart = self.queue[0], part = self.getMatch(lawPart);
-
-                // for each of Xl's neighbors Nl in the predicate graph
-                let valid = lawPart.eachNeighbor(function(lawNeighbor, lawDirection) {
-
-                    // if this is a link outside the law, make sure its other end is part of the law
-                    if(!self.inLaw(lawNeighbor)) return;
-
-                    // if Np has already been matched to some part N, then
-                    // N should connect to X in the same way that Nl connects to Xl
-
-                    // otherwise, try all ways of adding a neighbor N that matches Nl
-                    let found = false;
-                    part.eachNeighbor(function(neighbor, direction) {
-                        let match = direction === lawDirection &&
-                            (neighbor.isNode() || neighbor.getConcept() === lawNeighbor.getConcept());
-                        if(match) {
-                            let newMap = self.clone();
-                            newMap.map(neighbor, lawNeighbor);
-                            newMap.extend();
-                            found = true;
-                        }
-                    });
-
-                    // if no match was found for the Nl, then we can rule out any predicate that requires it
-                    if(!found) {
-                        lawNeighbor.eachOutgoing('in', 'predicate', function(predicate) {
-                            delete self.predicatePossible[predicate.getId()];
-                        });
-                        if(Object.keys(self.predicatePossible).length === 0) {
-                            return false;
-                        }
-                    }
-                });
-                if(!valid) return false;
-
-                self.queue.shift();
-            }
-
-            //nothing left to do, so see if we match any predicate of the law
-            let match = !self.predicateSets.every(function(predicateSet) {
-                return !predicateSet.every(function(part) {
-                    return self.hasMatch(part);
-                });
+            // try all neighbors in the relation that match the link in the law
+            part.eachLink(lawDirection, function(link) {
+                if(!self.inRelation(link.getEndpoint(lawDirection))) return;
+                if(link.getConcept() === lawLink.getConcept()) {
+                    let newMap = self.clone();
+                    if(newMap.map(link, lawLink)) newMap.extend();
+                    found = true;
+                }
             });
-            if(match) {
-                console.log('matches law ' + self.law.getName());
+
+            // we can try to extend this map without having matched that link, as long as it wasn't required
+            if(best.priority > 0) {
+                delete self.waiting[lawLink.getId()];
+                self.extend();
             }
         };
 
@@ -194,6 +179,10 @@
 
         Map.prototype.getMatch = function(lawPart) {
             return this.map[lawPart.getId()];
+        };
+
+        Map.prototype.register = function() {
+            Map.map[Map.nextId++] = this;
         };
 
         Map.prototype.eachPair = function(callback) {
@@ -207,13 +196,8 @@
             return true;
         };
 
-        Map.prototype.check = function() {
-            let self = this;
-        };
-
         Map.prototype.clone = function() {
             let map = Object.assign({}, this);
-            map.from[this.id] = this;
         };
 
         Map.prototype.append = function() {
