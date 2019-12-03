@@ -59,7 +59,7 @@
 
             self.$wrapper.find('.concept-create-button').click(function(e) {
                 let node = Part.create();
-                node.addLink('in', self.concept);
+                node.addLink('in', self.node);
             });
             self.$wrapper.find('.law-create-button').click(function(e) {
                 let node = Part.create();
@@ -101,6 +101,10 @@
             return this.node;
         };
 
+        Explorer.prototype.isShowing = function(node) {
+            return this.node && node.hasLink('in', this.node);
+        };
+
         Explorer.prototype.open = function(node, mode) {
             this.$card.hide();
             this.node = Part.get(node);
@@ -130,7 +134,7 @@
 
         Explorer.prototype.updateLayout = function() {
             if(!this.node || this.mode !== 'graph') return;
-            this.node.layoutTree(this.getGraph());
+            this.getGraph().invalidateLayout();
         };
 
         Explorer.prototype.toggleCloseButtons = function(show) {
@@ -183,7 +187,9 @@
             Page.clearDiagram(diagram);
 
             this.node.eachIncoming(['in', '*'], function(child) {
-                child.addNodeData(diagram);
+                console.log('drawing child');
+                console.log(child);
+                child.addGoData(diagram);
             });
         };
 
@@ -192,7 +198,7 @@
                 links = {}, linkLinks = {};
 
             // add a visual node for each node in the relation
-            $.each(nodes, function(node) {
+            $.each(nodes, function(n, node) {
                 node.draw(diagram);
                 node.eachLink(function(link) {
                     links[link.getId()] = link;
@@ -200,7 +206,7 @@
             });
 
             // any links from links will be parsed as well
-            $.each(links, function(link) {
+            $.each(links, function(l, link) {
                 if(nodes.hasOwnProperty(link.getStartId()) && nodes.hasOwnProperty(link.getEndId())) {
                     link.eachLink(function(linkLink) {
                         linkLinks[linkLink.getId()] = linkLink;
@@ -210,10 +216,10 @@
 
             // draw any links between nodes of this relation,
             // and use visual cues to represent links to external concepts
-            $.each(links, function(link) {
+            $.each(links, function(l, link) {
                 link.draw(diagram);
             });
-            $.each(linkLinks, function(linkLink) {
+            $.each(linkLinks, function(l, linkLink) {
                 linkLink.draw(diagram);
             });
 
@@ -377,6 +383,15 @@
                             let part = o.part.adornedPart;
                             return !(part.diagram instanceof go.Palette) && (part instanceof go.Node);
                         }),
+                    makeButton("Open",
+                        function(e, obj) {
+                            let node = Part.get(obj.part.adornedPart);
+                            if(node) self.open(node);
+                        },
+                        function(o) {
+                            let part = o.part.adornedPart;
+                            return part.diagram instanceof go.Palette;
+                        }),
                     makeButton("Open in new Explorer",
                         function(e, obj) {
                             let node = Part.get(obj.part.adornedPart);
@@ -454,7 +469,13 @@
                     },
                     // we use a function to determine what text the node will display
                     new go.Binding('text', '', function(data, node) {
-                        return (data.name || '...') + ' [' + data.id + ']';
+                        let name = data.name, is_a = '';
+                        if(data.is_a) for(let id in data.is_a) {
+                            is_a += data.is_a[id].getName() + ',';
+                        }
+                        if(name && is_a.length > 1) name += ' (' + is_a.substring(0, is_a.length-1) + ')';
+                        else if(is_a.length > 1) name = is_a.substring(0, is_a.length-1);
+                        return (name || '...') + ' [' + data.id + ']';
                     }))
                 ),
                 // the port on top has an incoming link from my head node, and an outgoing link to my reference node
@@ -616,34 +637,31 @@
                     });//*/
                 }
                 diagram.addDiagramListener('ObjectSingleClicked', function(e) {
-                    let node = e.subject.part;
-                    if(node instanceof go.Node) {
-                        let concept = Concept.get(node);
-                        if(!concept) return;
-                        self.editConcept = concept;
-                        self.$nameEdit.val(concept.get('name') || '');
-                        self.$descriptionEdit.val(concept.get('description') || '');
-                        Page.clearDiagram(self.instanceOfPalette);
-                        concept.eachInstanceOf(function(instanceOf) {
-                            instanceOf.addNodeData(self.instanceOfPalette);
-                        });
+                    let goPart = e.subject.part, part = Part.get(e.subject.part);
+                    if(!part) return;
+                    self.partEditing = part;
+                    self.$nameEdit.val(part.getName() || '');
+                    self.$descriptionEdit.val(part.getDescription() || '');
+                    Page.clearDiagram(self.instanceOfPalette);
+                    part.eachOutgoing(['is a', '*'], function(node) {
+                        node.addGoData(self.instanceOfPalette);
+                    });
 
-                        let $diagram = $(diagram.div), $parent = $diagram.parents().has(self.$card).first(),
-                            diagramOffset = $diagram.offset(), parentOffset = $parent.offset();
+                    let $diagram = $(diagram.div), $parent = $diagram.parents().has(self.$card).first(),
+                        diagramOffset = $diagram.offset(), parentOffset = $parent.offset();
 
-                        let viewport = diagram.viewportBounds,
-                            nodeBounds = node.getDocumentBounds(),
-                            cardWidth = self.$card.width(),
-                            x = nodeBounds.x + nodeBounds.width/2 - cardWidth/2 - viewport.x,
-                            y = nodeBounds.y + nodeBounds.height - viewport.y;
-                        x = Math.max(0, Math.min(x, viewport.width-cardWidth/2));
-                        x += diagramOffset.left - parentOffset.left;
-                        y += diagramOffset.top - parentOffset.top;
+                    let viewport = diagram.viewportBounds,
+                        nodeBounds = goPart.getDocumentBounds(),
+                        cardWidth = self.$card.width(),
+                        x = nodeBounds.x + nodeBounds.width/2 - cardWidth/2 - viewport.x,
+                        y = nodeBounds.y + nodeBounds.height - viewport.y;
+                    x = Math.max(0, Math.min(x, viewport.width-cardWidth/2));
+                    x += diagramOffset.left - parentOffset.left;
+                    y += diagramOffset.top - parentOffset.top;
 
-                        self.$card.css('left', '' + x + 'px');
-                        self.$card.css('top', '' + y + 'px');
-                        self.$card.show();
-                    }
+                    self.$card.css('left', '' + x + 'px');
+                    self.$card.css('top', '' + y + 'px');
+                    self.$card.show();
                 });
                 diagram.addDiagramListener('ObjectDoubleClicked', function(e) {
                     let node = e.subject.part;

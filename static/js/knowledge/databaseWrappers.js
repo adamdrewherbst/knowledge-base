@@ -16,8 +16,9 @@
         var Misc = {
 
             each: function(obj, callback) {
+                if(Object.keys(obj).length === 0) return true;
                 let ret = true;
-                $.each(obj, function(val) {
+                $.each(obj, function(key, val) {
                     if(callback.call(val, val) === false) {
                         ret = false;
                         return false;
@@ -105,7 +106,7 @@
             on the value of the subkey.  If the callback returns true the loop halts.  If the key is omitted,
             all keys of the object will be looped through.
         */
-        Misc.each = function(obj, callback, key) {
+        /*Misc.each = function(obj, callback, key) {
             if(!obj || typeof obj !== 'object') return;
             let stop = callback.call(obj, obj, key);
             if(stop === true) return;
@@ -114,7 +115,7 @@
                 if(obj[k] && typeof obj[k] === 'object')
                     Misc.each(obj[k], callback, k);
             }
-        };
+        };*/
 
         /*
             apply a callback function to a sub-object of an object, treating the sub-object
@@ -201,11 +202,11 @@
         };
 
         Page.save = function() {
-            let records = {};
+            let records = {concept: {}, part: {}};
             Page.eachTable(function(table, name) {
-                table.eachRecord(function(record, id) {
+                table.each(function(record, id) {
                     if(record.deleted) {
-                        if(id > 0) records[table][id] = { id: id, deleted: true };
+                        if(id > 0) records[name][id] = { id: id, deleted: true };
                     } else {
                         if(record instanceof Concept) {
                             records.concept[id] = {
@@ -253,7 +254,7 @@
             this.records = {};
             this.nextId = -1;
 
-            Page.tables[type.name] = this;
+            Page.tables[type.tableName] = this;
         }
 
         Table.prototype.get = function(data) {
@@ -270,7 +271,7 @@
                 record = this.records[data] || null;
             } else if(typeof data === 'string') {
                 for(let id in this.records) if(this.records[id].get('name') === data) {
-                    record = self.records[id];
+                    record = this.records[id];
                     break;
                 }
             }
@@ -286,8 +287,9 @@
         Table.prototype.storeRecord = function(records, id) {
             let record = records[id];
 
-            if(record.saved) return;
-            record.saved = true;
+            delete record.saved; // flag used by the server, not needed here
+            if(record.stored) return;
+            record.stored = true;
 
             if(record.deleted) {
                 delete this.records[id];
@@ -299,9 +301,9 @@
             }
 
             if(id != record.id) {
-                this.records[record.id].oldId = id;
                 this.records[record.id] = this.records[id];
                 delete this.records[id];
+                this.records[record.id].oldId = id;
             }
             if(!this.records[record.id]) this.records[record.id] = new this.type();
 
@@ -384,11 +386,14 @@
         }
         Concept.prototype = Object.create(Record.prototype);
         Concept.constructor = Concept;
-        Concept.name = 'concept';
+        Concept.tableName = 'concept';
         Concept.table = new Table(Concept);
 
         Concept.get = function(data) {
             return Concept.table.get(data);
+        };
+        Concept.create = function(data) {
+            return Concept.table.create(data);
         };
         function c(data) {
             return Concept.table.get(data);
@@ -397,8 +402,14 @@
         Concept.prototype.getName = function() {
             return this.get('name');
         };
+        Concept.prototype.setName = function(name) {
+            this.set('name', name);
+        };
         Concept.prototype.getDescription = function() {
             return this.get('description');
+        };
+        Concept.prototype.setDescription = function(description) {
+            this.set('description', description);
         };
 
         Concept.prototype.getNode = function() {
@@ -427,7 +438,7 @@
         Concept.prototype.eachPart = function(callback) {
             let self = this;
             Part.table.each(function(part) {
-                if(part.getConcept() === this) {
+                if(part.getConcept() === self) {
                     if(callback.call(part, part) === false) return false;
                 }
             });
@@ -455,11 +466,16 @@
         }
         Part.prototype = Object.create(Record.prototype);
         Part.constructor = Part;
-        Part.name = 'part';
+        Part.tableName = 'part';
         Part.table = new Table(Part);
 
         Part.get = function(data) {
             return Part.table.get(data);
+        };
+        Part.create = function(data) {
+            let part = Part.table.create(data);
+            if(!part.getConcept()) part.setConcept(Concept.create());
+            return part;
         };
         function p(data) {
             return Part.table.get(data);
@@ -498,8 +514,26 @@
             }
         };
 
+        Part.prototype.delete = function() {
+            let self = this;
+            Record.prototype.delete.call(self);
+            self.eachLink(function(link) {
+                link.delete();
+            });
+            if(self.isNode() || self.isGeneral()) {
+                self.concept.delete();
+            }
+        };
+
         Part.prototype.getConcept = function() {
             return this.concept;
+        };
+        Part.prototype.setConcept = function(concept) {
+            this.concept = concept;
+            if(!this.isLink()) concept.setNode(this);
+        };
+        Part.prototype.getConceptId = function() {
+            return this.concept ? this.concept.getId() : null;
         };
 
         Part.prototype.getName = function() {
@@ -523,8 +557,13 @@
         Part.prototype.matches = function(data) {
             if(data === '*') return true;
             if(!isNaN(data)) return this.getId() == data;
-            if(typeof data === 'string') return this.getName() === data;
             if(data instanceof Part) return this === data;
+            if(typeof data === 'string') {
+                if(this.getName() === data) return true;
+                let concept = Concept.get(data), node = null;
+                if(concept) node = concept.getNode();
+                if(node) return this.hasLink('is a', node);
+            }
             return false;
         };
 
@@ -556,6 +595,16 @@
             this.set('end', end);
         };
 
+        Part.prototype.isGeneral = function() {
+            if(self.isNode()) {
+                return !self.eachOutgoing(['in', '*'], function(context) {
+                    return context.hasOutgoing(['is a', '*', 'in', 'META']);
+                });
+            } else if(self.isLink()) {
+                return self.getStart().isGeneral() && self.getEnd().isGeneral();
+            }
+        };
+
         Part.prototype.setNeighbor = function(part, direction, include) {
             include = include === undefined || include;
             if(this.isNeighbor(part, direction) == include) return true;
@@ -569,30 +618,33 @@
         };
 
         Part.prototype.eachNeighbor = function(directions, callback) {
+            let self = this;
             if(callback === undefined) callback = directions;
             directions = typeof directions === 'string' ? [directions] : ['outgoing', 'incoming'];
-            for(let direction in directions) {
-                for(let id in this.neighbors[direction]) {
-                    let neighbor = this.neighbors[direction][id];
-                    if(callback.call(neighbor, neighbor, direction)) return false;
+            return directions.every(function(direction) {
+                for(let id in self.neighbors[direction]) {
+                    let neighbor = self.neighbors[direction][id];
+                    if(callback.call(neighbor, neighbor, direction) === false) return false;
                 }
-            }
-            return true;
+                return true;
+            });
         };
 
-        Part.prototype.hasEndpoint = function(direction, chain) {
+        Part.prototype.hasEndpoint = function(direction, chain, index) {
             let self = this;
-            if(chain.length === 0) return true;
-            let data = chain.shift();
+            if(index === undefined) index = 0;
+            if(index >= chain.length) return true;
+            let data = chain[index];
             return !self.eachNeighbor(direction, function(neighbor) {
-                return !(neighbor.matches(data) && neighbor.hasEndpoint(direction, chain));
+                return !(neighbor.matches(data) && neighbor.hasEndpoint(direction, chain, index+1));
             })
         };
 
         Part.prototype.getEndpoints = function(direction, chain) {
-            let self = this, parts = {self.getId(): self}, neighbors = {};
-            $.each(chain, function(data) {
-                $.each(parts, (function(part) {
+            let self = this, parts = {}, neighbors = {};
+            parts[self.id] = self;
+            chain.forEach(function(data) {
+                $.each(parts, function(p, part) {
                     for(let id in part.neighbors[direction]) {
                         let neighbor = part.neighbors[direction][id];
                         if(neighbor.matches(data)) {
@@ -627,6 +679,17 @@
             return this.getEndpoints('incoming', ['in', '*']);
         };
 
+        Part.prototype.getExclusiveChildren = function() {
+            let self = this, children = self.getChildren();
+            $.each(children, function(c, child) {
+                let exclusive = child.eachOutgoing(['in'], function(link) {
+                    return link.getEnd() === self;
+                });
+                if(!exclusive) delete children[c];
+            });
+            return children;
+        };
+
         Part.prototype.getOutgoing = function(chain) {
             return this.getEndpoints('outgoing', chain);
         };
@@ -644,6 +707,7 @@
         };
 
         Part.prototype.eachLink = function(directions, callback) {
+            directions = typeof directions === 'string' ? [directions] : ['incoming', 'outgoing'];
             return this.eachNeighbor(directions, function(neighbor, direction) {
                 if(!neighbor.isLink()) return;
                 return callback.call(neighbor, neighbor, direction);
@@ -660,6 +724,7 @@
                 start: self,
                 end: node
             });
+            self.updatePage();
             link.updatePage();
         };
 
@@ -669,28 +734,30 @@
                 let neighbor = self.neighbors.outgoing[id];
                 if(neighbor.isLink() && neighbor.matches(link) && neighbor.getEnd().matches(node)) {
                     neighbor.delete();
+                    self.updatePage();
                     neighbor.updatePage();
                 }
             }
         };
 
-        Part.prototype.updatePage = function() {
+        Part.prototype.updatePage = function(doLayout) {
             let self = this;
             Page.eachExplorer(function(e) {
                 self.updateExplorer(e);
+                if(doLayout) e.updateLayout();
             });
         };
 
         Part.prototype.updateExplorer = function(e) {
-            let diagram = e.getActiveDiagram();
+            let self = this, diagram = e.getActiveDiagram();
             if(self.deleted) self.removeGoPart(diagram);
-            else self.updateGoPart(diagram);
+            else if(e.isShowing(self)) self.updateGoPart(diagram);
         };
 
         Part.prototype.updateGoPart = function(diagram) {
             let self = this, data = self.getGoData(diagram);
             if(!data) {
-                self.addGoData(diagram);
+                self.draw(diagram);
                 data = self.getGoData(diagram);
             } else {
                 diagram.model.set(data, 'id', self.getId());
@@ -768,6 +835,13 @@
                 let goEnd = self.end.getGoPart(diagram);
                 if(goEnd) self.addGoData(diagram);
                 else {
+                    if(self.matches('is a')) {
+                        let is_a = goStart.data.is_a;
+                        if(!is_a) is_a = {};
+                        is_a[self.getEndId()] = self.getEnd();
+                        diagram.model.set(goStart.data, 'is_a', is_a);
+                    } else if(self.matches('in') && self.getEnd().matches('predicate')) {
+                    }
                 }
             }
         };

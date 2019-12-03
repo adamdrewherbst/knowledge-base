@@ -31,7 +31,9 @@ def knowledge():
 
     #   make sure the global ROOT concept exists; this is the root of the tree of all concepts
     db['concept'].update_or_insert(id=1, name='ROOT', description='root of the concept tree')
+    db['concept'].update_or_insert(id=2, name='in', description='one concept belongs within another')
     db['part'].update_or_insert(id=1, concept=1)
+    db['part'].update_or_insert(id=2, concept=2, start=None, end=1)
 
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
@@ -95,13 +97,9 @@ def save():
     print('{}'.format(records))
 
     for cid in records['concept']:
-        saveRecord('concept', records['concept'][cid])
-    for lid in records['link']:
-        link = records['link'][lid]
-        for field in link:
-            if link[field] in records['concept']:
-                link[field] = records['concept'][link[field]]['id']
-        saveRecord('link', link)
+        saveRecord(records, 'concept', cid)
+    for pid in records['part']:
+        saveRecord(records, 'part', pid)
 
     db.executesql('alter table concept auto_increment=1')
     db.executesql('alter table link auto_increment=1')
@@ -109,7 +107,20 @@ def save():
     return response.json(records)
 
 
-def saveRecord(table, record):
+def saveRecord(records, table, rid):
+
+    record = records[table][str(rid)]
+    if 'saved' in record:
+        return record['id']
+    record['saved'] = True
+
+    if table is 'part':
+        if 'concept' in record and record['concept'] is not None:
+            record['concept'] = saveRecord(records, 'concept', record['concept'])
+        if 'start' in record and record['start'] is not None:
+            record['start'] = saveRecord(records, 'part', record['start'])
+        if 'end' in record and record['end'] is not None:
+            record['end'] = saveRecord(records, 'part', record['end'])
 
     if 'deleted' in record:
         db(db[table].id == record['id']).delete()
@@ -117,6 +128,8 @@ def saveRecord(table, record):
         db[table][record['id']].update_record(**record)
     else:
         record['id'] = db[table].insert(**record)
+
+    return record['id']
 
 
 def isint(val):
