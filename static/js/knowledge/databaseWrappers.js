@@ -246,6 +246,7 @@
         Page.store = function(data) {
             Concept.table.store(data.concept);
             Part.table.store(data.part);
+            Part.updateNeighbors();
         };
 
 
@@ -263,7 +264,7 @@
                 record = data;
             } else if(data instanceof go.GraphObject) {
                 let part = data.part ? data.part : data;
-                if(part instanceof go.Node) {
+                if(part instanceof go.Node || part instanceof go.Link) {
                     let id = part.data ? part.data.id : null;
                     if(id) record = this.records[id] || null;
                 }
@@ -279,7 +280,9 @@
         };
 
         Table.prototype.store = function(records) {
+            records.stored = {};
             for(let id in records) {
+                if(id === 'stored') continue;
                 this.storeRecord(records, id);
             }
         };
@@ -287,12 +290,15 @@
         Table.prototype.storeRecord = function(records, id) {
             let record = records[id];
 
-            delete record.saved; // flag used by the server, not needed here
-            if(record.stored) return;
-            record.stored = true;
+            if(records.stored[id]) return;
+            records.stored[id] = true;
+
+            console.log('storing ' + this.type.tableName + ' ' + id);
+            console.log(record);
 
             if(record.deleted) {
                 delete this.records[id];
+                return;
             }
 
             if(this.type === Part) {
@@ -300,16 +306,17 @@
                 if(record.end) this.storeRecord(records, record.end);
             }
 
-            if(id != record.id) {
-                this.records[record.id] = this.records[id];
-                delete this.records[id];
-                this.records[record.id].oldId = id;
+            if(record.oldId) {
+                this.records[id] = this.records[record.oldId];
+                delete this.records[record.oldId];
             }
-            if(!this.records[record.id]) this.records[record.id] = new this.type();
+            if(!this.records[id]) this.records[id] = new this.type();
 
-            this.records[record.id].update(record);
-            if(this.records[record.id].oldId !== undefined)
-                this.records[record.id].updatePage();
+            this.records[id].update(record);
+            if(this.records[id].oldId !== undefined) {
+                this.records[id].updatePage();
+                delete this.records[id].oldId;
+            }
         };
 
         Table.prototype.each = function(callback) {
@@ -485,7 +492,24 @@
             if(direction === 'incoming') return 'outgoing';
             if(direction === 'outgoing') return 'incoming';
             return null;
-        }
+        };
+
+        Part.updateNeighbors = function() {
+            let updates = {incoming: {}, outgoing: {}};
+            Part.table.each(function(part) {
+                for(let direction in updates) {
+                    for(let id in part.neighbors[direction]) {
+                        let neighbor = part.neighbors[direction][id], newId = neighbor.getId();
+                        if(newId != id) updates[direction][id] = newId;
+                    }
+                    for(let id in updates[direction]) {
+                        let newId = updates[direction][id];
+                        part.neighbors[direction][newId] = part.neighbors[direction][id];
+                        delete part.neighbors[direction][id];
+                    }
+                }
+            });
+        };
 
 
         Part.prototype.set = function(key, value) {
@@ -596,6 +620,7 @@
         };
 
         Part.prototype.isGeneral = function() {
+            let self = this;
             if(self.isNode()) {
                 return !self.eachOutgoing(['in', '*'], function(context) {
                     return context.hasOutgoing(['is a', '*', 'in', 'META']);
@@ -619,8 +644,12 @@
 
         Part.prototype.eachNeighbor = function(directions, callback) {
             let self = this;
-            if(callback === undefined) callback = directions;
-            directions = typeof directions === 'string' ? [directions] : ['outgoing', 'incoming'];
+            if(typeof directions === 'function') {
+                callback = directions;
+                directions = undefined;
+            }
+            if(typeof directions === 'string') directions = [directions];
+            if(!directions) directions = ['outgoing', 'incoming'];
             return directions.every(function(direction) {
                 for(let id in self.neighbors[direction]) {
                     let neighbor = self.neighbors[direction][id];
@@ -638,6 +667,12 @@
             return !self.eachNeighbor(direction, function(neighbor) {
                 return !(neighbor.matches(data) && neighbor.hasEndpoint(direction, chain, index+1));
             })
+        };
+
+        Part.prototype.firstEndpoint = function(direction, chain) {
+            let endpoints = this.getEndpoints(direction, chain), keys = Object.keys(endpoints);
+            if(keys.length === 0) return null;
+            return endpoints[keys[0]];
         };
 
         Part.prototype.getEndpoints = function(direction, chain) {
@@ -702,12 +737,22 @@
             return this.eachEndpoint('outgoing', chain, callback);
         };
 
-        Part.prototype.hasLink = function(link, node) {
-            return this.hasEndpoint('outgoing', [link, node]);
+        Part.prototype.hasLink = function(link, part) {
+            return this.hasEndpoint('outgoing', [link, part]);
+        };
+
+        Part.prototype.getLink = function(link, part) {
+            return this.firstEndpoint('outgoing', [link, part]);
         };
 
         Part.prototype.eachLink = function(directions, callback) {
-            directions = typeof directions === 'string' ? [directions] : ['incoming', 'outgoing'];
+            if(typeof directions === 'function') {
+                callback = directions;
+                directions = undefined;
+            }
+            if(typeof directions === 'string') directions = [directions];
+            if(!directions) directions = ['outgoing', 'incoming'];
+
             return this.eachNeighbor(directions, function(neighbor, direction) {
                 if(!neighbor.isLink()) return;
                 return callback.call(neighbor, neighbor, direction);
@@ -744,26 +789,33 @@
             let self = this;
             Page.eachExplorer(function(e) {
                 self.updateExplorer(e);
-                if(doLayout) e.updateLayout();
             });
         };
 
-        Part.prototype.updateExplorer = function(e) {
-            let self = this, diagram = e.getActiveDiagram();
-            if(self.deleted) self.removeGoPart(diagram);
-            else if(e.isShowing(self)) self.updateGoPart(diagram);
-        };
-
-        Part.prototype.updateGoPart = function(diagram) {
-            let self = this, data = self.getGoData(diagram);
-            if(!data) {
-                self.draw(diagram);
-                data = self.getGoData(diagram);
+        Part.prototype.updateExplorer = function(explorer) {
+            let self = this, diagram = explorer.getActiveDiagram();
+            if(self.deleted) {
+                self.removeGoData(diagram);
             } else {
-                diagram.model.set(data, 'id', self.getId());
-                if(self.isLink()) {
-                    diagram.model.set(data, 'from', self.getStartId());
-                    diagram.model.set(data, 'to', self.getEndId());
+                if(self.isNode()) {
+                    let node = explorer.getNode();
+                    if(node && (self === node || self.hasLink('in', node)))
+                        self.addGoData(diagram);
+                } else if(self.isLink()) {
+                    let goStart = self.getStart().getGoData(diagram),
+                        goEnd = self.getEnd().getGoData(diagram);
+                    if(goStart && goEnd) self.addGoData(diagram);
+                    else if(goStart) {
+                        if(self.matches('is a')) {
+                            let is_a = goStart.is_a;
+                            if(!is_a) is_a = {};
+                            is_a[self.getEndId()] = self.getEnd();
+                            diagram.model.set(goStart, 'is_a', is_a);
+                        } else if(self.matches('in') && self.getEnd().matches('predicate')) {
+                        }
+                    } else if(goEnd) {
+
+                    }
                 }
             }
             let goPart = self.getGoPart(diagram);
@@ -775,28 +827,23 @@
             if(!part && this.oldId !== undefined) part = diagram.findPartForKey(this.oldId);
         };
 
-        Part.prototype.removeGoPart = function(diagram) {
-            let goPart = this.getGoPart(diagram);
-            if(goPart) diagram.removeParts([goPart]);
-        };
-
         Part.prototype.addGoData = function(diagram) {
-            let self = this;
+            let self = this, goData = self.getGoData(diagram);
             let data = {
                 id: self.getId(),
                 name: self.getName(),
-                description: self.getDescription(),
-                loc: '0 0'
+                description: self.getDescription()
             }
+            if(!(diagram instanceof go.Palette)) data.loc = '0 0';
             if(self.isLink()) {
                 data.from = self.getStartId();
                 data.to = self.getEndId();
-                data.fromPort = 'T';
-                data.toPort = 'B';
-                diagram.model.addLinkData(data);
+                if(!goData) diagram.model.addLinkData(data);
             } else {
-                diagram.model.addNodeData(data);
+                if(!goData) diagram.model.addNodeData(data);
             }
+
+            if(goData) self.setGoData(diagram, data);
         };
 
         Part.prototype.getGoData = function(diagram, key) {
@@ -825,23 +872,24 @@
             else diagram.model.set(data, key, value);
         };
 
+        Part.prototype.removeGoData = function(diagram) {
+            let goData = this.getGoData(diagram);
+            if(goData) {
+                if(this.isNode()) diagram.model.removeNodeData(data);
+                else if(this.isLink()) diagram.model.removeLinkData(data);
+            }
+        };
+
         Part.prototype.draw = function(diagram) {
             let self = this;
             if(self.isNode()) {
                 self.addGoData(diagram);
             } else if(self.isLink()) {
-                let goStart = self.start.getGoPart(diagram);
+                let goStart = self.start.getGoData(diagram);
                 if(!goStart) return;
-                let goEnd = self.end.getGoPart(diagram);
+                let goEnd = self.end.getGoData(diagram);
                 if(goEnd) self.addGoData(diagram);
                 else {
-                    if(self.matches('is a')) {
-                        let is_a = goStart.data.is_a;
-                        if(!is_a) is_a = {};
-                        is_a[self.getEndId()] = self.getEnd();
-                        diagram.model.set(goStart.data, 'is_a', is_a);
-                    } else if(self.matches('in') && self.getEnd().matches('predicate')) {
-                    }
                 }
             }
         };

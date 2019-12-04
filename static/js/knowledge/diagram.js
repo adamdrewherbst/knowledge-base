@@ -68,8 +68,8 @@
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
                 if(self.node) {
-                    let context = self.node.getOutgoing(['in', '*']);
-                    if(context.length === 1) self.open(context[0]);
+                    let context = self.node.getOutgoing(['in', '*']), keys = Object.keys(context);
+                    if(keys.length === 1) self.open(context[keys[0]]);
                 }
             });
 
@@ -88,6 +88,7 @@
             });
 
             Page.addExplorer(self);
+            self.setMode('palette');
         }
 
         function e(id) { return Page.explorers[id]; }
@@ -101,14 +102,19 @@
             return this.node;
         };
 
-        Explorer.prototype.isShowing = function(node) {
-            return this.node && node.hasLink('in', this.node);
+        Explorer.prototype.isShowing = function(part) {
+            if(part.isNode()) {
+                return this.node && part.hasLink('in', this.node);
+            } else if(part.isLink()) {
+                let diagram = this.getActiveDiagram();
+                return part.getStart().hasGoData(diagram) || part.getEnd().hasGoData(diagram);
+            }
         };
 
         Explorer.prototype.open = function(node, mode) {
             this.$card.hide();
             this.node = Part.get(node);
-            let preferredMode = (this.node && this.node.hasLink('is a', 'law')) ? 'graph' : 'palette';
+            let preferredMode = (this.node && this.node.hasLink('is a', 'law')) ? 'graph' : this.mode;
             this.setMode(mode || preferredMode);
         };
 
@@ -121,7 +127,11 @@
             if(!this.node) return;
 
             let diagram = this.getActiveDiagram();
-            if(diagram) switch(this.mode) {
+            if(!diagram) return;
+
+            Page.clearDiagram(diagram);
+
+            switch(this.mode) {
                 case 'palette':
                     this.fillPalette();
                     break;
@@ -184,8 +194,6 @@
         Explorer.prototype.fillPalette = function() {
             let self = this, diagram = self.getPalette();
 
-            Page.clearDiagram(diagram);
-
             this.node.eachIncoming(['in', '*'], function(child) {
                 console.log('drawing child');
                 console.log(child);
@@ -197,9 +205,11 @@
             let self = this, nodes = self.node.getExclusiveChildren(), diagram = self.getGraph(),
                 links = {}, linkLinks = {};
 
+            nodes[self.node.getId()] = self.node;
+
             // add a visual node for each node in the relation
             $.each(nodes, function(n, node) {
-                node.draw(diagram);
+                node.updateExplorer(self);
                 node.eachLink(function(link) {
                     links[link.getId()] = link;
                 });
@@ -217,10 +227,10 @@
             // draw any links between nodes of this relation,
             // and use visual cues to represent links to external concepts
             $.each(links, function(l, link) {
-                link.draw(diagram);
+                link.updateExplorer(self);
             });
             $.each(linkLinks, function(l, linkLink) {
-                linkLink.draw(diagram);
+                linkLink.updateExplorer(self);
             });
 
             diagram.requestUpdate();
@@ -233,6 +243,57 @@
         Explorer.prototype.getPalette = function() {
             return this.modes.palette.diagram;
         };
+
+
+        // This variation on ForceDirectedLayout does not move any selected Nodes
+        // but does move all other nodes (vertexes).
+        function ContinuousForceDirectedLayout() {
+          go.ForceDirectedLayout.call(this);
+          this._isObserving = false;
+          this.explorer = null;
+        }
+        go.Diagram.inherit(ContinuousForceDirectedLayout, go.ForceDirectedLayout);
+
+        ContinuousForceDirectedLayout.prototype.isFixed = function(v) {
+            let part = Part.get(v.node);
+            if(part && this.explorer && this.explorer.node === part) return true;
+            return v.node.isSelected;
+        }
+
+        // optimization: reuse the ForceDirectedNetwork rather than re-create it each time
+        ContinuousForceDirectedLayout.prototype.doLayout = function(coll) {
+            if (!this._isObserving) {
+                this._isObserving = true;
+                // cacheing the network means we need to recreate it if nodes or links have been added or removed or relinked,
+                // so we need to track structural model changes to discard the saved network.
+                var lay = this;
+                this.diagram.addModelChangedListener(function(e) {
+                  // modelChanges include a few cases that we don't actually care about, such as
+                  // "nodeCategory" or "linkToPortId", but we'll go ahead and recreate the network anyway.
+                  // Also clear the network when replacing the model.
+                  if (e.modelChange !== "" ||
+                    (e.change === go.ChangedEvent.Transaction && e.propertyName === "StartingFirstTransaction")) {
+                    lay.network = null;
+                  }
+                });
+            }
+          var net = this.network;
+          if (net === null) {  // the first time, just create the network as normal
+            this.network = net = this.makeNetwork(coll);
+          } else {  // but on reuse we need to update the LayoutVertex.bounds for selected nodes
+            this.diagram.nodes.each(function(n) {
+              var v = net.findVertex(n);
+              if (v !== null) v.bounds = n.actualBounds;
+            });
+          }
+          // now perform the normal layout
+          go.ForceDirectedLayout.prototype.doLayout.call(this, coll);
+          // doLayout normally discards the LayoutNetwork by setting Layout.network to null;
+          // here we remember it for next time
+          this.network = net;
+        }
+        // end ContinuousForceDirectedLayout
+
 
         Explorer.prototype.makeGraph = function($div) {
             let self = this;
@@ -248,6 +309,14 @@
                       $$(go.Shape, "LineV", { stroke: "lightgray", strokeWidth: 0.5 }),
                       $$(go.Shape, "LineV", { stroke: "gray", strokeWidth: 0.5, interval: 10 })
                     ),
+
+                layout: $$(ContinuousForceDirectedLayout, {
+                    explorer: self,
+                    maxIterations: 200,
+                    defaultSpringLength: 30,
+                    defaultElectricalCharge: 100,
+                    defaultGravitationalMass: 100
+                }),
 
                 // allow the user to drag concepts from the palette and drop them in the diagram
                 allowDrop: true,
@@ -269,25 +338,7 @@
                 //"rotatingTool.snapAngleMultiple": 15,
                 //"rotatingTool.snapAngleEpsilon": 15,
                 "undoManager.isEnabled": true,
-
-                // when the user clicks on a node, call a function to display information about that node
-                "ChangedSelection": onSelectionChanged
             });
-
-            // display information about a node when the user clicks on it, in a div to the right of the diagram
-            function onSelectionChanged(e) {
-                let node = e.diagram.selection.first(),
-                    concept = Concept.get(node);
-                if(!concept) return;
-
-                let title = document.getElementById('node-title'), description = document.getElementById('node-description');
-                title.textContent = "Node Info";
-                description.innerHTML = concept.getInfoString().replace(new RegExp("\n", 'g'), "<br>");
-
-                let symbol = concept.getSymbol();
-                if(symbol)
-                    $('#symbolization-wrapper').html('<p><math display="block" scriptlevel="-3">' + symbol + '</math></p>');
-            }
 
             // dragging a node invalidates the Diagram.layout, causing a layout during the drag
             graph.toolManager.draggingTool.doMouseMove = function() {
@@ -328,27 +379,6 @@
             graph.addDiagramListener('LayoutCompleted', function(e) {
             });
 
-            // called in the node template below to create the top and bottom 'port' on each node;
-            // the user can press on this port and drag to the port of another node to create a link between them
-            function makePort(name, spot, output, input, fromMax, toMax) {
-                // the port is basically just a small transparent square
-                var options =
-                {
-                    fill: null,  // not seen, by default; set to a translucent gray by showSmallPorts, defined below
-                    stroke: null,
-                    desiredSize: new go.Size(12, 12),
-                    alignment: spot,  // align the port on the main Shape
-                    alignmentFocus: spot,  // just inside the Shape
-                    portId: name,  // declare this object to be a "port"
-                    fromSpot: spot, toSpot: spot,  // declare where links may connect at this port
-                    fromLinkable: output, toLinkable: input,  // declare whether the user may draw links to/from here
-                    cursor: "pointer",  // show a different cursor to indicate potential link point
-                };
-                if(fromMax !== undefined) options.fromMaxLinks = fromMax;
-                if(toMax !== undefined) options.toMaxLinks = toMax;
-                return $$(go.Shape, "Circle", options);
-            }
-
             function showSmallPorts(node, show) {
               node.ports.each(function(port) {
                 if (port.portId !== "") {  // don't change the default port, which is the big shape
@@ -377,7 +407,6 @@
                                     concept: Concept.create()
                                 });
                             child.addLink('in', node);
-                            child.updateNodes();
                         },
                         function(o) {
                             let part = o.part.adornedPart;
@@ -389,8 +418,9 @@
                             if(node) self.open(node);
                         },
                         function(o) {
-                            let part = o.part.adornedPart;
-                            return part.diagram instanceof go.Palette;
+                            return true;
+                            //let part = o.part.adornedPart;
+                            //return part.diagram instanceof go.Palette;
                         }),
                     makeButton("Open in new Explorer",
                         function(e, obj) {
@@ -398,8 +428,9 @@
                             if(node) self.openInNew(node, false);
                         },
                         function(o) {
-                            let part = o.part.adornedPart;
-                            return part.diagram instanceof go.Palette;
+                            return true;
+                            //let part = o.part.adornedPart;
+                            //return part.diagram instanceof go.Palette;
                         })
               );
 
@@ -413,23 +444,6 @@
                     // if you set the "loc" key in the node data (see the binding below these brackets),
                     // that determines where the center of the node will appear in the diagram
                     locationSpot: go.Spot.Center,
-                    // this is what appears when you hover the mouse over the node
-                    /*toolTip:
-                      $$(go.Adornment, "Auto",
-                        $$(go.Shape, { fill: "#EFEFCC" }),
-                        $$(go.TextBlock, { margin: 4, width: 140 },
-                            // we pop up a box next to the cursor, showing some info about the node
-                            new go.Binding("text", "", function(obj) {
-                                let part = obj.part;
-                                if (part instanceof go.Adornment) part = part.adornedPart;
-                                let msg = "";
-                                if (part instanceof go.Link) {
-                                } else if (part instanceof go.Node) {
-                                    msg = self.getNodeString(part.data.id);
-                                }
-                                return msg;
-                            }).ofObject())
-                      )//*/
                 },
                 // the 'loc' data key is parsed into a go.Point object, and this determines the location of the node on screen;
                 // specifically, it determines the center of the node on screen, per the 'locationSpot' option above.  Also,
@@ -478,11 +492,6 @@
                         return (name || '...') + ' [' + data.id + ']';
                     }))
                 ),
-                // the port on top has an incoming link from my head node, and an outgoing link to my reference node
-                makePort("T", go.Spot.Top, true, true),
-                // port on the bottom has an outgoing arrow to nodes whose head I am,
-                // and an incoming arrow from nodes whose reference I am
-                makePort("B", go.Spot.Bottom, true, true),
                 // handle mouse enter/leave events to show/hide the ports
                 {
                     contextMenu: nodeContextMenu,
@@ -616,26 +625,6 @@
                         if(part) part.delete();
                     }
                 });
-
-                if($div.hasClass('concept-graph')) {
-                    /*diagram.addChangedListener(function(e) {
-                        switch(e.change) {
-                            case go.ChangedEvent.Property:
-                                if(e.object instanceof go.Node) {
-                                    let node = e.object, concept = Concept.get(node);
-                                    if(concept && e.propertyName === 'position') {
-                                        if(node.data.nodeWidth !== undefined &&
-                                          node.data.nodeWidth !== node.getDocumentBounds().width) {
-                                            console.log('node ' + concept.id + ' from ' + node.data.nodeWidth +
-                                                ' to ' + node.getDocumentBounds().width);
-                                            self.updateLayout();
-                                        }
-                                    }
-                                }
-                                break;
-                        }
-                    });//*/
-                }
                 diagram.addDiagramListener('ObjectSingleClicked', function(e) {
                     let goPart = e.subject.part, part = Part.get(e.subject.part);
                     if(!part) return;
@@ -671,11 +660,17 @@
                         self.open(concept);
                     }
                 });
-            }
 
-            diagram.addDiagramListener('ViewportBoundsChanged', function(e) {
-                diagram.position = new go.Point(-diagram.viewportBounds.width/2, -50);
-            });
+                if($div.hasClass('concept-graph')) {
+                    diagram.addDiagramListener('ViewportBoundsChanged', function(e) {
+                        diagram.position = new go.Point(-diagram.viewportBounds.width/2, -diagram.viewportBounds.height/2);
+                    });
+                } else if($div.hasClass('concept-palette')) {
+                    diagram.addDiagramListener('ViewportBoundsChanged', function(e) {
+                        diagram.position = new go.Point(-diagram.viewportBounds.width/2, -50);
+                    });
+                }
+            }
         };
 
 
@@ -693,7 +688,17 @@
         };
 
         Page.clearDiagram = function(diagram) {
-            diagram.clear();
+            //diagram.clear();
+            let nodes = diagram.nodes;
+            while(nodes.next()) {
+                let node = nodes.value;
+                diagram.model.removeNodeData(node.data);
+            }
+            let links = diagram.links;
+            while(links.next()) {
+                let link = links.value;
+                diagram.model.removeLinkData(link.data);
+            }
         };
 
         Page.eachNode = function(diagram, callback) {

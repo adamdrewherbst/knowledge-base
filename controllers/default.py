@@ -96,23 +96,36 @@ def save():
     print('SAVING RECORDS')
     print('{}'.format(records))
 
+    records['saved'] = {'concept': {}, 'part': {}}
+
     for cid in records['concept']:
         saveRecord(records, 'concept', cid)
     for pid in records['part']:
         saveRecord(records, 'part', pid)
 
     db.executesql('alter table concept auto_increment=1')
-    db.executesql('alter table link auto_increment=1')
+    db.executesql('alter table part auto_increment=1')
+
+    for table in records['saved']:
+        for rid in records['saved'][table]:
+            rid = str(rid)
+            newId = str(records['saved'][table][rid])
+            if newId != rid:
+                records[table][newId] = records[table][rid]
+                del records[table][rid]
+
+    del records['saved']
 
     return response.json(records)
 
 
 def saveRecord(records, table, rid):
 
-    record = records[table][str(rid)]
-    if 'saved' in record:
-        return record['id']
-    record['saved'] = True
+    rid = str(rid)
+    if rid in records['saved'][table]:
+        return records['saved'][table][rid]
+
+    record = records[table][rid]
 
     if table is 'part':
         if 'concept' in record and record['concept'] is not None:
@@ -129,6 +142,10 @@ def saveRecord(records, table, rid):
     else:
         record['id'] = db[table].insert(**record)
 
+    if record['id'] is not rid:
+        record['oldId'] = rid
+
+    records['saved'][table][rid] = str(record['id'])
     return record['id']
 
 
