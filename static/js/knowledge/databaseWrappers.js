@@ -207,6 +207,7 @@
                 table.each(function(record, id) {
                     if(record.deleted) {
                         if(id > 0) records[name][id] = { id: id, deleted: true };
+                        else table.delete(id);
                     } else {
                         if(record instanceof Concept) {
                             records.concept[id] = {
@@ -246,7 +247,9 @@
         Page.store = function(data) {
             Concept.table.store(data.concept);
             Part.table.store(data.part);
-            Part.updateNeighbors();
+            Part.updateReferences();
+            Concept.table.removeOldIds();
+            Part.table.removeOldIds();
         };
 
 
@@ -263,10 +266,14 @@
             if(data instanceof this.type) {
                 record = data;
             } else if(data instanceof go.GraphObject) {
-                let part = data.part ? data.part : data;
-                if(part instanceof go.Node || part instanceof go.Link) {
-                    let id = part.data ? part.data.id : null;
-                    if(id) record = this.records[id] || null;
+                let goPart = data.part ? data.part : data;
+                if(goPart instanceof go.Node || goPart instanceof go.Link) {
+                    let id = goPart.data ? goPart.data.id : null, part = null;
+                    if(id) part = Part.table.records[id] || null;
+                    if(part) {
+                        if(this.type === Part) record = part;
+                        else if(this.type === Concept) record = part.getConcept();
+                    }
                 }
             } else if(!isNaN(data)) {
                 record = this.records[data] || null;
@@ -289,6 +296,8 @@
 
         Table.prototype.storeRecord = function(records, id) {
             let record = records[id];
+            id = parseInt(id);
+            record.id = parseInt(record.id);
 
             if(records.stored[id]) return;
             records.stored[id] = true;
@@ -315,8 +324,13 @@
             this.records[id].update(record);
             if(this.records[id].oldId !== undefined) {
                 this.records[id].updatePage();
-                delete this.records[id].oldId;
             }
+        };
+
+        Table.prototype.removeOldIds = function() {
+            this.each(function(record) {
+                delete record.oldId;
+            });
         };
 
         Table.prototype.each = function(callback) {
@@ -334,11 +348,8 @@
             return record;
         };
 
-        Table.prototype.delete = function(id, permanent) {
-            if(permanent) {
-                delete this.records[id];
-            } else {
-            }
+        Table.prototype.delete = function(id) {
+            delete this.records[id];
         };
 
 
@@ -494,9 +505,9 @@
             return null;
         };
 
-        Part.updateNeighbors = function() {
-            let updates = {incoming: {}, outgoing: {}};
+        Part.updateReferences = function() {
             Part.table.each(function(part) {
+                let updates = {incoming: {}, outgoing: {}};
                 for(let direction in updates) {
                     for(let id in part.neighbors[direction]) {
                         let neighbor = part.neighbors[direction][id], newId = neighbor.getId();
@@ -541,9 +552,16 @@
         Part.prototype.delete = function() {
             let self = this;
             Record.prototype.delete.call(self);
+            if(self.deleted) return;
             self.eachLink(function(link) {
                 link.delete();
             });
+            if(self.isLink()) {
+                if(self.start) {
+                    self.start.setNeighbor(self, 'outgoing', false);
+                    if(!self.start.hasLink('*', '*')) self.start.delete();
+                } if(self.end) self.end.setNeighbor(self, 'incoming', false);
+            }
             if(self.isNode() || self.isGeneral()) {
                 self.concept.delete();
             }
@@ -793,18 +811,30 @@
         };
 
         Part.prototype.updateExplorer = function(explorer) {
-            let self = this, diagram = explorer.getActiveDiagram();
+            let self = this, diagram = explorer.getActiveDiagram(), node = explorer.getNode(),
+                inLink = self.getLink('in', node), isInLink = self === inLink;
+
             if(self.deleted) {
+                if(self.isLink() && self.getStart() && !isInLink) {
+                    let isDetached = self.getStart().eachLink('outgoing', function(link) {
+                        return !link.hasGoData(diagram);
+                    });
+                    if(isDetached && inLink) {
+                        inLink.addGoData(diagram);
+                    }
+                }
                 self.removeGoData(diagram);
             } else {
                 if(self.isNode()) {
-                    let node = explorer.getNode();
                     if(node && (self === node || self.hasLink('in', node)))
                         self.addGoData(diagram);
                 } else if(self.isLink()) {
                     let goStart = self.getStart().getGoData(diagram),
                         goEnd = self.getEnd().getGoData(diagram);
-                    if(goStart && goEnd) self.addGoData(diagram);
+                    if(goStart && goEnd) {
+                        self.addGoData(diagram);
+                        if(inLink && !isInLink) inLink.removeGoData(diagram);
+                    }
                     else if(goStart) {
                         if(self.matches('is a')) {
                             let is_a = goStart.is_a;
@@ -825,6 +855,7 @@
         Part.prototype.getGoPart = function(diagram) {
             let part = diagram.findPartForKey(this.getId());
             if(!part && this.oldId !== undefined) part = diagram.findPartForKey(this.oldId);
+            return part;
         };
 
         Part.prototype.addGoData = function(diagram) {
@@ -846,16 +877,20 @@
             if(goData) self.setGoData(diagram, data);
         };
 
+        Part.prototype.hasGoData = function(diagram) {
+            return this.getGoData(diagram) ? true : false;
+        };
+
         Part.prototype.getGoData = function(diagram, key) {
             let data = null;
-            if(this.isLink()) {
-                data = diagram.model.findLinkDataForKey(this.getId());
-                if(!data && this.oldId !== undefined)
-                    data = diagram.model.findLinkDataForKey(this.oldId);
-            } else {
+            if(this.isNode()) {
                 data = diagram.model.findNodeDataForKey(this.getId());
                 if(!data && this.oldId !== undefined)
                     data = diagram.model.findNodeDataForKey(this.oldId);
+            } else if(this.isLink()) {
+                data = diagram.model.findLinkDataForKey(this.getId());
+                if(!data && this.oldId !== undefined)
+                    data = diagram.model.findLinkDataForKey(this.oldId);
             }
             if(data && key) return data[key];
             return data;

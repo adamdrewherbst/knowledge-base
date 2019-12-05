@@ -215,6 +215,9 @@
                 });
             });
 
+            let node = self.node.getGoPart(diagram);
+            if(node) node.movable = false;
+
             // any links from links will be parsed as well
             $.each(links, function(l, link) {
                 if(nodes.hasOwnProperty(link.getStartId()) && nodes.hasOwnProperty(link.getEndId())) {
@@ -532,6 +535,7 @@
             graph.model = $$(go.GraphLinksModel,
             {
                 nodeKeyProperty: 'id',
+                linkKeyProperty: 'id',
                 linkFromPortIdProperty: 'fromPort',
                 linkToPortIdProperty: 'toPort',
             });

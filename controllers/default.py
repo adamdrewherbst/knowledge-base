@@ -30,10 +30,26 @@ from datetime import datetime
 def knowledge():
 
     #   make sure the global ROOT concept exists; this is the root of the tree of all concepts
-    db['concept'].update_or_insert(id=1, name='ROOT', description='root of the concept tree')
-    db['concept'].update_or_insert(id=2, name='in', description='one concept belongs within another')
-    db['part'].update_or_insert(id=1, concept=1)
-    db['part'].update_or_insert(id=2, concept=2, start=None, end=1)
+    db.concept.update_or_insert(db.concept.name == 'ROOT',
+        name = 'ROOT', description = 'root of the concept tree')
+    db.concept.update_or_insert(db.concept.name == 'in',
+        name = 'in', description = 'one concept belongs within another')
+    db.concept.update_or_insert(db.concept.name == 'is a',
+        name = 'is a', description = 'one concept is an instance of another')
+
+    rootId = db(db.concept.name == 'ROOT').select().first().id
+    inId = db(db.concept.name == 'in').select().first().id
+    isAId = db(db.concept.name == 'is a').select().first().id
+
+    db.part.update_or_insert(db.part.concept == rootId,
+        concept = rootId)
+
+    rootNode = db(db.part.concept == rootId).select().first().id
+
+    db.part.update_or_insert((db.part.concept == inId) & (db.part.end == rootNode),
+        concept = inId, end = rootNode)
+    db.part.update_or_insert((db.part.concept == isAId) & (db.part.end == rootNode),
+        concept = isAId, end = rootNode)
 
     #   There are no URL options for the main page and knowledge.html handles everything so we just
     #   return an empty Python dictionary
