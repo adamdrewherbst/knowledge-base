@@ -37,8 +37,13 @@
 
         .concept-explorer {
             height: 100%;
-            flex-grow: 1;
             position: relative;
+        }
+        .concept-explorer[diagram-mode="graph"] {
+            flex-grow: 4;
+        }
+        .concept-explorer[diagram-mode="palette"] {
+            flex-grow: 1;
         }
 
         .concept-mode {

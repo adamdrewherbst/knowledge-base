@@ -158,7 +158,7 @@ def saveRecord(records, table, rid):
     else:
         record['id'] = db[table].insert(**record)
 
-    if record['id'] is not rid:
+    if str(record['id']) != str(rid):
         record['oldId'] = rid
 
     records['saved'][table][rid] = str(record['id'])

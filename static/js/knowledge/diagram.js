@@ -164,6 +164,7 @@
                 this.$wrapper.find('.concept-mode').hide();
                 obj.wrapper.show();
                 this.mode = mode;
+                this.$wrapper.attr('diagram-mode', mode);
             }
 
             this.update();
@@ -213,6 +214,8 @@
                 node.eachLink(function(link) {
                     links[link.getId()] = link;
                 });
+                //let g = node.getGoPart(diagram);
+                //if(g) g.movable = false;
             });
 
             let node = self.node.getGoPart(diagram);
@@ -368,13 +371,14 @@
                 if(!start || !end) return;
                 if(link) link.setEndpoints(start, end);
                 else {
-                    let link = Part.create({
+                    link = Part.create({
                         concept: null,
                         start: start,
                         end: end
                     });
                     graph.model.set(e.subject.data, 'id', link.getId());
                 }
+                link.updatePage();
             }
             graph.addDiagramListener('LinkDrawn', storeLink);
             graph.addDiagramListener('LinkRelinked', storeLink);
@@ -472,6 +476,11 @@
                     {
                         cursor: "pointer",
                         strokeWidth: 2,
+                        portId: '',
+                        fromLinkable: true,
+                        toLinkable: true,
+                        fromLinkableDuplicates: true,
+                        toLinkableDuplicates: true
                     },
                     new go.Binding('fill', '', function(data, node) {
                         //if(data.isLaw) return '#cccc33';
@@ -692,10 +701,11 @@
 
             let viewport = diagram.viewportBounds,
                 nodeBounds = goPart.getDocumentBounds(),
-                cardWidth = self.$card.width(),
+                cardWidth = self.$card.width(), cardHeight = self.$card.height(),
                 x = nodeBounds.x + nodeBounds.width/2 - cardWidth/2 - viewport.x,
                 y = nodeBounds.y + nodeBounds.height - viewport.y;
-            x = Math.max(0, Math.min(x, viewport.width-cardWidth/2));
+            x = Math.max(0, Math.min(x, viewport.width - cardWidth));
+            y = Math.max(0, Math.min(y, viewport.height - cardHeight));
             x += diagramOffset.left - parentOffset.left;
             y += diagramOffset.top - parentOffset.top;
 

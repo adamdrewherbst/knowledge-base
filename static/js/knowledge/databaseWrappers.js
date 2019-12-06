@@ -223,7 +223,7 @@
                         }
                         if(id > 0) records[name][id].id = id;
                     }
-                });
+                }, true);
             });
             $.ajax({
                 url: Page.saveURL,
@@ -333,8 +333,9 @@
             });
         };
 
-        Table.prototype.each = function(callback) {
+        Table.prototype.each = function(callback, includeDeleted) {
             for(let id in this.records) {
+                if(!includeDeleted && this.records[id].deleted) continue;
                 if(callback.call(this.records[id], this.records[id], id) === false) return false;
             }
             return true;
@@ -437,17 +438,17 @@
         };
 
         Concept.prototype.getLinks = function() {
-            let self = this, links = [];
-            Part.table.each(function(part) {
-                if(part.isLink() && part.getConcept() === self) links.push(part);
+            let self = this, links = {};
+            Part.table.each(function(part, p) {
+                if(part.isLink() && part.getConcept() === self) links[p] = part;
             });
             return links;
         };
 
         Concept.prototype.getParts = function() {
-            let self = this, parts = [];
-            Part.table.each(function(part) {
-                if(part.getConcept() === self) parts.push(part);
+            let self = this, parts = {};
+            Part.table.each(function(part, p) {
+                if(part.getConcept() === self) parts[p] = part;
             });
             return parts;
         };
@@ -473,6 +474,10 @@
                     });
                 });
             });
+        };
+
+        Concept.prototype.toString = function() {
+            return this.name + ' (' + this.id + ')';
         };
 
 
@@ -562,7 +567,7 @@
                 }
                 if(self.end) self.end.setNeighbor(self, 'incoming', false);
             }
-            if(self.isNode() || self.isGeneral()) {
+            if(self.concept && Object.keys(self.concept.getParts()).length === 0) {
                 self.concept.delete();
             }
         };
@@ -613,7 +618,7 @@
             return !this.start || !this.end;
         };
         Part.prototype.isLink = function() {
-            return this.start && this.end;
+            return this.start && this.end ? true : false;
         };
         Part.prototype.getStart = function() {
             return this.start;
@@ -787,7 +792,7 @@
         Part.prototype.printLinks = function() {
             let self = this;
             self.eachLink(function(link, direction) {
-                console.log(link.getStartId() + ' > ' + link.getName() + ' [' + link.getId() + '] > ' + link.getEndId());
+                link.print();
             });
         };
 
@@ -923,6 +928,18 @@
             if(goData) {
                 if(this.isNode()) diagram.model.removeNodeData(goData);
                 else if(this.isLink()) diagram.model.removeLinkData(goData);
+            }
+        };
+
+        Part.prototype.print = function() {
+            console.log(this.toString());
+        };
+
+        Part.prototype.toString = function() {
+            if(this.isNode()) {
+                return this.concept.toString() + ' [' + this.id + ']';
+            } else if(this.isLink()) {
+                return this.start.toString() + ' > ' + this.concept.toString() + ' > ' + this.end.toString();
             }
         };
 
