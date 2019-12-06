@@ -392,7 +392,6 @@
         Record.prototype.delete = function() {
             if(this.deleted) return;
             this.deleted = true;
-            this.table.delete(this.id);
             this.updatePage();
         };
 
@@ -551,8 +550,8 @@
 
         Part.prototype.delete = function() {
             let self = this;
-            Record.prototype.delete.call(self);
             if(self.deleted) return;
+            Record.prototype.delete.call(self);
             self.eachLink(function(link) {
                 link.delete();
             });
@@ -560,7 +559,8 @@
                 if(self.start) {
                     self.start.setNeighbor(self, 'outgoing', false);
                     if(!self.start.hasLink('*', '*')) self.start.delete();
-                } if(self.end) self.end.setNeighbor(self, 'incoming', false);
+                }
+                if(self.end) self.end.setNeighbor(self, 'incoming', false);
             }
             if(self.isNode() || self.isGeneral()) {
                 self.concept.delete();
@@ -760,7 +760,14 @@
         };
 
         Part.prototype.getLink = function(link, part) {
-            return this.firstEndpoint('outgoing', [link, part]);
+            let self = this, ret = null;
+            self.eachLink('outgoing', function(l) {
+                if(l.matches(link) && l.getEnd().matches(part)) {
+                    ret = l;
+                    return false;
+                }
+            });
+            return ret;
         };
 
         Part.prototype.eachLink = function(directions, callback) {
@@ -774,6 +781,13 @@
             return this.eachNeighbor(directions, function(neighbor, direction) {
                 if(!neighbor.isLink()) return;
                 return callback.call(neighbor, neighbor, direction);
+            });
+        };
+
+        Part.prototype.printLinks = function() {
+            let self = this;
+            self.eachLink(function(link, direction) {
+                console.log(link.getStartId() + ' > ' + link.getName() + ' [' + link.getId() + '] > ' + link.getEndId());
             });
         };
 
@@ -797,7 +811,6 @@
                 let neighbor = self.neighbors.outgoing[id];
                 if(neighbor.isLink() && neighbor.matches(link) && neighbor.getEnd().matches(node)) {
                     neighbor.delete();
-                    self.updatePage();
                     neighbor.updatePage();
                 }
             }
@@ -811,43 +824,41 @@
         };
 
         Part.prototype.updateExplorer = function(explorer) {
-            let self = this, diagram = explorer.getActiveDiagram(), node = explorer.getNode(),
-                inLink = self.getLink('in', node), isInLink = self === inLink;
+            let self = this, diagram = explorer.getActiveDiagram(), node = explorer.getNode();
 
-            if(self.deleted) {
-                if(self.isLink() && self.getStart() && !isInLink) {
-                    let isDetached = self.getStart().eachLink('outgoing', function(link) {
-                        return !link.hasGoData(diagram);
-                    });
-                    if(isDetached && inLink) {
-                        inLink.addGoData(diagram);
-                    }
-                }
-                self.removeGoData(diagram);
-            } else {
-                if(self.isNode()) {
-                    if(node && (self === node || self.hasLink('in', node)))
-                        self.addGoData(diagram);
-                } else if(self.isLink()) {
-                    let goStart = self.getStart().getGoData(diagram),
-                        goEnd = self.getEnd().getGoData(diagram);
-                    if(goStart && goEnd) {
-                        self.addGoData(diagram);
-                        if(inLink && !isInLink) inLink.removeGoData(diagram);
-                    }
-                    else if(goStart) {
+            if(self.deleted) self.removeGoData(diagram);
+
+            if(self.isNode()) {
+                if(!self.deleted && node && (self === node || self.hasLink('in', node)))
+                    self.addGoData(diagram);
+            } else if(self.isLink()) {
+                let goStart = self.getStart().getGoData(diagram),
+                    goEnd = self.getEnd().getGoData(diagram);
+                if(goStart) {
+                    let inLink = node && self.getStart() ? self.getStart().getLink('in', node) : null;
+                    if(goEnd) {
+                        if(!self.deleted && self !== inLink) self.addGoData(diagram);
+                    } else {
                         if(self.matches('is a')) {
                             let is_a = goStart.is_a;
                             if(!is_a) is_a = {};
-                            is_a[self.getEndId()] = self.getEnd();
+                            if(!self.deleted) is_a[self.getEndId()] = self.getEnd();
+                            else delete is_a[self.getEndId()];
                             diagram.model.set(goStart, 'is_a', is_a);
                         } else if(self.matches('in') && self.getEnd().matches('predicate')) {
                         }
-                    } else if(goEnd) {
-
+                        diagram.model.updateTargetBindings(goStart);
+                    }
+                    if(inLink) {
+                        let showInLink = !inLink.deleted && self.getStart().eachLink('outgoing', function(link) {
+                                return link === inLink || !link.hasGoData(diagram);
+                            });
+                        if(showInLink) inLink.addGoData(diagram);
+                        else inLink.removeGoData(diagram);
                     }
                 }
             }
+
             let goPart = self.getGoPart(diagram);
             if(goPart) goPart.updateTargetBindings();
         };
@@ -865,7 +876,7 @@
                 name: self.getName(),
                 description: self.getDescription()
             }
-            if(!(diagram instanceof go.Palette)) data.loc = '0 0';
+            if(!goData && !(diagram instanceof go.Palette)) data.loc = '0 0';
             if(self.isLink()) {
                 data.from = self.getStartId();
                 data.to = self.getEndId();
@@ -910,25 +921,10 @@
         Part.prototype.removeGoData = function(diagram) {
             let goData = this.getGoData(diagram);
             if(goData) {
-                if(this.isNode()) diagram.model.removeNodeData(data);
-                else if(this.isLink()) diagram.model.removeLinkData(data);
+                if(this.isNode()) diagram.model.removeNodeData(goData);
+                else if(this.isLink()) diagram.model.removeLinkData(goData);
             }
         };
-
-        Part.prototype.draw = function(diagram) {
-            let self = this;
-            if(self.isNode()) {
-                self.addGoData(diagram);
-            } else if(self.isLink()) {
-                let goStart = self.start.getGoData(diagram);
-                if(!goStart) return;
-                let goEnd = self.end.getGoData(diagram);
-                if(goEnd) self.addGoData(diagram);
-                else {
-                }
-            }
-        };
-
 
 
 

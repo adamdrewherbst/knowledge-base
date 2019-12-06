@@ -63,8 +63,8 @@
             });
             self.$wrapper.find('.law-create-button').click(function(e) {
                 let node = Part.create();
-                node.addLink('is a', 'law');
                 node.addLink('in', self.node);
+                node.addLink('is a', 'law');
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
                 if(self.node) {
@@ -401,7 +401,7 @@
 
 
             // here is the template that is used as the context menu for each node
-            let nodeContextMenu =
+            let partContextMenu =
               $$(go.Adornment, "Vertical",
                     makeButton("Add child",
                         function(e, obj) {
@@ -409,11 +409,20 @@
                                 child = Part.create({
                                     concept: Concept.create()
                                 });
-                            child.addLink('in', node);
+                            if(self.node) child.addLink('in', self.node);
+                            if(node !== self.node) child.addLink(null, node);
                         },
                         function(o) {
                             let part = o.part.adornedPart;
                             return !(part.diagram instanceof go.Palette) && (part instanceof go.Node);
+                        }),
+                    makeButton("Edit",
+                        function(e, obj) {
+                            let part = Part.get(obj.part.adornedPart);
+                            if(part) self.editPart(part);
+                        },
+                        function(o) {
+                            return true;
                         }),
                     makeButton("Open",
                         function(e, obj) {
@@ -421,9 +430,7 @@
                             if(node) self.open(node);
                         },
                         function(o) {
-                            return true;
-                            //let part = o.part.adornedPart;
-                            //return part.diagram instanceof go.Palette;
+                            return o.part.adornedPart instanceof go.Node;
                         }),
                     makeButton("Open in new Explorer",
                         function(e, obj) {
@@ -431,9 +438,7 @@
                             if(node) self.openInNew(node, false);
                         },
                         function(o) {
-                            return true;
-                            //let part = o.part.adornedPart;
-                            //return part.diagram instanceof go.Palette;
+                            return o.part.adornedPart instanceof go.Node;
                         })
               );
 
@@ -497,7 +502,7 @@
                 ),
                 // handle mouse enter/leave events to show/hide the ports
                 {
-                    contextMenu: nodeContextMenu,
+                    contextMenu: partContextMenu,
                     mouseEnter: function(e, node) { showSmallPorts(node, true); },
                     mouseLeave: function(e, node) { showSmallPorts(node, false); },
                     mouseDrop: function(e, node) {
@@ -510,26 +515,46 @@
                 }
             );
 
-            let linkContextMenu =
-              $$(go.Adornment, "Vertical");
-
             // GoJS also needs a template to specify how links between nodes will appear
             graph.linkTemplate =
                 $$(go.Link,
-                  $$(go.Shape,
-                    new go.Binding("stroke", "color"),
-                    new go.Binding("strokeWidth", "width"),
-                    /*new go.Binding("strokeDashArray", "", function(data, link) {
+                    $$(go.Shape,
+                        new go.Binding("stroke", "color"),
+                        new go.Binding("strokeWidth", "width"),
+                        /*new go.Binding("strokeDashArray", "", function(data, link) {
                         // if this is a link from the top of a node to the bottom of another, then it is pointing
                         // from a node to its reference; to distinguish these from head links, we make them dashed lines
                         if(data.fromPort === 'T') return [4, 4];
                         else return null;
-                    })//*/
-                  ),
-                  $$(go.Shape, { toArrow: "standard", stroke: null }),
-                  {
-                      contextMenu: linkContextMenu
-                  }
+                        })//*/
+                    ),
+                    $$(go.Shape, { toArrow: "standard", stroke: null }),
+                    $$(go.Panel, "Auto",
+                        $$(go.Shape,  // the label background, which becomes transparent around the edges
+                            {
+                                fill: $$(go.Brush, "Radial",
+                                    {
+                                        0: "rgb(240, 240, 240)",
+                                        0.3: "rgb(240, 240, 240)",
+                                        1: "rgba(240, 240, 240, 0)"
+                                    }
+                                ),
+                                stroke: null
+                            }
+                        ),
+                        $$(go.TextBlock,  // the label text
+                            {
+                                textAlign: "center",
+                                font: "14pt helvetica, arial, sans-serif",
+                                stroke: "#555555",
+                                margin: 10
+                            },
+                            new go.Binding("text", "name")
+                        )
+                    ),
+                    {
+                        contextMenu: partContextMenu
+                    }
                 );
 
             graph.model = $$(go.GraphLinksModel,
@@ -630,39 +655,11 @@
                     }
                 });
                 diagram.addDiagramListener('ObjectSingleClicked', function(e) {
-                    let goPart = e.subject.part, part = Part.get(e.subject.part);
-                    if(!part) return;
-                    self.partEditing = part;
-                    self.$nameEdit.val(part.getName() || '');
-                    self.$descriptionEdit.val(part.getDescription() || '');
-                    Page.clearDiagram(self.instanceOfPalette);
-                    part.eachOutgoing(['is a', '*'], function(node) {
-                        node.addGoData(self.instanceOfPalette);
-                    });
-
-                    let $diagram = $(diagram.div), $parent = $diagram.parents().has(self.$card).first(),
-                        diagramOffset = $diagram.offset(), parentOffset = $parent.offset();
-
-                    let viewport = diagram.viewportBounds,
-                        nodeBounds = goPart.getDocumentBounds(),
-                        cardWidth = self.$card.width(),
-                        x = nodeBounds.x + nodeBounds.width/2 - cardWidth/2 - viewport.x,
-                        y = nodeBounds.y + nodeBounds.height - viewport.y;
-                    x = Math.max(0, Math.min(x, viewport.width-cardWidth/2));
-                    x += diagramOffset.left - parentOffset.left;
-                    y += diagramOffset.top - parentOffset.top;
-
-                    self.$card.css('left', '' + x + 'px');
-                    self.$card.css('top', '' + y + 'px');
-                    self.$card.show();
+                    let goPart = e.subject.part, part = Part.get(goPart);
                 });
                 diagram.addDiagramListener('ObjectDoubleClicked', function(e) {
-                    let node = e.subject.part;
-                    if(node instanceof go.Node) {
-                        let concept = Concept.get(node);
-                        if(!concept) return;
-                        self.open(concept);
-                    }
+                    let goPart = e.subject.part, part = Part.get(goPart);
+                    if(part) self.open(part);
                 });
 
                 if($div.hasClass('concept-graph')) {
@@ -676,6 +673,36 @@
                 }
             }
         };
+
+        Explorer.prototype.editPart = function(part) {
+            let self = this, diagram = self.getActiveDiagram();
+            part = Part.get(part);
+            if(!part) return;
+            let goPart = part.getGoPart(diagram);
+            self.partEditing = part;
+            self.$nameEdit.val(part.getName() || '');
+            self.$descriptionEdit.val(part.getDescription() || '');
+            Page.clearDiagram(self.instanceOfPalette);
+            part.eachOutgoing(['is a', '*'], function(node) {
+                node.addGoData(self.instanceOfPalette);
+            });
+
+            let $diagram = $(diagram.div), $parent = $diagram.parents().has(self.$card).first(),
+                diagramOffset = $diagram.offset(), parentOffset = $parent.offset();
+
+            let viewport = diagram.viewportBounds,
+                nodeBounds = goPart.getDocumentBounds(),
+                cardWidth = self.$card.width(),
+                x = nodeBounds.x + nodeBounds.width/2 - cardWidth/2 - viewport.x,
+                y = nodeBounds.y + nodeBounds.height - viewport.y;
+            x = Math.max(0, Math.min(x, viewport.width-cardWidth/2));
+            x += diagramOffset.left - parentOffset.left;
+            y += diagramOffset.top - parentOffset.top;
+
+            self.$card.css('left', '' + x + 'px');
+            self.$card.css('top', '' + y + 'px');
+            self.$card.show();
+        }
 
 
 
