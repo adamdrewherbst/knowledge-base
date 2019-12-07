@@ -829,39 +829,27 @@
         };
 
         Part.prototype.updateExplorer = function(explorer) {
-            let self = this, diagram = explorer.getActiveDiagram(), node = explorer.getNode();
+            let self = this, diagram = explorer.getActiveDiagram(), show = explorer.isShowing(self),
+                mainLink = self.getLink(explorer.getFilter(), explorer.getNode()), showMainLink = true,
+                is_a = {};
 
-            if(self.deleted) self.removeGoData(diagram);
+            self.updateGoData(diagram, show);
 
-            if(self.isNode()) {
-                if(!self.deleted && node && (self === node || self.hasLink('in', node)))
-                    self.addGoData(diagram);
-            } else if(self.isLink()) {
-                let goStart = self.getStart().getGoData(diagram),
-                    goEnd = self.getEnd().getGoData(diagram);
-                if(goStart) {
-                    let inLink = node && self.getStart() ? self.getStart().getLink('in', node) : null;
-                    if(goEnd) {
-                        if(!self.deleted && self !== inLink) self.addGoData(diagram);
-                    } else {
-                        if(self.matches('is a')) {
-                            let is_a = goStart.is_a;
-                            if(!is_a) is_a = {};
-                            if(!self.deleted) is_a[self.getEndId()] = self.getEnd();
-                            else delete is_a[self.getEndId()];
-                            diagram.model.set(goStart, 'is_a', is_a);
-                        } else if(self.matches('in') && self.getEnd().matches('predicate')) {
+            if(explorer.getMode() === 'graph') {
+                self.eachLink(function(link, direction) {
+                    if(link === mainLink) return;
+                    let end = link.getEndpoint(direction), showLink = show && explorer.isShowing(end);
+                    link.updateGoData(diagram, showLink);
+                    if(showLink && direction === 'outgoing') showMainLink = false;
+                    if(show && !showLink) {
+                        if(link.matches('is a')) {
+                            is_a[end.getId()] = end;
                         }
-                        diagram.model.updateTargetBindings(goStart);
                     }
-                    if(inLink) {
-                        let showInLink = !inLink.deleted && self.getStart().eachLink('outgoing', function(link) {
-                                return link === inLink || !link.hasGoData(diagram);
-                            });
-                        if(showInLink) inLink.addGoData(diagram);
-                        else inLink.removeGoData(diagram);
-                    }
-                }
+                });
+                if(show) self.setGoData(diagram, 'is_a', is_a);
+
+                if(mainLink) mainLink.updateGoData(diagram, showMainLink);
             }
 
             let goPart = self.getGoPart(diagram);
@@ -874,23 +862,31 @@
             return part;
         };
 
-        Part.prototype.addGoData = function(diagram) {
-            let self = this, goData = self.getGoData(diagram);
-            let data = {
-                id: self.getId(),
-                name: self.getName(),
-                description: self.getDescription()
-            }
-            if(!goData && !(diagram instanceof go.Palette)) data.loc = '0 0';
-            if(self.isLink()) {
-                data.from = self.getStartId();
-                data.to = self.getEndId();
-                if(!goData) diagram.model.addLinkData(data);
+        Part.prototype.updateGoData = function(diagram, show) {
+            let self = this, model = diagram.model, goData = self.getGoData(diagram), fcn = null;
+            if(show) {
+                let data = {
+                    id: self.getId(),
+                    name: self.getName()
+                };
+                if(self.isLink()) {
+                    data.from = self.getStartId();
+                    data.to = self.getEndId();
+                }
+                if(!goData) {
+                    if(!(diagram instanceof go.Palette)) data.loc = '0 0';
+                    fcn = this.isNode() ? model.addNodeData : model.addLinkData;
+                    fcn.call(model, data);
+                } else {
+                    for(let key in data) model.set(goData, key, data[key]);
+                    model.set(goData, 'is_a', null);
+                }
             } else {
-                if(!goData) diagram.model.addNodeData(data);
+                if(goData) {
+                    fcn = this.isNode() ? model.removeNodeData : model.removeLinkData;
+                    fcn.call(model, goData);
+                }
             }
-
-            if(goData) self.setGoData(diagram, data);
         };
 
         Part.prototype.hasGoData = function(diagram) {
@@ -898,16 +894,11 @@
         };
 
         Part.prototype.getGoData = function(diagram, key) {
-            let data = null;
-            if(this.isNode()) {
-                data = diagram.model.findNodeDataForKey(this.getId());
-                if(!data && this.oldId !== undefined)
-                    data = diagram.model.findNodeDataForKey(this.oldId);
-            } else if(this.isLink()) {
-                data = diagram.model.findLinkDataForKey(this.getId());
-                if(!data && this.oldId !== undefined)
-                    data = diagram.model.findLinkDataForKey(this.oldId);
-            }
+            let data = null, model = diagram.model,
+                fcn = this.isNode() ? model.findNodeDataForKey : model.findLinkDataForKey;
+            data = fcn.call(model, this.getId());
+            if(!data && this.oldId !== undefined)
+                data = fcn.call(model, this.oldId);
             if(data && key) return data[key];
             return data;
         };

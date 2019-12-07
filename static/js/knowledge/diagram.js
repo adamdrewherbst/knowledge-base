@@ -45,6 +45,12 @@
                 };
             });
 
+            self.views = {
+                normal: 'in',
+                meta: 'of'
+            }
+            self.view = 'normal';
+
             self.$wrapper.find('.explorer-mode-button').click(function(e) {
                 self.setMode($(this).attr('mode'));
             });
@@ -102,15 +108,6 @@
             return this.node;
         };
 
-        Explorer.prototype.isShowing = function(part) {
-            if(part.isNode()) {
-                return this.node && part.hasLink('in', this.node);
-            } else if(part.isLink()) {
-                let diagram = this.getActiveDiagram();
-                return part.getStart().hasGoData(diagram) || part.getEnd().hasGoData(diagram);
-            }
-        };
-
         Explorer.prototype.open = function(node, mode) {
             this.$card.hide();
             this.node = Part.get(node);
@@ -124,22 +121,17 @@
         };
 
         Explorer.prototype.update = function() {
-            if(!this.node) return;
+            let self = this;
+            if(!self.node) return;
 
             let diagram = this.getActiveDiagram();
             if(!diagram) return;
 
             Page.clearDiagram(diagram);
 
-            switch(this.mode) {
-                case 'palette':
-                    this.fillPalette();
-                    break;
-                case 'graph':
-                    this.drawGraph();
-                    break;
-                default: break;
-            }
+            self.eachShowing(function(child) {
+                child.updateExplorer(self);
+            });
         };
 
         Explorer.prototype.updateLayout = function() {
@@ -171,6 +163,40 @@
             Page.updateExplorers();
         };
 
+        Explorer.prototype.getView = function() {
+            return this.view;
+        };
+
+        Explorer.prototype.setView = function(view) {
+            if(this.view === view) return;
+            this.view = view;
+            this.update();
+        };
+
+        Explorer.prototype.getFilter = function() {
+            return this.view ? this.views[this.view] : null;
+        };
+
+        Explorer.prototype.getShowing = function() {
+            let showing = this.node.getIncoming([this.getFilter(), '*']);
+            if(this.mode === 'graph' && this.node) showing[this.node.getId()] = this.node;
+            return showing;
+        };
+
+        Explorer.prototype.eachShowing = function(callback) {
+            let self = this;
+            if(self.mode === 'graph' && self.node) callback.call(self.node, self.node);
+            self.node.eachIncoming([this.getFilter(), '*'], function(child) {
+                callback.call(child, child);
+            });
+        };
+
+        Explorer.prototype.isShowing = function(part) {
+            return this.node && part.isNode() &&
+                ((this.mode === 'graph' && part === this.node) ||
+                part.hasLink(this.getFilter(), this.node));
+        };
+
         Explorer.prototype.setPosition = function(explorer, before) {
             if(before) this.$wrapper.insertBefore(explorer.$wrapper);
             else this.$wrapper.insertAfter(explorer.$wrapper);
@@ -190,56 +216,6 @@
 
         Explorer.prototype.getActiveDiagram = function() {
             return this.mode ? this.modes[this.mode].diagram : null;
-        };
-
-        Explorer.prototype.fillPalette = function() {
-            let self = this, diagram = self.getPalette();
-
-            this.node.eachIncoming(['in', '*'], function(child) {
-                console.log('drawing child');
-                console.log(child);
-                child.addGoData(diagram);
-            });
-        };
-
-        Explorer.prototype.drawGraph = function() {
-            let self = this, nodes = self.node.getExclusiveChildren(), diagram = self.getGraph(),
-                links = {}, linkLinks = {};
-
-            nodes[self.node.getId()] = self.node;
-
-            // add a visual node for each node in the relation
-            $.each(nodes, function(n, node) {
-                node.updateExplorer(self);
-                node.eachLink(function(link) {
-                    links[link.getId()] = link;
-                });
-                //let g = node.getGoPart(diagram);
-                //if(g) g.movable = false;
-            });
-
-            let node = self.node.getGoPart(diagram);
-            if(node) node.movable = false;
-
-            // any links from links will be parsed as well
-            $.each(links, function(l, link) {
-                if(nodes.hasOwnProperty(link.getStartId()) && nodes.hasOwnProperty(link.getEndId())) {
-                    link.eachLink(function(linkLink) {
-                        linkLinks[linkLink.getId()] = linkLink;
-                    });
-                }
-            });
-
-            // draw any links between nodes of this relation,
-            // and use visual cues to represent links to external concepts
-            $.each(links, function(l, link) {
-                link.updateExplorer(self);
-            });
-            $.each(linkLinks, function(l, linkLink) {
-                linkLink.updateExplorer(self);
-            });
-
-            diagram.requestUpdate();
         };
 
         Explorer.prototype.getGraph = function() {
@@ -325,7 +301,7 @@
                 }),
 
                 // allow the user to drag concepts from the palette and drop them in the diagram
-                allowDrop: true,
+                 allowDrop: true,
 
                 // other options for the diagram
                 "draggingTool.dragsLink": true,
@@ -638,6 +614,23 @@
                     }
                 });
             } else {
+                diagram.addDiagramListener('ExternalObjectsDropped', function(e) {
+                    if(!self.node) return;
+                    let it = e.subject.iterator;
+                    console.log('dropped nodes');
+                    while(it.next()) {
+                        let parent = Part.get(it.value);
+                        console.log(it.value.data);
+                        console.log(parent);
+                        if(!parent || !parent.isNode()) continue;
+                        let isMeta = parent.hasLink('in', 'META');
+                        self.setView(isMeta ? 'meta' : 'normal');
+                        let node = Part.create();
+                        diagram.model.set(it.value.data, 'id', node.getId());
+                        node.addLink(self.getFilter(), self.node);
+                        node.addLink('is a', parent);
+                    }
+                });
                 diagram.addDiagramListener('ChangedSelection', function(e) {
                     let it = e.subject.iterator, node = null;
                     if(it.next()) node = it.value;
