@@ -548,8 +548,8 @@
             if(this.isNode()) {
                 if(this.concept) this.concept.setNode(this);
             } else {
-                this.setNeighbor(this.start, 'incoming');
-                this.setNeighbor(this.end, 'outgoing')
+                if(this.start) this.setNeighbor(this.start, 'incoming');
+                if(this.end) this.setNeighbor(this.end, 'outgoing')
             }
         };
 
@@ -603,22 +603,23 @@
 
         Part.prototype.matches = function(data) {
             if(data === '*') return true;
-            if(!isNaN(data)) return this.getId() == data;
+            if(!isNaN(data)) return this.id == data;
             if(data instanceof Part) return this === data;
+            if(data instanceof Concept) return this.concept === data;
             if(typeof data === 'string') {
                 if(this.getName() === data) return true;
                 let concept = Concept.get(data), node = null;
                 if(concept) node = concept.getNode();
-                if(node) return this.hasLink('is a', node);
+                if(node) return this.hasLink(Concept.isA, node);
             }
             return false;
         };
 
         Part.prototype.isNode = function() {
-            return !this.start || !this.end;
+            return !this.start && !this.end;
         };
         Part.prototype.isLink = function() {
-            return this.start && this.end ? true : false;
+            return this.start || this.end ? true : false;
         };
         Part.prototype.getStart = function() {
             return this.start;
@@ -642,14 +643,19 @@
             this.set('end', end);
         };
 
+        Part.prototype.isMeta = function() {
+            return this.getName() === 'META' || this.has('>in>META') || this.has('>is a>*>in>META');
+        };
+
         Part.prototype.isGeneral = function() {
             let self = this;
             if(self.isNode()) {
-                return !self.eachOutgoing(['in', '*'], function(context) {
-                    return context.hasOutgoing(['is a', '*', 'in', 'META']);
+                return !self.each('>in>*', function(context) {
+                    return context.has('>is a>*>in>META');
                 });
             } else if(self.isLink()) {
-                return self.getStart().isGeneral() && self.getEnd().isGeneral();
+                return self.getStart && self.getStart().isGeneral()
+                    && self.getEnd() && self.getEnd().isGeneral();
             }
         };
 
@@ -673,6 +679,7 @@
             }
             if(typeof directions === 'string') directions = [directions];
             if(!directions) directions = ['outgoing', 'incoming'];
+
             return directions.every(function(direction) {
                 for(let id in self.neighbors[direction]) {
                     let neighbor = self.neighbors[direction][id];
@@ -682,92 +689,117 @@
             });
         };
 
-        Part.prototype.hasEndpoint = function(direction, chain, index) {
+        Part.parseChain = function(chain) {
+            if(!Array.isArray(chain)) chain = [chain];
+            let ret = [], re = new RegExp(/[<|>]/g), match = null;
+            chain.forEach(function(data) {
+                if(typeof data === 'string') {
+                    let ind = 0;
+                    while((match = re.exec(data)) !== null) {
+                        if(match.index > ind)
+                            ret.push(data.substring(ind, match.index));
+                        ret.push(data[match.index]);
+                        ind = match.index+1;
+                    }
+                    if(ind < data.length) ret.push(data.substring(ind));
+                } else {
+                    ret.push(data);
+                }
+            });
+            return ret;
+        };
+
+        Part.getDirection = function(str) {
+            if(typeof str !== 'string') return null;
+            str = str.toLowerCase();
+            switch(str) {
+                case '>':
+                case 'outgoing':
+                    return 'outgoing';
+                    break;
+                case '<':
+                case 'incoming':
+                    return 'incoming';
+                    break;
+            }
+        };
+
+        Part.prototype.has = function(chain, index, direction) {
+
             let self = this;
+            chain = Part.parseChain(chain);
             if(index === undefined) index = 0;
+
+            let dir = null, data = null;
+            while(index < chain.length && (dir = Part.getDirection(data = chain[index]))) {
+                direction = dir;
+                index++;
+            }
             if(index >= chain.length) return true;
-            let data = chain[index];
+
+            if(data === null) {
+                return direction && self.getEndpoint(Part.opposite(direction)) && self.getEndpoint(direction) === null;
+            }
+
             return !self.eachNeighbor(direction, function(neighbor) {
-                return !(neighbor.matches(data) && neighbor.hasEndpoint(direction, chain, index+1));
+                return !(neighbor.matches(data) && neighbor.has(chain, index+1, direction));
             })
         };
 
-        Part.prototype.firstEndpoint = function(direction, chain) {
-            let endpoints = this.getEndpoints(direction, chain), keys = Object.keys(endpoints);
+        Part.prototype.getFirst = function(chain) {
+            let endpoints = this.getAll(chain), keys = Object.keys(endpoints);
             if(keys.length === 0) return null;
             return endpoints[keys[0]];
         };
 
-        Part.prototype.getEndpoints = function(direction, chain) {
-            let self = this, parts = {}, neighbors = {};
+        Part.prototype.getAll = function(chain) {
+            chain = Part.parseChain(chain);
+            let self = this, parts = {}, neighbors = {}, direction = undefined;
             parts[self.id] = self;
             chain.forEach(function(data) {
+                if(dir = Part.getDirection(data)) {
+                    direction = dir;
+                    return;
+                }
                 $.each(parts, function(p, part) {
-                    for(let id in part.neighbors[direction]) {
-                        let neighbor = part.neighbors[direction][id];
-                        if(neighbor.matches(data)) {
-                            neighbors[id] = neighbor;
+                    if(data === null) {
+                        if(direction && part.getEndpoint(Part.opposite(direction)) && part.getEndpoint(direction) === null) {
+                            neighbors[p] = part;
                         }
+                    } else {
+                        part.eachNeighbor(direction, function(neighbor) {
+                            if(neighbor.matches(data)) {
+                                neighbors[neighbor.getId()] = neighbor;
+                            }
+                        });
                     }
                 });
                 parts = neighbors;
+                if(data === null) return false;
                 neighbors = {};
             });
             return parts;
         };
 
-        Part.prototype.eachEndpoint = function(direction, chain, callback) {
-            let parts = this.getEndpoints(direction, chain);
+        Part.prototype.each = function(chain, callback) {
+            let parts = this.getAll(chain);
             return Misc.each(parts, callback);
         };
 
-        Part.prototype.hasIncoming = function(chain) {
-            return this.hasEndpoint('incoming', chain);
-        };
-
-        Part.prototype.hasOutgoing = function(chain) {
-            return this.hasEndpoint('outgoing', chain);
-        };
-
-        Part.prototype.getIncoming = function(chain) {
-            return this.getEndpoints('incoming', chain);
-        };
-
-        Part.prototype.getChildren = function() {
-            return this.getEndpoints('incoming', ['in', '*']);
-        };
-
-        Part.prototype.getExclusiveChildren = function() {
-            let self = this, children = self.getChildren();
-            $.each(children, function(c, child) {
-                let exclusive = child.eachOutgoing(['in'], function(link) {
-                    return link.getEnd() === self;
-                });
-                if(!exclusive) delete children[c];
-            });
-            return children;
-        };
-
-        Part.prototype.getOutgoing = function(chain) {
-            return this.getEndpoints('outgoing', chain);
-        };
-
-        Part.prototype.eachIncoming = function(chain, callback) {
-            return this.eachEndpoint('incoming', chain, callback);
-        };
-
-        Part.prototype.eachOutgoing = function(chain, callback) {
-            return this.eachEndpoint('outgoing', chain, callback);
+        Part.prototype.getMainLinkType = function() {
+            return this.isMeta() ? Concept.metaOf : Concept.in;
         };
 
         Part.prototype.hasLink = function(link, part) {
-            return this.hasEndpoint('outgoing', [link, part]);
+            return this.has(['>', link, part]);
         };
 
         Part.prototype.getLink = function(link, part) {
             let self = this, ret = null;
             self.eachLink('outgoing', function(l) {
-                if(l.matches(link) && l.getEnd().matches(part)) {
+                if(l.matches(link) && ((part && l.getEnd() && l.getEnd().matches(part)) ||
+                    (part === null && l.getEnd() === null)))
+                {
                     ret = l;
                     return false;
                 }
@@ -806,15 +838,16 @@
                 start: self,
                 end: node
             });
-            self.updatePage();
-            link.updatePage();
         };
 
         Part.prototype.removeLink = function(link, node) {
             let self = this;
             for(let id in self.neighbors.outgoing) {
                 let neighbor = self.neighbors.outgoing[id];
-                if(neighbor.isLink() && neighbor.matches(link) && neighbor.getEnd().matches(node)) {
+                if(neighbor.isLink() && neighbor.matches(link) && (
+                    (node && neighbor.getEnd() && neighbor.getEnd().matches(node)) ||
+                    (node === null && neighbor.getEnd() === null)))
+                {
                     neighbor.delete();
                     neighbor.updatePage();
                 }
@@ -829,20 +862,24 @@
         };
 
         Part.prototype.updateExplorer = function(explorer) {
-            let self = this, diagram = explorer.getActiveDiagram(), show = explorer.isShowing(self),
-                mainLink = self.getLink(explorer.getFilter(), explorer.getNode()), showMainLink = true,
-                is_a = {};
+            let self = this, diagram = explorer.getActiveDiagram(), show = explorer.isShowing(self);
 
             self.updateGoData(diagram, show);
 
             if(explorer.getMode() === 'graph') {
+                let mainLink = self.getLink(self.getMainLinkType(), explorer.getNode()), showMainLink = true,
+                    is_a = {};
+
                 self.eachLink(function(link, direction) {
                     if(link === mainLink) return;
-                    let end = link.getEndpoint(direction), showLink = show && explorer.isShowing(end);
+                    let end = link.getEndpoint(direction);
+                    if(!end) return;
+                    let showLink = show && explorer.isShowing(end);
                     link.updateGoData(diagram, showLink);
-                    if(showLink && direction === 'outgoing') showMainLink = false;
+                    if(showLink && direction === 'outgoing' && !end.isMeta())
+                        showMainLink = false;
                     if(show && !showLink) {
-                        if(link.matches('is a')) {
+                        if(link.getConcept() === Concept.isA) {
                             is_a[end.getId()] = end;
                         }
                     }
@@ -867,7 +904,8 @@
             if(show) {
                 let data = {
                     id: self.getId(),
-                    name: self.getName()
+                    name: self.getName(),
+                    isMeta: self.isMeta()
                 };
                 if(self.isLink()) {
                     data.from = self.getStartId();
@@ -930,7 +968,9 @@
             if(this.isNode()) {
                 return this.concept.toString() + ' [' + this.id + ']';
             } else if(this.isLink()) {
-                return this.start.toString() + ' > ' + this.concept.toString() + ' > ' + this.end.toString();
+                return (this.start ? this.start.toString() : 'null')
+                    + ' > ' + this.concept.toString() + ' > '
+                    + (this.end ? this.end.toString() : 'null');
             }
         };
 

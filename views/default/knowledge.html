@@ -225,6 +225,11 @@
             });
 
             Page.load(function() {
+                let root = Part.get(1);
+                Concept.in = root.getFirst(['<in', null]).getConcept();
+                Concept.isA = root.getFirst(['<is a', null]).getConcept();
+                Concept.metaOf = root.getFirst(['<in<META>of', null]).getConcept();
+
                 let explorer = new Explorer();
                 explorer.open(1);
             });

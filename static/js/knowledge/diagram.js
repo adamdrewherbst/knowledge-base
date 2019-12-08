@@ -45,12 +45,6 @@
                 };
             });
 
-            self.views = {
-                normal: 'in',
-                meta: 'of'
-            }
-            self.view = 'normal';
-
             self.$wrapper.find('.explorer-mode-button').click(function(e) {
                 self.setMode($(this).attr('mode'));
             });
@@ -65,16 +59,18 @@
 
             self.$wrapper.find('.concept-create-button').click(function(e) {
                 let node = Part.create();
-                node.addLink('in', self.node);
+                node.addLink(Concept.in, self.node);
+                node.updatePage();
             });
             self.$wrapper.find('.law-create-button').click(function(e) {
                 let node = Part.create();
-                node.addLink('in', self.node);
-                node.addLink('is a', 'law');
+                node.addLink(Concept.in, self.node);
+                node.addLink(Concept.isA, 'law');
+                node.updatePage();
             });
             self.$wrapper.find('.concept-level-up-button').click(function(e) {
                 if(self.node) {
-                    let context = self.node.getOutgoing(['in', '*']), keys = Object.keys(context);
+                    let context = self.node.getAll('>in>*'), keys = Object.keys(context);
                     if(keys.length === 1) self.open(context[keys[0]]);
                 }
             });
@@ -93,8 +89,10 @@
                 self.partEditing.setDescription(self.$descriptionEdit.val());
             });
 
-            Page.addExplorer(self);
             self.setMode('palette');
+            self.showingMeta = {};
+
+            Page.addExplorer(self);
         }
 
         function e(id) { return Page.explorers[id]; }
@@ -111,7 +109,7 @@
         Explorer.prototype.open = function(node, mode) {
             this.$card.hide();
             this.node = Part.get(node);
-            let preferredMode = (this.node && this.node.hasLink('is a', 'law')) ? 'graph' : this.mode;
+            let preferredMode = (this.node && this.node.hasLink(Concept.isA, 'law')) ? 'graph' : this.mode;
             this.setMode(mode || preferredMode);
         };
 
@@ -163,38 +161,27 @@
             Page.updateExplorers();
         };
 
-        Explorer.prototype.getView = function() {
-            return this.view;
-        };
-
-        Explorer.prototype.setView = function(view) {
-            if(this.view === view) return;
-            this.view = view;
-            this.update();
-        };
-
-        Explorer.prototype.getFilter = function() {
-            return this.view ? this.views[this.view] : null;
-        };
-
         Explorer.prototype.getShowing = function() {
-            let showing = this.node.getIncoming([this.getFilter(), '*']);
-            if(this.mode === 'graph' && this.node) showing[this.node.getId()] = this.node;
+            let self = this, showing = {};
+            self.eachShowing(function(child) {
+                showing[child.getId()] = child;
+            });
             return showing;
         };
 
         Explorer.prototype.eachShowing = function(callback) {
             let self = this;
-            if(self.mode === 'graph' && self.node) callback.call(self.node, self.node);
-            self.node.eachIncoming([this.getFilter(), '*'], function(child) {
-                callback.call(child, child);
+            if(self.isShowing(self.node)) callback.call(self.node, self.node);
+            self.node.each('<*<*', function(child) {
+                if(self.isShowing(child)) callback.call(child, child);
             });
         };
 
         Explorer.prototype.isShowing = function(part) {
-            return this.node && part.isNode() &&
-                ((this.mode === 'graph' && part === this.node) ||
-                part.hasLink(this.getFilter(), this.node));
+            return this.node && part.isNode() && (
+                (this.mode === 'graph' && part === this.node) ||
+                part.hasLink(Concept.in, this.node) ||
+                (this.showingMeta.hasOwnProperty('all') || this.showingMeta.hasOwnProperty(part.getId())));
         };
 
         Explorer.prototype.setPosition = function(explorer, before) {
@@ -342,19 +329,23 @@
             });
 
             function storeLink(e) {
-                let start = Part.get(e.subject.fromNode), end = Part.get(e.subject.toNode),
-                    link = Part.get(e.subject);
+                let start = Part.get(e.subject.fromNode), end = Part.get(e.subject.toNode);
                 if(!start || !end) return;
-                if(link) link.setEndpoints(start, end);
-                else {
+                if(e.name === 'LinkRelinked') {
+                    let link = Part.get(e.subject);
+                    if(link && link.isLink()) link.setEndpoints(start, end);
+                    else return;
+                } else {
+                    let concept = null;
+                    if(!start.isMeta() && end.isMeta()) concept = Concept.in;
                     link = Part.create({
-                        concept: null,
+                        concept: concept,
                         start: start,
                         end: end
                     });
                     graph.model.set(e.subject.data, 'id', link.getId());
                 }
-                link.updatePage();
+                start.updatePage();
             }
             graph.addDiagramListener('LinkDrawn', storeLink);
             graph.addDiagramListener('LinkRelinked', storeLink);
@@ -389,8 +380,9 @@
                                 child = Part.create({
                                     concept: Concept.create()
                                 });
-                            if(self.node) child.addLink('in', self.node);
+                            if(self.node) child.addLink(Concept.in, self.node);
                             if(node !== self.node) child.addLink(null, node);
+                            child.updatePage();
                         },
                         function(o) {
                             let part = o.part.adornedPart;
@@ -459,8 +451,7 @@
                         toLinkableDuplicates: true
                     },
                     new go.Binding('fill', '', function(data, node) {
-                        //if(data.isLaw) return '#cccc33';
-                        //else if(data.isLink) return '#cc33cc';
+                        if(data.isMeta) return '#cc3';
                         return '#6c6';
                     }),
                     new go.Binding("figure")),
@@ -602,7 +593,7 @@
                         if(!(node instanceof go.Node)) continue;
                         console.log(node.data);
                         let otherPart = Part.get(node);
-                        if(otherPart) self.partEditing.addLink('is a', otherPart);
+                        if(otherPart) self.partEditing.addLink(Concept.isA, otherPart);
                     }
                 });
                 diagram.addDiagramListener('SelectionDeleted', function(e) {
@@ -610,7 +601,7 @@
                     let it = e.subject.iterator;
                     while(it.next()) {
                         let otherPart = Part.get(it.value);
-                        if(otherPart) self.partEditing.removeLink('is a', otherPart);
+                        if(otherPart) self.partEditing.removeLink(Concept.isA, otherPart);
                     }
                 });
             } else {
@@ -623,12 +614,12 @@
                         console.log(it.value.data);
                         console.log(parent);
                         if(!parent || !parent.isNode()) continue;
-                        let isMeta = parent.hasLink('in', 'META');
-                        self.setView(isMeta ? 'meta' : 'normal');
                         let node = Part.create();
+                        self.showingMeta[node.getId()] = true;
                         diagram.model.set(it.value.data, 'id', node.getId());
-                        node.addLink(self.getFilter(), self.node);
-                        node.addLink('is a', parent);
+                        node.addLink(parent.getMainLinkType(), self.node);
+                        node.addLink(Concept.isA, parent);
+                        node.updatePage();
                     }
                 });
                 diagram.addDiagramListener('ChangedSelection', function(e) {
@@ -685,7 +676,7 @@
             self.$nameEdit.val(part.getName() || '');
             self.$descriptionEdit.val(part.getDescription() || '');
             Page.clearDiagram(self.instanceOfPalette);
-            part.eachOutgoing(['is a', '*'], function(node) {
+            part.eachOutgoing([Concept.isA, '*'], function(node) {
                 node.addGoData(self.instanceOfPalette);
             });
 
