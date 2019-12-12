@@ -85,6 +85,10 @@
             float: right;
         }
 
+        .show-hide-menu {
+            display: inline-block;
+        }
+
         .explorer-close-button {
             background-color: #b22;
         }
@@ -100,22 +104,21 @@
             right: 0%;
         }
 
-        .explorer-edit-concept {
+        .card {
             display: none;
             width: 100%;
-            max-width: 600px;
             position: absolute;
             z-index: 100;
+        }
+
+        .explorer-edit-concept {
+            max-width: 600px;
         }
         .explorer-edit-instance-of {
             min-height: 100px;
         }
-
-        .node-info {
-            background-color: #8ff;
-            color: #604;
-            font-weight: bold;
-            padding: 0 20px;
+        .explorer-show-links {
+            max-width: 500px;
         }
 
 

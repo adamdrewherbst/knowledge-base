@@ -821,6 +821,14 @@
             });
         };
 
+        Part.prototype.eachInLink = function(callback) {
+            return this.eachLink('incoming', callback);
+        };
+
+        Part.prototype.eachOutLink = function(callback) {
+            return this.eachLink('outgoing', callback);
+        };
+
         Part.prototype.printLinks = function() {
             let self = this;
             self.eachLink(function(link, direction) {
@@ -867,10 +875,10 @@
             self.updateGoData(diagram, show);
 
             if(explorer.getMode() === 'graph') {
-                let mainLink = self.getLink(self.getMainLinkType(), explorer.getNode()), showMainLink = true,
+                let mainLink = self.getLink(self.getMainLinkType(), explorer.getNode()), showMainLink = show,
                     is_a = {};
 
-                self.eachLink(function(link, direction) {
+                self.eachOutLink(function(link, direction) {
                     if(link === mainLink) return;
                     let end = link.getEndpoint(direction);
                     if(!end) return;

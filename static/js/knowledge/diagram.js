@@ -75,11 +75,16 @@
                 }
             });
 
+            self.$showLinks = self.$wrapper.find('.explorer-show-links');
+            self.$showInternal = self.$wrapper.find('.explorer-show-internal');
+            self.$showExternal = self.$wrapper.find('.explorer-show-external');
+            self.$showMeta = self.$wrapper.find('.explorer-show-meta');
+
             self.partEditing = null;
-            self.$card = self.$wrapper.find('.explorer-edit-concept');
-            self.$nameEdit = self.$card.find('.explorer-edit-name');
-            self.$descriptionEdit = self.$card.find('.explorer-edit-description');
-            self.$instanceOfEdit = self.$card.find('.explorer-edit-instance-of').attr('id', 'explorer-edit-instance-of-' + this.id);
+            self.$partEdit = self.$wrapper.find('.explorer-edit-concept');
+            self.$nameEdit = self.$partEdit.find('.explorer-edit-name');
+            self.$descriptionEdit = self.$partEdit.find('.explorer-edit-description');
+            self.$instanceOfEdit = self.$partEdit.find('.explorer-edit-instance-of').attr('id', 'explorer-edit-instance-of-' + this.id);
             self.instanceOfPalette = self.makePalette(self.$instanceOfEdit);
 
             self.$nameEdit.change(function(e) {
@@ -107,7 +112,7 @@
         };
 
         Explorer.prototype.open = function(node, mode) {
-            this.$card.hide();
+            this.$partEdit.hide();
             this.node = Part.get(node);
             let preferredMode = (this.node && this.node.hasLink(Concept.isA, 'law')) ? 'graph' : this.mode;
             this.setMode(mode || preferredMode);
@@ -127,8 +132,23 @@
 
             Page.clearDiagram(diagram);
 
-            self.eachShowing(function(child) {
-                child.updateExplorer(self);
+            self.includes = {};
+            self.showing = {};
+            self.hidden = {};
+
+            self.includes[self.node.getId()] = true;
+            self.showing[self.node.getId()] = self.mode === 'graph';
+            self.node.each('<*<*', function(child) {
+                self.includes[child.getId()] = child;
+                self.showing[child.getId()] = !child.isMeta();
+                child.each('>*>*', function(neighbor) {
+                    self.includes[neighbor.getId()] = neighbor;
+                    if(!self.showing.hasOwnProperty(neighbor.getId())) self.showing[neighbor.getId()] = false;
+                });
+            });
+
+            $.each(self.showing, function(id) {
+                if(self.showing[id]) self.includes[id].updateExplorer(self);
             });
         };
 
@@ -161,27 +181,16 @@
             Page.updateExplorers();
         };
 
-        Explorer.prototype.getShowing = function() {
-            let self = this, showing = {};
-            self.eachShowing(function(child) {
-                showing[child.getId()] = child;
-            });
-            return showing;
-        };
-
         Explorer.prototype.eachShowing = function(callback) {
             let self = this;
-            if(self.isShowing(self.node)) callback.call(self.node, self.node);
-            self.node.each('<*<*', function(child) {
-                if(self.isShowing(child)) callback.call(child, child);
+            $.each(self.showing, function(id, node) {
+                if(callback.call(child, child) === false) return false;
             });
+            return true;
         };
 
         Explorer.prototype.isShowing = function(part) {
-            return this.node && part.isNode() && (
-                (this.mode === 'graph' && part === this.node) ||
-                part.hasLink(Concept.in, this.node) ||
-                (this.showingMeta.hasOwnProperty('all') || this.showingMeta.hasOwnProperty(part.getId())));
+            return this.showing[part.getId()];
         };
 
         Explorer.prototype.setPosition = function(explorer, before) {
@@ -395,6 +404,29 @@
                         },
                         function(o) {
                             return true;
+                        }),
+                    makeButton('Hide',
+                        function(e, obj) {
+                            let part = Part.get(obj.part.adornedPart);
+                            if(part) self.showHidePart(part, false);
+                        }, function(obj) {
+                            let part = Part.get(obj.part.adornedPart);
+                            return part && part !== self.node;
+                        }),
+                    makeButton('Collapse',
+                        function(e, obj) {
+
+                        },
+                        function(obj) {
+
+                        }),
+                    makeButton('Show/Hide Links...',
+                        function(e, obj) {
+                            let part = Part.get(obj.part.adornedPart);
+                            if(part) self.showLinks(part);
+                        },
+                        function(o) {
+                            return true; //obj.part.adornedPart instanceof go.Node;
                         }),
                     makeButton("Open",
                         function(e, obj) {
@@ -627,7 +659,8 @@
                     if(it.next()) node = it.value;
                     let part = Part.get(node);
                     if(!part) {
-                        self.$card.hide();
+                        self.$partEdit.hide();
+                        self.$showLinks.hide();
                         return;
                     }
                 });
@@ -668,10 +701,7 @@
         };
 
         Explorer.prototype.editPart = function(part) {
-            let self = this, diagram = self.getActiveDiagram();
-            part = Part.get(part);
-            if(!part) return;
-            let goPart = part.getGoPart(diagram);
+            let self = this;
             self.partEditing = part;
             self.$nameEdit.val(part.getName() || '');
             self.$descriptionEdit.val(part.getDescription() || '');
@@ -679,13 +709,22 @@
             part.eachOutgoing([Concept.isA, '*'], function(node) {
                 node.addGoData(self.instanceOfPalette);
             });
+            self.showCard(self.$partEdit, part);
+        };
 
-            let $diagram = $(diagram.div), $parent = $diagram.parents().has(self.$card).first(),
+        Explorer.prototype.showLinks = function(part) {
+            let self = this;
+            self.showCard(self.$showLinks, part);
+        };
+
+        Explorer.prototype.showCard = function($card, part) {
+            let self = this, diagram = self.getActiveDiagram();
+            let goPart = part.getGoPart(diagram);
+            let $diagram = $(diagram.div), $parent = $diagram.parents().has(self.$partEdit).first(),
                 diagramOffset = $diagram.offset(), parentOffset = $parent.offset();
-
             let viewport = diagram.viewportBounds,
                 nodeBounds = goPart.getDocumentBounds(),
-                cardWidth = self.$card.width(), cardHeight = self.$card.height(),
+                cardWidth = $card.width(), cardHeight = $card.height(),
                 x = nodeBounds.x + nodeBounds.width/2 - cardWidth/2 - viewport.x,
                 y = nodeBounds.y + nodeBounds.height - viewport.y;
             x = Math.max(0, Math.min(x, viewport.width - cardWidth));
@@ -693,10 +732,28 @@
             x += diagramOffset.left - parentOffset.left;
             y += diagramOffset.top - parentOffset.top;
 
-            self.$card.css('left', '' + x + 'px');
-            self.$card.css('top', '' + y + 'px');
-            self.$card.show();
-        }
+            $card.css('left', '' + x + 'px');
+            $card.css('top', '' + y + 'px');
+            $card.show();
+        };
+
+        Explorer.prototype.showHidePart = function(part, show) {
+            let self = this;
+            self.hidden[part.getId()] = !show;
+            self.setShown(part, show);
+        };
+
+        Explorer.prototype.setShown = function(part, show) {
+            let self = this;
+            if(!self.includes[part.getId()]) return;
+            self.showing[part.getId()] = show;
+            part.updateExplorer(self);
+            part.eachLink('incoming', function(link) {
+                if(link.getConcept() === Concept.in) return;
+                let start = link.getStart();
+                if(start && !self.hidden[start.getId()]) self.setShown(start, show);
+            });
+        };
 
 
 

@@ -137,6 +137,22 @@
                         </ul>
                     </div>
                 </div>
+                <div class="explorer-show-links card">
+                    <div class="card-body">
+                        <div class="explorer-show-internal">
+                            <input type="checkbox" class="explorer-show-internal-all">Show Internal</input>
+                            <div class="explorer-show-internal-individual collapse"></div>
+                        </div>
+                        <div class="explorer-show-external">
+                            <input type="checkbox" class="explorer-show-external-all">Show External</input>
+                            <div class="explorer-show-external-individual collapse"></div>
+                        </div>
+                        <div class="explorer-show-meta">
+                            <input type="checkbox" class="explorer-show-meta-all">Show Meta</input>
+                            <div class="explorer-show-meta-individual collapse"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -169,7 +185,11 @@
     {{block page_js}}
     {{include 'web2py_ajax.html'}}
 
+    <!--<script type="text/javascript" src="https://unpkg.com/popper.js"></script>-->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/gojs/release/go.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+        integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
     <!--<script type="text/javascript" src="/welcome/static/GoJS-master/release/go.js"></script>
     <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/highlight.js"></script>
     <script type="text/javascript" src="/welcome/static/GoJS-master/assets/js/bootstrap.min.js"></script>-->
