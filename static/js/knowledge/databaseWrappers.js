@@ -643,6 +643,10 @@
             this.set('end', end);
         };
 
+        Part.prototype.isIn = function(part) {
+            return this.hasLink(Concept.in, part);
+        };
+
         Part.prototype.isMeta = function() {
             return this.getName() === 'META' || this.has('>in>META') || this.has('>is a>*>in>META');
         };
@@ -830,10 +834,11 @@
         };
 
         Part.prototype.printLinks = function() {
-            let self = this;
+            let self = this, str = '';
             self.eachLink(function(link, direction) {
-                link.print();
+                str += link.toString() + "\n";
             });
+            return str;
         };
 
         Part.prototype.addLink = function(linkName, node) {
@@ -869,33 +874,62 @@
             });
         };
 
+        Part.prototype.pathLevel = function(explorer, node) {
+            let self = this;
+            if(explorer.isHiding(self)) return -1;
+            if(self === node) return 0;
+            if(self.end === node) return 1;
+            if(self.endpointHasInLink(explorer, node)) return 3;
+            let doubleLink = false;
+            self.eachLink(function(link, direction) {
+                if(link.endpointHasInLink(explorer, node)) doubleLink = true;
+                return !doubleLink;
+            });
+            if(doubleLink) return 4;
+            if(self.hasInLink(explorer, node)) return 2;
+            return -1;
+        };
+
+        Part.prototype.hasInLink = function(explorer, node) {
+            if(explorer.isHiding(this)) return false;
+            let inLink = this.getLink(this.getMainLinkType(), node);
+            return inLink && !explorer.isHiding(inLink) ? true : false;
+        };
+
+        Part.prototype.endpointHasInLink = function(explorer, node) {
+            if(explorer.isHiding(this)) return false;
+            return (this.start && this.start.hasInLink(explorer, node))
+                || (this.end && this.end.hasInLink(explorer, node));
+        };
+
+        Part.prototype.showIsA = function(diagram, node, show) {
+            let goData = this.getGoData(diagram);
+            if(!goData) return;
+            let isA = goData.isA || {};
+            if(show) isA[node.getId()] = node;
+            else delete isA[node.getId()];
+            diagram.model.set(goData, 'isA', isA);
+            let goPart = this.getGoPart(diagram);
+            if(goPart) goPart.updateTargetBindings();
+        };
+
         Part.prototype.updateExplorer = function(explorer) {
-            let self = this, diagram = explorer.getActiveDiagram(), show = explorer.isShowing(self);
+            let self = this, node = explorer.getNode(), diagram = explorer.getActiveDiagram(),
+                level = self.pathLevel(explorer, node), show = level >= 0, goData = self.getGoData(diagram);
 
             self.updateGoData(diagram, show);
+            let inLink = self.getLink(Concept.in, node);
+            if(inLink) inLink.updateGoData(diagram, show && (level !== 4));
 
-            if(explorer.getMode() === 'graph') {
-                let mainLink = self.getLink(self.getMainLinkType(), explorer.getNode()), showMainLink = show,
-                    is_a = {};
+            if(self !== node && (show == self.hasGoData(diagram) || level === 4)) return;
 
-                self.eachOutLink(function(link, direction) {
-                    if(link === mainLink) return;
-                    let end = link.getEndpoint(direction);
-                    if(!end) return;
-                    let showLink = show && explorer.isShowing(end);
-                    link.updateGoData(diagram, showLink);
-                    if(showLink && direction === 'outgoing' && !end.isMeta())
-                        showMainLink = false;
-                    if(show && !showLink) {
-                        if(link.getConcept() === Concept.isA) {
-                            is_a[end.getId()] = end;
-                        }
-                    }
-                });
-                if(show) self.setGoData(diagram, 'is_a', is_a);
-
-                if(mainLink) mainLink.updateGoData(diagram, showMainLink);
+            if(self.getConcept() === Concept.isA && self.start) {
+                self.start.showIsA(diagram, self.end, !show);
             }
+
+            self.eachNeighbor(level < 2 ? 'incoming' : 'outgoing', function(part) {
+                part.updateExplorer(explorer);
+            });
 
             let goPart = self.getGoPart(diagram);
             if(goPart) goPart.updateTargetBindings();
@@ -916,6 +950,7 @@
                     isMeta: self.isMeta()
                 };
                 if(self.isLink()) {
+                    if(!self.start || !self.end) return;
                     data.from = self.getStartId();
                     data.to = self.getEndId();
                 }

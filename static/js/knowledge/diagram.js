@@ -76,9 +76,32 @@
             });
 
             self.$showLinks = self.$wrapper.find('.explorer-show-links');
-            self.$showInternal = self.$wrapper.find('.explorer-show-internal');
-            self.$showExternal = self.$wrapper.find('.explorer-show-external');
-            self.$showMeta = self.$wrapper.find('.explorer-show-meta');
+            self.$showLinksId = self.$showLinks.find('.explorer-show-links-id');
+            self.$showInternal = self.$showLinks.find('.explorer-show-internal');
+            self.$showExternal = self.$showLinks.find('.explorer-show-external');
+            self.$showMeta = self.$showLinks.find('.explorer-show-meta');
+            self.$showLinks.find('input[type="checkbox"]').change(function(e) {
+                let part = Part.get(self.$showLinksId.val());
+                if(!part) return;
+                let $this = $(this), show = $this.prop('checked');
+                let type = this.className.split('-')[2];
+                part.eachLink(function(link, direction) {
+                    let end = link.getEndpoint(direction);
+                    if(!end) return;
+                    switch(type) {
+                        case 'internal':
+                            if(direction !== 'incoming' || !self.includes[end.getId()]) return;
+                            break;
+                        case 'external':
+                            if(direction !== 'outgoing' || self.includes[end.getId()]) return;
+                            break;
+                        case 'meta':
+                            if(!end.isMeta()) return;
+                            break;
+                    }
+                    self.showHidePart(end, show);
+                });
+            });
 
             self.partEditing = null;
             self.$partEdit = self.$wrapper.find('.explorer-edit-concept');
@@ -132,24 +155,17 @@
 
             Page.clearDiagram(diagram);
 
-            self.includes = {};
-            self.showing = {};
             self.hidden = {};
-
-            self.includes[self.node.getId()] = true;
-            self.showing[self.node.getId()] = self.mode === 'graph';
-            self.node.each('<*<*', function(child) {
-                self.includes[child.getId()] = child;
-                self.showing[child.getId()] = !child.isMeta();
-                child.each('>*>*', function(neighbor) {
-                    self.includes[neighbor.getId()] = neighbor;
-                    if(!self.showing.hasOwnProperty(neighbor.getId())) self.showing[neighbor.getId()] = false;
+            if(self.mode === 'palette') self.hidden[self.node.getId()] = true;
+            self.node.eachLink('incoming', function(inLink) {
+                if(!inLink.start) return;
+                inLink.start.eachLink(function(link, direction) {
+                    let end = link.getEndpoint(direction);
+                    if(end && !end.isIn(self.node)) self.hidden[end.getId()] = true;
                 });
             });
 
-            $.each(self.showing, function(id) {
-                if(self.showing[id]) self.includes[id].updateExplorer(self);
-            });
+            self.node.updateExplorer(self);
         };
 
         Explorer.prototype.updateLayout = function() {
@@ -179,6 +195,10 @@
 
             this.update();
             Page.updateExplorers();
+        };
+
+        Explorer.prototype.isHiding = function(part) {
+            return this.hidden[part.getId()] ? true : false;
         };
 
         Explorer.prototype.eachShowing = function(callback) {
@@ -425,8 +445,8 @@
                             let part = Part.get(obj.part.adornedPart);
                             if(part) self.showLinks(part);
                         },
-                        function(o) {
-                            return true; //obj.part.adornedPart instanceof go.Node;
+                        function(obj) {
+                            return obj.part.adornedPart instanceof go.Node;
                         }),
                     makeButton("Open",
                         function(e, obj) {
@@ -714,6 +734,7 @@
 
         Explorer.prototype.showLinks = function(part) {
             let self = this;
+            self.$showLinksId.val(part.getId());
             self.showCard(self.$showLinks, part);
         };
 
@@ -745,9 +766,9 @@
 
         Explorer.prototype.setShown = function(part, show) {
             let self = this;
-            if(!self.includes[part.getId()]) return;
             self.showing[part.getId()] = show;
             part.updateExplorer(self);
+            if(!self.includes[part.getId()]) return;
             part.eachLink('incoming', function(link) {
                 if(link.getConcept() === Concept.in) return;
                 let start = link.getStart();
