@@ -15,6 +15,14 @@
 
         var Misc = {
 
+            toArray: function(obj) {
+                arr = [];
+                for(let key in obj) {
+                    arr.push(obj[key]);
+                }
+                return arr;
+            },
+
             each: function(obj, callback) {
                 if(Object.keys(obj).length === 0) return true;
                 let ret = true;
@@ -25,167 +33,75 @@
                     }
                 });
                 return ret;
+            },
+
+            hasIndex: function() {
+                return false;
+            },
+
+            getIndex: function() {
+                let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
+                for(let i = 1; i < n; i++) {
+                    let index = args[i];
+                    if(index === undefined) continue;
+                    if(typeof ref !== 'object'
+                        || !ref.hasOwnProperty(index)) return undefined;
+                    ref = ref[index];
+                }
+                return ref;
+            },
+
+            getOrCreateIndex: function() {
+                let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
+                for(let i = 1; i < n; i++) {
+                    let index = args[i];
+                    if(index === undefined) continue;
+                    if(!ref[index]) ref[index] = {};
+                    ref = ref[index];
+                }
+                return ref;
+            },
+
+            setIndex: function(obj) {
+                let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
+                for(let i = 1; i < n-2; i++) {
+                    let index = args[i];
+                    if(index === undefined) continue;
+                    if(!ref[index]) ref[index] = {};
+                    ref = ref[index];
+                }
+                ref[args[n-2]] = args[n-1];
+            },
+
+            deleteIndex: function(obj) {
+                let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0], i = 1, refs = [];
+                for(; i < n-1; i++) {
+                    let index = args[i];
+                    if(index === undefined) continue;
+                    if(!ref[index]) return;
+                    refs.push(ref);
+                    ref = ref[index];
+                }
+                if(ref) delete ref[args[i--]];
+                while(ref && Object.keys(ref).length === 0) {
+                    ref = refs.pop();
+                    if(ref) delete ref[args[i--]];
+                }
+            },
+
+            cleanArguments: function(args, clean) {
+                if(!clean) clean = [];
+                for(let i = 0; i < args.length; i++) {
+                    if(args[i] === undefined) clean.push('');
+                    else if(Array.isArray(args[i])) {
+                        Misc.cleanArguments(args[i], clean);
+                    } else clean.push(args[i]);
+                }
+                return clean;
             }
 
         };
 
-        Misc.toArray = function(obj) {
-            arr = [];
-            for(let key in obj) {
-                arr.push(obj[key]);
-            }
-            return arr;
-        };
-
-        /*
-            get the value at an index of a JS object.  For example, Misc.getIndex(obj, 'a', 'b', 'c') will check if
-            obj['a']['b']['c'] exists, and if so return its value.  Without this helper function we'd have to first check if
-            obj['a'] exists, then obj['a']['b'], then obj['a']['b']['c'] to avoid runtime index errors.
-        */
-        Misc.getIndex = function() {
-            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
-            for(let i = 1; i < n; i++) {
-                let index = args[i];
-                if(index === undefined) continue;
-                if(typeof ref !== 'object'
-                    || !ref.hasOwnProperty(index)) return undefined;
-                ref = ref[index];
-            }
-            return ref;
-        };
-
-        /*
-            like getIndex, but creates the index with the specified value if it doesn't exist yet.  For example,
-            Misc.getOrCreateIndex(obj, 'a', 'b', 5) will return obj['a']['b'] if it already exists, otherwise set it to 5.
-        */
-        Misc.getOrCreateIndex = function() {
-            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
-            for(let i = 1; i < n; i++) {
-                let index = args[i];
-                if(index === undefined) continue;
-                if(!ref[index]) ref[index] = {};
-                ref = ref[index];
-            }
-            return ref;
-        };
-
-        /*
-            set an index of an object.  Same syntax as above, but in this case the index will be overwritten if it exists.
-        */
-        Misc.setIndex = function(obj) {
-            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0];
-            for(let i = 1; i < n-2; i++) {
-                let index = args[i];
-                if(index === undefined) continue;
-                if(!ref[index]) ref[index] = {};
-                ref = ref[index];
-            }
-            ref[args[n-2]] = args[n-1];
-        };
-
-        /*
-            Delete the specified index of the given object.
-        */
-        Misc.deleteIndex = function(obj) {
-            let args = Misc.cleanArguments(arguments), n = args.length, ref = args[0], i = 1, refs = [];
-            for(; i < n-1; i++) {
-                let index = args[i];
-                if(index === undefined) continue;
-                if(!ref[index]) return;
-                refs.push(ref);
-                ref = ref[index];
-            }
-            while(ref && Object.keys(ref).length > 0) {
-                delete ref[args[i--]];
-                ref = refs.pop();
-            }
-        };
-
-        /*
-            loop through each sub-key of the given key of the given object, calling the callback function
-            on the value of the subkey.  If the callback returns true the loop halts.  If the key is omitted,
-            all keys of the object will be looped through.
-        */
-        /*Misc.each = function(obj, callback, key) {
-            if(!obj || typeof obj !== 'object') return;
-            let stop = callback.call(obj, obj, key);
-            if(stop === true) return;
-            for(let k in obj) {
-                if(stop && typeof stop === 'object' && stop[k]) continue;
-                if(obj[k] && typeof obj[k] === 'object')
-                    Misc.each(obj[k], callback, k);
-            }
-        };*/
-
-        /*
-            apply a callback function to a sub-object of an object, treating the sub-object
-            as an array according to its keys
-        */
-        Misc.eachChild = function() {
-
-            let n = arguments.length;
-            if(n < 2) return;
-            let callback = arguments[n-1];
-            if(typeof callback !== 'function') return;
-            delete arguments[n-1];
-
-            //get the requested sub-object
-            let args = [];
-            for(let i = 1; i < n-1; i++) args.push(arguments[i]);
-            let sub = Misc.getIndex(arguments[0], args);
-            if(sub === undefined) return;
-
-            //if this key has keys 0,1,2... then it is an array
-            //and we must perform the callback on each element
-            Misc.asArray(sub).forEach(function(subsub) {
-                callback.call(this, subsub);
-            });
-        };
-
-        /*
-            used by the above functions - given an argument list,
-            converts undefined values to empty strings, and unpacks arrays,
-            so that we have a single list of strings, representing a chain of indices in a JS object
-        */
-        Misc.cleanArguments = function(args, clean) {
-            if(!clean) clean = [];
-            for(let i = 0; i < args.length; i++) {
-                if(args[i] === undefined) clean.push('');
-                else if(Array.isArray(args[i])) {
-                    Misc.cleanArguments(args[i], clean);
-                } else clean.push(args[i]);
-            }
-            return clean;
-        };
-
-        /*
-            Convert an object to an array.  If the object has only numeric keys starting from 0,
-            the values of these keys are the elements of the array.  Otherwise, the array's only element is
-            the object itself.  If the object has 0-indexed numeric keys but also other keys, the
-            whole object is appended as a final array element.  Used here and in nodeData.js
-        */
-        Misc.asArray = function(obj) {
-            if(typeof obj !== 'object') return [obj];
-            let arr = [], i = 0;
-            for(; obj.hasOwnProperty(i); i++) {
-                arr.push(obj[i]);
-            }
-            let keys = Object.keys(obj);
-            // if there were no indexed keys or if the object has other subkeys, add the whole object to the array
-            if(arr.length == 0 || keys.length > i) {
-                // ... unless the only other key is an empty '_value' key
-                if(!(i > 0 && keys.length == i+1 && keys[i] == '_value' && !obj._value))
-                    arr.push(obj);
-            }
-            return arr;
-        };
-
-        Misc.booleanValues = function(obj) {
-            if(typeof obj !== 'object') return {};
-            let ret = obj;
-            for(let k in ret) ret[k] = true;
-            return ret;
-        };
 
 
         Page.load = function(callback) {

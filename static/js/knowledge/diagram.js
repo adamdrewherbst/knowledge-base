@@ -155,17 +155,8 @@
 
             Page.clearDiagram(diagram);
 
-            self.hidden = {};
-            if(self.mode === 'palette') self.hidden[self.node.getId()] = true;
-            self.node.eachLink('incoming', function(inLink) {
-                if(!inLink.start) return;
-                inLink.start.eachLink(function(link, direction) {
-                    let end = link.getEndpoint(direction);
-                    if(end && !end.isIn(self.node)) self.hidden[end.getId()] = true;
-                });
-            });
-
-            self.node.updateExplorer(self);
+            self.data = {};
+            self.setData(self.node, 'shown', self.node, true);
         };
 
         Explorer.prototype.updateLayout = function() {
@@ -758,23 +749,70 @@
             $card.show();
         };
 
-        Explorer.prototype.showHidePart = function(part, show) {
+        Explorer.prototype.setData = function(part, field, refPart, include) {
             let self = this;
-            self.hidden[part.getId()] = !show;
-            self.setShown(part, show);
+            let partId = part.getId(), refId = refPart ? refPart.getId() : null;
+
+            let wasShown = self.isShown(part);
+            if(include) Misc.setIndex(self.data, partId, field, refId, true);
+            else Misc.deleteIndex(self.data, partId, field, refId);
+            let isShown = self.isShown(part);
+
+            if(field === 'secondary') {
+                let inLink = part.getLink(Concept.in, self.getNode());
+                if(inLink) self.setData(inLink.getId(), 'hidden', part, true);
+            }
+
+            if(wasShown !== isShown) {
+                part.eachLink(function(link, direction, neighbor) {
+                    self.checkLink(link);
+                });
+            }
         };
 
-        Explorer.prototype.setShown = function(part, show) {
-            let self = this;
-            self.showing[part.getId()] = show;
-            part.updateExplorer(self);
-            if(!self.includes[part.getId()]) return;
-            part.eachLink('incoming', function(link) {
-                if(link.getConcept() === Concept.in) return;
-                let start = link.getStart();
-                if(start && !self.hidden[start.getId()]) self.setShown(start, show);
-            });
+        Explorer.prototype.checkLink = function(link) {
+            let self = this, node = self.getNode();
+            let start = link.getStart(), end = link.getEnd();
+            let isPrimary = false, isSecondary = false, isMeta = false, isExternal = false, isDangling = false;
+
+            if(start) {
+                if(start === node) isPrimary = true;
+                else if(start.hasLink(Concept.in, node)) {
+                    if(end) {
+                        if(end.hasLink(Concept.in, node)) isSecondary = true;
+                        else if(end.hasLink(Concept.metaOf, node)) isMeta = true;
+                        else isExternal = true;
+                    } else isDangling = true;
+                }
+            } else isDangling = true;
+
+            if(isPrimary) {
+                self.setData(start, 'shown', link, true);
+            } else if(isSecondary) {
+                self.setData(start, 'secondary', link, true);
+            }
+
+            if((isPrimary || isSecondary) && (self.isHidden(link) || self.isHidden(end))) {
+                self.setData(start, 'hidden', link, true);
+            } else if(isExternal && (!self.isShown(link) || !self.isShown(start))) {
+                self.setData(end, 'shown', link, false);
+            }
+
+            if((self.isShown(start) || !start) && (self.isShown(end) || !end) && !isExternal) {
+                self.setData(link, 'shown', link, true);
+            }
         };
+
+        Explorer.prototype.isShown = function(part) {
+            let self = this;
+            return Misc.hasIndex(self.data, part.getId(), 'shown') && !Misc.hasIndex(self.data, part.getId(), 'hidden');
+        };
+
+        Explorer.prototype.isHidden = function(part) {
+            let self = this;
+            return Misc.hasIndex(self.data, part.getId(), 'hidden');
+        };
+
 
 
 
