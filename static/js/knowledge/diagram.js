@@ -117,7 +117,7 @@
                 self.partEditing.setDescription(self.$descriptionEdit.val());
             });
 
-            self.setMode('palette');
+            self.setMode('graph');
             self.showingMeta = {};
 
             Page.addExplorer(self);
@@ -156,7 +156,7 @@
             Page.clearDiagram(diagram);
 
             self.data = {};
-            self.setData(self.node, 'shown', self.node, true);
+            self.setData(self.node, 'shown', self.node, true, true);
         };
 
         Explorer.prototype.updateLayout = function() {
@@ -186,22 +186,6 @@
 
             this.update();
             Page.updateExplorers();
-        };
-
-        Explorer.prototype.isHiding = function(part) {
-            return this.hidden[part.getId()] ? true : false;
-        };
-
-        Explorer.prototype.eachShowing = function(callback) {
-            let self = this;
-            $.each(self.showing, function(id, node) {
-                if(callback.call(child, child) === false) return false;
-            });
-            return true;
-        };
-
-        Explorer.prototype.isShowing = function(part) {
-            return this.showing[part.getId()];
         };
 
         Explorer.prototype.setPosition = function(explorer, before) {
@@ -349,12 +333,12 @@
             });
 
             function storeLink(e) {
-                let start = Part.get(e.subject.fromNode), end = Part.get(e.subject.toNode);
+                let start = Part.get(e.subject.fromNode), end = Part.get(e.subject.toNode), link = null;
                 if(!start || !end) return;
                 if(e.name === 'LinkRelinked') {
-                    let link = Part.get(e.subject);
+                    link = Part.get(e.subject);
                     if(link && link.isLink()) link.setEndpoints(start, end);
-                    else return;
+                    else link = null;
                 } else {
                     let concept = null;
                     if(!start.isMeta() && end.isMeta()) concept = Concept.in;
@@ -365,7 +349,7 @@
                     });
                     graph.model.set(e.subject.data, 'id', link.getId());
                 }
-                start.updatePage();
+                if(link) link.updatePage();
             }
             graph.addDiagramListener('LinkDrawn', storeLink);
             graph.addDiagramListener('LinkRelinked', storeLink);
@@ -510,12 +494,11 @@
                     },
                     // we use a function to determine what text the node will display
                     new go.Binding('text', '', function(data, node) {
-                        let name = data.name, is_a = '';
-                        if(data.is_a) for(let id in data.is_a) {
-                            is_a += data.is_a[id].getName() + ',';
+                        let name = data.name || '', isA = '';
+                        if(data.isA) for(let id in data.isA) {
+                            isA += data.isA[id].getName() + ',';
                         }
-                        if(name && is_a.length > 1) name += ' (' + is_a.substring(0, is_a.length-1) + ')';
-                        else if(is_a.length > 1) name = is_a.substring(0, is_a.length-1);
+                        if(isA.length > 1) name += ' (' + isA.substring(0, isA.length-1) + ')';
                         return (name || '...') + ' [' + data.id + ']';
                     }))
                 ),
@@ -724,7 +707,16 @@
         };
 
         Explorer.prototype.showLinks = function(part) {
-            let self = this;
+            let self = this, $showList = self.$showLinks.find('.explorer-show-hide-individual').empty();
+            part.eachLink(function(link, direction, neighbor) {
+                let type = self.getLinkType(link),
+                    showable = (type === 'primary' || type === 'secondary') && direction === 'incoming'
+                        && !self.hasData(link, 'hidden', neighbor);
+                showable = showable || type === 'external';
+                if(showable) {
+                    let $checkbox = $('<input type="checkbox" class="explorer-show-individual">');
+                }
+            });
             self.$showLinksId.val(part.getId());
             self.showCard(self.$showLinks, part);
         };
@@ -749,18 +741,28 @@
             $card.show();
         };
 
-        Explorer.prototype.setData = function(part, field, refPart, include) {
+        Explorer.prototype.setData = function(part, field, refPart, include, apply) {
             let self = this;
             let partId = part.getId(), refId = refPart ? refPart.getId() : null;
 
             let wasShown = self.isShown(part);
-            if(include) Misc.setIndex(self.data, partId, field, refId, true);
-            else Misc.deleteIndex(self.data, partId, field, refId);
+            if(include) {
+                if(Misc.hasIndex(self.data, partId, field, refId)) return;
+                Misc.setIndex(self.data, partId, field, refId, true);
+            } else {
+                if(!Misc.hasIndex(self.data, partId, field, refId)) return;
+                Misc.deleteIndex(self.data, partId, field, refId);
+            }
             let isShown = self.isShown(part);
 
             if(field === 'secondary') {
-                let inLink = part.getLink(Concept.in, self.getNode());
-                if(inLink) self.setData(inLink.getId(), 'hidden', part, true);
+                let inLink = part.getLink(Concept.in, self.getNode()),
+                    isSecondary = Misc.hasIndex(self.data, part.getId(), 'secondary');
+                if(inLink) self.setData(inLink, 'hidden', part, isSecondary);
+            }
+
+            if(part.isLink()) {
+                self.checkLink(part);
             }
 
             if(wasShown !== isShown) {
@@ -768,15 +770,31 @@
                     self.checkLink(link);
                 });
             }
+
+            if(apply) self.updateShown();
         };
 
-        Explorer.prototype.checkLink = function(link) {
+        Explorer.prototype.checkLink = function(link, apply) {
             let self = this, node = self.getNode();
+
+            if(link.deleted) {
+                link.eachNeighbor(function(neighbor) {
+                    let nid = neighbor.getId();
+                    if(self.data[nid]) for(let field in self.data[nid]) {
+                        if(self.data[nid][field] && self.data[nid][field][link.getId()])
+                            self.setData(neighbor, field, link, false);
+                    }
+                });
+                Misc.deleteIndex(self.data, link.getId());
+                if(apply) self.updateShown();
+                return;
+            }
+
             let start = link.getStart(), end = link.getEnd();
             let isPrimary = false, isSecondary = false, isMeta = false, isExternal = false, isDangling = false;
 
             if(start) {
-                if(start === node) isPrimary = true;
+                if(end === node) isPrimary = true;
                 else if(start.hasLink(Concept.in, node)) {
                     if(end) {
                         if(end.hasLink(Concept.in, node)) isSecondary = true;
@@ -786,21 +804,28 @@
                 }
             } else isDangling = true;
 
-            if(isPrimary) {
-                self.setData(start, 'shown', link, true);
-            } else if(isSecondary) {
-                self.setData(start, 'secondary', link, true);
+            if(isPrimary || isSecondary) {
+                let hidden = self.isHidden(link) || self.isHidden(end);
+                self.setData(start, 'shown', link, !hidden);
             }
 
-            if((isPrimary || isSecondary) && (self.isHidden(link) || self.isHidden(end))) {
-                self.setData(start, 'hidden', link, true);
-            } else if(isExternal && (!self.isShown(link) || !self.isShown(start))) {
-                self.setData(end, 'shown', link, false);
+            if(self.getMode() === 'graph') {
+                if(isSecondary) {
+                    self.setData(start, 'secondary', link, true);
+                }
+
+                if(isExternal) {
+                    let shown = self.isShown(link);
+                    self.setData(end, 'shown', link, shown);
+                    if(link.getConcept() === Concept.isA) self.setData(start, 'isA', end, !shown);
+                }
+
+                if((!start || self.isShown(start)) && (!end || self.isShown(end)) && !isExternal) {
+                    self.setData(link, 'shown', link, true);
+                }
             }
 
-            if((self.isShown(start) || !start) && (self.isShown(end) || !end) && !isExternal) {
-                self.setData(link, 'shown', link, true);
-            }
+            if(apply) self.updateShown();
         };
 
         Explorer.prototype.isShown = function(part) {
@@ -811,6 +836,25 @@
         Explorer.prototype.isHidden = function(part) {
             let self = this;
             return Misc.hasIndex(self.data, part.getId(), 'hidden');
+        };
+
+        Explorer.prototype.updateShown = function() {
+            let self = this, diagram = self.getActiveDiagram();
+            for(let id in self.data) {
+
+                let part = Part.get(id);
+                if(!part) continue;
+                if(self.getMode() === 'palette' && part === self.getNode()) continue;
+
+                part.updateGoData(diagram, self.isShown(part));
+                let isA = {};
+                if(self.data[id].isA) {
+                    for(let refId in self.data[id].isA) {
+                        isA[refId] = Part.get(refId);
+                    }
+                }
+                part.setGoData(diagram, 'isA', isA);
+            }
         };
 
 

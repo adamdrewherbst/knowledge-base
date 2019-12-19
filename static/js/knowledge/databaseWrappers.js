@@ -36,7 +36,11 @@
             },
 
             hasIndex: function() {
-                return false;
+                let args = Misc.cleanArguments(arguments), n = args.length, i = 1, ref = args[0];
+                while(typeof ref === 'object' && i < n) {
+                    ref = ref[args[i++]];
+                }
+                return i === n && ref !== undefined ? true : false;
             },
 
             getIndex: function() {
@@ -479,7 +483,7 @@
             if(self.isLink()) {
                 if(self.start) {
                     self.start.setNeighbor(self, 'outgoing', false);
-                    if(!self.start.hasLink('*', '*')) self.start.delete();
+                    if(!self.start.hasLink('in', '*')) self.start.delete();
                 }
                 if(self.end) self.end.setNeighbor(self, 'incoming', false);
             }
@@ -785,37 +789,15 @@
 
         Part.prototype.updatePage = function(doLayout) {
             let self = this;
-            Page.eachExplorer(function(e) {
-                self.updateExplorer(e);
+            Page.eachExplorer(function(explorer) {
+                if(self.isLink()) explorer.checkLink(self, true);
+                else if(self.isNode()) {
+                    self.eachLink(function(link) {
+                        explorer.checkLink(link);
+                    });
+                    explorer.updateShown();
+                }
             });
-        };
-
-        Part.prototype.pathLevel = function(explorer, node) {
-            let self = this;
-            if(explorer.isHiding(self)) return -1;
-            if(self === node) return 0;
-            if(self.end === node) return 1;
-            if(self.endpointHasInLink(explorer, node)) return 3;
-            let doubleLink = false;
-            self.eachLink(function(link, direction) {
-                if(link.endpointHasInLink(explorer, node)) doubleLink = true;
-                return !doubleLink;
-            });
-            if(doubleLink) return 4;
-            if(self.hasInLink(explorer, node)) return 2;
-            return -1;
-        };
-
-        Part.prototype.hasInLink = function(explorer, node) {
-            if(explorer.isHiding(this)) return false;
-            let inLink = this.getLink(this.getMainLinkType(), node);
-            return inLink && !explorer.isHiding(inLink) ? true : false;
-        };
-
-        Part.prototype.endpointHasInLink = function(explorer, node) {
-            if(explorer.isHiding(this)) return false;
-            return (this.start && this.start.hasInLink(explorer, node))
-                || (this.end && this.end.hasInLink(explorer, node));
         };
 
         Part.prototype.showIsA = function(diagram, node, show) {
@@ -826,28 +808,6 @@
             else delete isA[node.getId()];
             diagram.model.set(goData, 'isA', isA);
             let goPart = this.getGoPart(diagram);
-            if(goPart) goPart.updateTargetBindings();
-        };
-
-        Part.prototype.updateExplorer = function(explorer) {
-            let self = this, node = explorer.getNode(), diagram = explorer.getActiveDiagram(),
-                level = self.pathLevel(explorer, node), show = level >= 0, goData = self.getGoData(diagram);
-
-            self.updateGoData(diagram, show);
-            let inLink = self.getLink(Concept.in, node);
-            if(inLink) inLink.updateGoData(diagram, show && (level !== 4));
-
-            if(self !== node && (show == self.hasGoData(diagram) || level === 4)) return;
-
-            if(self.getConcept() === Concept.isA && self.start) {
-                self.start.showIsA(diagram, self.end, !show);
-            }
-
-            self.eachNeighbor(level < 2 ? 'incoming' : 'outgoing', function(part) {
-                part.updateExplorer(explorer);
-            });
-
-            let goPart = self.getGoPart(diagram);
             if(goPart) goPart.updateTargetBindings();
         };
 
@@ -928,7 +888,7 @@
                 return this.concept.toString() + ' [' + this.id + ']';
             } else if(this.isLink()) {
                 return (this.start ? this.start.toString() : 'null')
-                    + ' > ' + this.concept.toString() + ' > '
+                    + ' > ' + this.concept.toString() + ' [' + this.id + '] > '
                     + (this.end ? this.end.toString() : 'null');
             }
         };
