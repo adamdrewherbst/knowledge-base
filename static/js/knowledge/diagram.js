@@ -80,27 +80,11 @@
             self.$showInternal = self.$showLinks.find('.explorer-show-internal');
             self.$showExternal = self.$showLinks.find('.explorer-show-external');
             self.$showMeta = self.$showLinks.find('.explorer-show-meta');
-            self.$showLinks.find('input[type="checkbox"]').change(function(e) {
-                let part = Part.get(self.$showLinksId.val());
-                if(!part) return;
-                let $this = $(this), show = $this.prop('checked');
-                let type = this.className.split('-')[2];
-                part.eachLink(function(link, direction) {
-                    let end = link.getEndpoint(direction);
-                    if(!end) return;
-                    switch(type) {
-                        case 'internal':
-                            if(direction !== 'incoming' || !self.includes[end.getId()]) return;
-                            break;
-                        case 'external':
-                            if(direction !== 'outgoing' || self.includes[end.getId()]) return;
-                            break;
-                        case 'meta':
-                            if(!end.isMeta()) return;
-                            break;
-                    }
-                    self.showHidePart(end, show);
-                });
+            self.$showLinks.find('input[type="radio"]').change(function(e) {
+                let val = self.$showLinks.find('input[name="show-hide-all"]:checked').val();
+                if(val === undefined) return;
+                let show = val === 'show' ? true : false;
+                self.$showLinks.find('input[type="checkbox"]').prop('checked', show).trigger('change');
             });
 
             self.partEditing = null;
@@ -199,7 +183,7 @@
             explorer.setPosition(this, before);
         };
 
-        Explorer.prototype.clear = function(mode) {
+         Explorer.prototype.clear = function(mode) {
             let self = this;
             let diagram = self.getActiveDiagram();
             if(diagram) Page.clearDiagram(diagram);
@@ -295,8 +279,8 @@
                  allowDrop: true,
 
                 // other options for the diagram
-                "draggingTool.dragsLink": true,
-                "draggingTool.isGridSnapEnabled": true,
+                "draggingTool.dragsLink": false,
+                "draggingTool.isGridSnapEnabled": false,
                 "linkingTool.isUnconnectedLinkValid": true,
                 "linkingTool.portGravity": 20,
                 "relinkingTool.isUnconnectedLinkValid": true,
@@ -348,6 +332,7 @@
                         end: end
                     });
                     graph.model.set(e.subject.data, 'id', link.getId());
+                    graph.model.set(e.subject.data, 'labelKeys', [link.getGoNodeId()]);
                 }
                 if(link) link.updatePage();
             }
@@ -517,6 +502,19 @@
                 }
             );
 
+            // This is the template for a label node on a link: just an Ellipse.
+            // This node supports user-drawn links to and from the label node.
+            graph.nodeTemplateMap.add("LinkLabel", $$("Node",
+                {
+                    selectable: false, avoidable: false,
+                    layerName: "Foreground"
+                },  // always have link label nodes in front of Links
+                $$(go.Shape, "Ellipse", {
+                    fill: '#bbb', width: 20, height: 20, stroke: null,
+                    portId: "", fromLinkable: true, toLinkable: true, cursor: "pointer"
+                })
+            ));
+
             // GoJS also needs a template to specify how links between nodes will appear
             graph.linkTemplate =
                 $$(go.Link,
@@ -551,10 +549,14 @@
                                 stroke: "#555555",
                                 margin: 10
                             },
-                            new go.Binding("text", "name")
+                            new go.Binding("text", "", function(data, link) {
+                                return data.name + ' [' + data.id + ']';
+                            })
                         )
                     ),
                     {
+                        relinkableFrom: true,
+                        relinkableTo: true,
                         contextMenu: partContextMenu
                     }
                 );
@@ -563,9 +565,11 @@
             {
                 nodeKeyProperty: 'id',
                 linkKeyProperty: 'id',
+                linkLabelKeysProperty: 'labelKeys',
                 linkFromPortIdProperty: 'fromPort',
-                linkToPortIdProperty: 'toPort',
+                linkToPortIdProperty: 'toPort'
             });
+            graph.toolManager.linkingTool.archetypeLabelNodeData = { category: "LinkLabel" };
 
             self.postprocessDiagram(graph);
 
@@ -700,21 +704,31 @@
             self.$nameEdit.val(part.getName() || '');
             self.$descriptionEdit.val(part.getDescription() || '');
             Page.clearDiagram(self.instanceOfPalette);
-            part.eachOutgoing([Concept.isA, '*'], function(node) {
+            part.each(['>', Concept.isA, '*'], function(node) {
                 node.addGoData(self.instanceOfPalette);
             });
             self.showCard(self.$partEdit, part);
         };
 
         Explorer.prototype.showLinks = function(part) {
-            let self = this, $showList = self.$showLinks.find('.explorer-show-hide-individual').empty();
+            let self = this, $showList = self.$showLinks.find('.explorer-show-hide-individual');
+            $showList.children().first().nextAll().remove();
             part.eachLink(function(link, direction, neighbor) {
                 let type = self.getLinkType(link),
                     showable = (type === 'primary' || type === 'secondary') && direction === 'incoming'
                         && !self.hasData(link, 'hidden', neighbor);
                 showable = showable || type === 'external';
                 if(showable) {
-                    let $checkbox = $('<input type="checkbox" class="explorer-show-individual">');
+                    let $checkbox = self.$showLinks.find('.explorer-show-individual-template').clone();
+                    $checkbox.removeClass('explorer-show-individual-template').val(link.getId());
+                    $checkbox.find('label').html(link.displayString());
+                    $checkbox.find('input').prop('checked', self.isShown(link)).change(function(e) {
+                        let show = $(this).prop('checked');
+                        self.setData(link, 'shown', link, show);
+                        self.setData(link, 'hidden', link, !show);
+                        self.updateShown();
+                    });
+                    $checkbox.appendTo($showList);
                 }
             });
             self.$showLinksId.val(part.getId());
@@ -739,6 +753,11 @@
             $card.css('left', '' + x + 'px');
             $card.css('top', '' + y + 'px');
             $card.show();
+        };
+
+        Explorer.prototype.hasData = function(part, field, refPart) {
+            let id = part.getId(), refId = refPart ? refPart.getId() : null;
+            return Misc.hasIndex(this.data, id, field, refId);
         };
 
         Explorer.prototype.setData = function(part, field, refPart, include, apply) {
@@ -790,42 +809,47 @@
                 return;
             }
 
-            let start = link.getStart(), end = link.getEnd();
-            let isPrimary = false, isSecondary = false, isMeta = false, isExternal = false, isDangling = false;
+            let start = link.getStart(), end = link.getEnd(), type = self.getLinkType(link);
 
-            if(start) {
-                if(end === node) isPrimary = true;
-                else if(start.hasLink(Concept.in, node)) {
-                    if(end) {
-                        if(end.hasLink(Concept.in, node)) isSecondary = true;
-                        else if(end.hasLink(Concept.metaOf, node)) isMeta = true;
-                        else isExternal = true;
-                    } else isDangling = true;
-                }
-            } else isDangling = true;
-
-            if(isPrimary || isSecondary) {
-                let hidden = self.isHidden(link) || self.isHidden(end);
+            if(type === 'primary' || type === 'secondary') {
+                self.setData(link, 'hidden', end, self.isHidden(end));
+                let hidden = self.isHidden(link);
                 self.setData(start, 'shown', link, !hidden);
+                let hideStart = (type === 'secondary' && hidden)
+                    || (type === 'primary' && (self.hasData(link, 'hidden', link) || self.hasData(link, 'hidden', end)));
+                self.setData(start, 'hidden', link, hideStart);
             }
 
             if(self.getMode() === 'graph') {
-                if(isSecondary) {
+                if(type === 'secondary') {
                     self.setData(start, 'secondary', link, true);
-                }
-
-                if(isExternal) {
+                } else if(type === 'external') {
                     let shown = self.isShown(link);
                     self.setData(end, 'shown', link, shown);
                     if(link.getConcept() === Concept.isA) self.setData(start, 'isA', end, !shown);
                 }
 
-                if((!start || self.isShown(start)) && (!end || self.isShown(end)) && !isExternal) {
+                if((!start || self.isShown(start)) && (!end || self.isShown(end)) && type !== 'external') {
                     self.setData(link, 'shown', link, true);
                 }
             }
 
             if(apply) self.updateShown();
+        };
+
+        Explorer.prototype.getLinkType = function(link) {
+            let self = this, start = link.getStart(), end = link.getEnd(), node = self.getNode();
+
+            if(start) {
+                if(end === node) return 'primary';
+                else if(start.hasLink(Concept.in, node)) {
+                    if(end) {
+                        if(end.hasLink(Concept.in, node)) return 'secondary';
+                        else if(end.hasLink(Concept.metaOf, node)) return 'meta';
+                        else return 'external';
+                    } else return 'dangling';
+                }
+            } else return 'dangling';
         };
 
         Explorer.prototype.isShown = function(part) {
@@ -840,13 +864,21 @@
 
         Explorer.prototype.updateShown = function() {
             let self = this, diagram = self.getActiveDiagram();
+
+            self.eachGoPart(function(goPart) {
+                let part = Part.get(goPart);
+                if(!part) return;
+                if(part.data && part.data.category === 'LinkLabel') return;
+                if(!self.isShown(part)) part.updateGoData(diagram, false);
+            });
+
             for(let id in self.data) {
 
                 let part = Part.get(id);
-                if(!part) continue;
+                if(!part || !self.isShown(part)) continue;
                 if(self.getMode() === 'palette' && part === self.getNode()) continue;
 
-                part.updateGoData(diagram, self.isShown(part));
+                part.updateGoData(diagram, true);
                 let isA = {};
                 if(self.data[id].isA) {
                     for(let refId in self.data[id].isA) {
@@ -854,6 +886,27 @@
                     }
                 }
                 part.setGoData(diagram, 'isA', isA);
+            }
+        };
+
+        Explorer.prototype.eachGoData = function(callback) {
+            let self = this, diagram = self.getActiveDiagram(), model = diagram.model;
+            if(Array.isArray(model.nodeDataArray)) model.nodeDataArray.forEach(function(data) {
+                callback.call(data, data);
+            });
+            if(Array.isArray(model.linkDataArray)) model.linkDataArray.forEach(function(data) {
+                callback.call(data, data);
+            });
+        };
+
+        Explorer.prototype.eachGoPart = function(callback) {
+            let self = this, diagram = self.getActiveDiagram(), it = diagram.nodes;
+            while(it.next()) {
+                callback.call(it.value, it.value);
+            }
+            it = diagram.links;
+            while(it.next()) {
+                callback.call(it.value, it.value);
             }
         };
 

@@ -187,8 +187,12 @@
                 record = data;
             } else if(data instanceof go.GraphObject) {
                 let goPart = data.part ? data.part : data;
-                if(goPart instanceof go.Node || goPart instanceof go.Link) {
-                    let id = goPart.data ? goPart.data.id : null, part = null;
+                if((goPart instanceof go.Node || goPart instanceof go.Link) && goPart.data) {
+                    let id = goPart.data.id, part = null;
+                    if(goPart.data.category === 'LinkLabel') {
+                        if(typeof id !== 'string') id = null;
+                        else id = id.split('-')[0];
+                    }
                     if(id) part = Part.table.records[id] || null;
                     if(part) {
                         if(this.type === Part) record = part;
@@ -741,7 +745,7 @@
 
             return this.eachNeighbor(directions, function(neighbor, direction) {
                 if(!neighbor.isLink()) return;
-                return callback.call(neighbor, neighbor, direction);
+                return callback.call(neighbor, neighbor, direction, neighbor.getEndpoint(direction));
             });
         };
 
@@ -827,16 +831,22 @@
                 };
                 if(self.isLink()) {
                     if(!self.start || !self.end) return;
-                    data.from = self.getStartId();
-                    data.to = self.getEndId();
+                    data.from = self.start.getGoNodeId();
+                    data.to = self.end.getGoNodeId();
+                    data.labelKeys = [self.getGoNodeId()];
                 }
                 if(!goData) {
                     if(!(diagram instanceof go.Palette)) data.loc = '0 0';
                     fcn = this.isNode() ? model.addNodeData : model.addLinkData;
                     fcn.call(model, data);
+                    if(this.isLink()) {
+                        model.addNodeData({
+                            id: self.getGoNodeId(),
+                            category: 'LinkLabel'
+                        })
+                    }
                 } else {
                     for(let key in data) model.set(goData, key, data[key]);
-                    model.set(goData, 'is_a', null);
                 }
             } else {
                 if(goData) {
@@ -844,6 +854,12 @@
                     fcn.call(model, goData);
                 }
             }
+        };
+
+        Part.prototype.getGoNodeId = function() {
+            if(this.isNode()) return this.getId();
+            else if(this.isLink()) return '' + this.getId() + '-label';
+            return null;
         };
 
         Part.prototype.hasGoData = function(diagram) {
@@ -890,6 +906,16 @@
                 return (this.start ? this.start.toString() : 'null')
                     + ' > ' + this.concept.toString() + ' [' + this.id + '] > '
                     + (this.end ? this.end.toString() : 'null');
+            }
+        };
+
+        Part.prototype.displayString = function() {
+            if(this.isNode()) {
+                return this.concept.toString();
+            } else if(this.isLink()) {
+                return (this.start ? this.start.displayString() : 'null')
+                    + ' > ' + this.concept.toString() + ' > '
+                    + (this.end ? this.end.displayString() : 'null');
             }
         };
 

@@ -120,6 +120,9 @@
         .explorer-show-links {
             max-width: 500px;
         }
+        .explorer-show-individual-template {
+            display: none;
+        }
 
 
         {{# Where the symbolic representation of the relation is displayed }}
