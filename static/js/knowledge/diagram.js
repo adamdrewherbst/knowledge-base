@@ -331,8 +331,12 @@
                         start: start,
                         end: end
                     });
-                    graph.model.set(e.subject.data, 'id', link.getId());
-                    graph.model.set(e.subject.data, 'labelKeys', [link.getGoNodeId()]);
+                    graph.model.setKeyForLinkData(e.subject.data, link.getId());
+                    graph.model.setLabelKeysForLinkData(e.subject.data, [link.getGoNodeId()]);
+                    graph.model.addNodeData({
+                        id: link.getGoNodeId(),
+                        category: 'LinkLabel'
+                    });
                 }
                 if(link) link.updatePage();
             }
@@ -550,7 +554,7 @@
                                 margin: 10
                             },
                             new go.Binding("text", "", function(data, link) {
-                                return data.name + ' [' + data.id + ']';
+                                return (data.name || '...') + ' [' + data.id + ']';
                             })
                         )
                     ),
@@ -569,7 +573,7 @@
                 linkFromPortIdProperty: 'fromPort',
                 linkToPortIdProperty: 'toPort'
             });
-            graph.toolManager.linkingTool.archetypeLabelNodeData = { category: "LinkLabel" };
+            //graph.toolManager.linkingTool.archetypeLabelNodeData = { category: "LinkLabel" };
 
             self.postprocessDiagram(graph);
 
@@ -675,7 +679,10 @@
                     let it = e.subject.iterator;
                     while(it.next()) {
                         let goPart = it.value, part = Part.get(goPart);
-                        if(part) part.delete();
+                        if(part) {
+                            part.delete();
+                            part.updatePage();
+                        }
                     }
                 });
                 diagram.addDiagramListener('ObjectSingleClicked', function(e) {
@@ -868,7 +875,7 @@
             self.eachGoPart(function(goPart) {
                 let part = Part.get(goPart);
                 if(!part) return;
-                if(part.data && part.data.category === 'LinkLabel') return;
+                //if(goPart.data && goPart.data.category === 'LinkLabel') return;
                 if(!self.isShown(part)) part.updateGoData(diagram, false);
             });
 
@@ -907,6 +914,22 @@
             it = diagram.links;
             while(it.next()) {
                 callback.call(it.value, it.value);
+            }
+        };
+
+        Explorer.prototype.updatePartId = function(part) {
+            let self = this, oldId = part.oldId, newId = part.getId();
+            if(self.data.hasOwnProperty(oldId)) {
+                self.data[newId] = self.data[oldId];
+                delete self.data[oldId];
+            }
+            for(let id in self.data) {
+                for(let field in self.data[id]) {
+                    if(self.data[id][field].hasOwnProperty(oldId)) {
+                        self.data[id][field][newId] = self.data[id][field][oldId];
+                        delete self.data[id][field][oldId];
+                    }
+                }
             }
         };
 

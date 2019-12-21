@@ -131,8 +131,8 @@
                     } else {
                         if(record instanceof Concept) {
                             records.concept[id] = {
-                                name: record.name,
-                                description: record.description,
+                                name: record.name || '',
+                                description: record.description || '',
                             };
                         } else if(record instanceof Part) {
                             records.part[id] = {
@@ -486,8 +486,9 @@
             });
             if(self.isLink()) {
                 if(self.start) {
+                    let hadInLink = self.start.isNode() && self.start.hasLink(Concept.in, '*');
                     self.start.setNeighbor(self, 'outgoing', false);
-                    if(!self.start.hasLink('in', '*')) self.start.delete();
+                    if(hadInLink && !self.start.hasLink(Concept.in, '*')) self.start.delete();
                 }
                 if(self.end) self.end.setNeighbor(self, 'incoming', false);
             }
@@ -736,6 +737,7 @@
         };
 
         Part.prototype.eachLink = function(directions, callback) {
+            let self = this;
             if(typeof directions === 'function') {
                 callback = directions;
                 directions = undefined;
@@ -744,7 +746,7 @@
             if(!directions) directions = ['outgoing', 'incoming'];
 
             return this.eachNeighbor(directions, function(neighbor, direction) {
-                if(!neighbor.isLink()) return;
+                if(!neighbor.isLink() || neighbor === self.start || neighbor === self.end) return;
                 return callback.call(neighbor, neighbor, direction, neighbor.getEndpoint(direction));
             });
         };
@@ -794,6 +796,7 @@
         Part.prototype.updatePage = function(doLayout) {
             let self = this;
             Page.eachExplorer(function(explorer) {
+                if(self.oldId !== undefined) explorer.updatePartId(self);
                 if(self.isLink()) explorer.checkLink(self, true);
                 else if(self.isNode()) {
                     self.eachLink(function(link) {
@@ -822,7 +825,8 @@
         };
 
         Part.prototype.updateGoData = function(diagram, show) {
-            let self = this, model = diagram.model, goData = self.getGoData(diagram), fcn = null;
+            let self = this, model = diagram.model, goData = self.getGoData(diagram), fcn = null,
+                updateLinkLabel = false;
             if(show) {
                 let data = {
                     id: self.getId(),
@@ -833,22 +837,33 @@
                     if(!self.start || !self.end) return;
                     data.from = self.start.getGoNodeId();
                     data.to = self.end.getGoNodeId();
-                    data.labelKeys = [self.getGoNodeId()];
+                    updateLinkLabel = !goData || !goData.labelKeys || goData.labelKeys[0] != self.getGoNodeId();
                 }
                 if(!goData) {
                     if(!(diagram instanceof go.Palette)) data.loc = '0 0';
-                    fcn = this.isNode() ? model.addNodeData : model.addLinkData;
+                    fcn = self.isNode() ? model.addNodeData : model.addLinkData;
                     fcn.call(model, data);
-                    if(this.isLink()) {
-                        model.addNodeData({
-                            id: self.getGoNodeId(),
-                            category: 'LinkLabel'
-                        })
-                    }
+                    goData = self.getGoData(diagram);
                 } else {
                     for(let key in data) model.set(goData, key, data[key]);
                 }
+                if(updateLinkLabel) {
+                    let goLink = self.getGoPart(diagram), it = null;
+                    if(goLink) it = goLink.labelNodes;
+                    if(it) while(it.next()) {
+                        model.removeNodeData(it.value.data);
+                    }
+                    model.setLabelKeysForLinkData(goData, [self.getGoNodeId()]);
+                    model.addNodeData({
+                        id: self.getGoNodeId(),
+                        category: 'LinkLabel'
+                    });
+                }
             } else {
+                if(this.isLink()) {
+                    let labelData = model.findNodeDataForKey(self.getGoNodeId());
+                    if(labelData) model.removeNodeData(labelData);
+                }
                 if(goData) {
                     fcn = this.isNode() ? model.removeNodeData : model.removeLinkData;
                     fcn.call(model, goData);
