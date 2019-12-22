@@ -33,7 +33,9 @@
 
             self.node = null;
 
-            self.$wrapper = $('#concept-explorer-template').clone().attr('id', 'concept-explorer-' + this.id).appendTo('#concept-wrapper');
+            self.$wrapper = Page.addListItem($('#concept-explorers'), function($explorer) {
+                $explorer.attr('id', 'concept-explorer-' + this.id);
+            });
 
             self.modes = {};
             self.$wrapper.find('.concept-mode').each(function(i, wrapper) {
@@ -89,6 +91,12 @@
 
             self.partEditing = null;
             self.$partEdit = self.$wrapper.find('.explorer-edit-concept');
+
+            self.$partEdit.find('.explorer-custom-concept-panel').attr('id', 'explorer-custom-concept-panel-' + self.id);
+            self.$partEdit.find('.explorer-select-concept-panel').attr('id', 'explorer-select-concept-panel-' + self.id);
+            self.$partEdit.find('.explorer-custom-concept-tab').attr('href', '#explorer-custom-concept-panel-' + self.id);
+            self.$partEdit.find('.explorer-select-concept-tab').attr('href', '#explorer-select-concept-panel-' + self.id);
+
             self.$nameEdit = self.$partEdit.find('.explorer-edit-name');
             self.$descriptionEdit = self.$partEdit.find('.explorer-edit-description');
             self.$instanceOfEdit = self.$partEdit.find('.explorer-edit-instance-of').attr('id', 'explorer-edit-instance-of-' + this.id);
@@ -620,14 +628,18 @@
             if($div.hasClass('explorer-edit-instance-of')) {
                 diagram.addDiagramListener('ExternalObjectsDropped', function(e) {
                     if(!self.partEditing) return;
-                    let it = e.subject.iterator;
+                    let it = e.subject.iterator, added = false;
                     console.log('dropped nodes');
                     while(it.next()) {
                         let node = it.value;
                         if(!(node instanceof go.Node)) continue;
                         console.log(node.data);
                         let otherPart = Part.get(node);
-                        if(otherPart) self.partEditing.addLink(Concept.isA, otherPart);
+                        if(otherPart) {
+                            self.partEditing.addLink(Concept.isA, otherPart);
+                            added = true;
+                        }
+                        if(added) self.partEditing.updatePage();;
                     }
                 });
                 diagram.addDiagramListener('SelectionDeleted', function(e) {
@@ -712,9 +724,45 @@
             self.$descriptionEdit.val(part.getDescription() || '');
             Page.clearDiagram(self.instanceOfPalette);
             part.each(['>', Concept.isA, '*'], function(node) {
-                node.addGoData(self.instanceOfPalette);
+                node.updateGoData(self.instanceOfPalette, true);
             });
+            if(part.isLink()) {
+                let checked = {}, $results = self.$partEdit.find('.explorer-select-concept-results');
+                Page.clearList($results);
+                self.addConceptResult($results, Concept.in);
+                self.addConceptResult($results, Concept.isA);
+                part.eachEndpoint(function(endpoint, direction, other) {
+                    endpoint.eachIsA(function(node) {
+                        node.eachLink(function(link, dir, neighbor) {
+                            if(dir === direction) return;
+                            let concept = link.getConcept();
+                            if(!concept || concept === Concept.isA || concept === Concept.in || concept === Concept.metaOf) return;
+                            if(checked[concept.getId()]) return;
+                            checked[concept.getId()] = true;
+                            if(!neighbor || other.hasLink(Concept.isA, neighbor)) {
+                                self.addConceptResult($results, concept);
+                            }
+                        });
+                    }, true);
+                });
+            }
+            self.$partEdit.find('.card-header').toggle(part.isLink());
             self.showCard(self.$partEdit, part);
+        };
+
+        Explorer.prototype.addConceptResult = function($results, concept) {
+            let self = this;
+            Page.addListItem($results, function($result) {
+                $result.find('.explorer-select-concept-name').text(concept.getName());
+                $result.find('.explorer-select-concept-description').text(concept.getDescription());
+                $result.click(function(e) {
+                    if(self.partEditing && self.partEditing.isLink()) {
+                        self.partEditing.setConcept(concept);
+                        self.partEditing.updatePage();
+                        self.$partEdit.hide();
+                    }
+                });
+            });
         };
 
         Explorer.prototype.showLinks = function(part) {
@@ -726,16 +774,16 @@
                         && !self.hasData(link, 'hidden', neighbor);
                 showable = showable || type === 'external';
                 if(showable) {
-                    let $checkbox = self.$showLinks.find('.explorer-show-individual-template').clone();
-                    $checkbox.removeClass('explorer-show-individual-template').val(link.getId());
-                    $checkbox.find('label').html(link.displayString());
-                    $checkbox.find('input').prop('checked', self.isShown(link)).change(function(e) {
-                        let show = $(this).prop('checked');
-                        self.setData(link, 'shown', link, show);
-                        self.setData(link, 'hidden', link, !show);
-                        self.updateShown();
+                    Page.addListItem(self.$showLinks, function($checkbox) {
+                        $checkbox.val(link.getId());
+                        $checkbox.find('label').html(link.displayString());
+                        $checkbox.find('input').prop('checked', self.isShown(link)).change(function(e) {
+                            let show = $(this).prop('checked');
+                            self.setData(link, 'shown', link, show);
+                            self.setData(link, 'hidden', link, !show);
+                            self.updateShown();
+                        });
                     });
-                    $checkbox.appendTo($showList);
                 }
             });
             self.$showLinksId.val(part.getId());
@@ -935,6 +983,16 @@
 
 
 
+        Page.clearList = function($list) {
+            $list.children().first().nextAll().remove();
+        };
+
+        Page.addListItem = function($list, preprocess) {
+            let $item = $list.children('.list-template').first().clone().removeClass('list-template');
+            if(typeof preprocess === 'function') preprocess.call($item, $item);
+            $item.appendTo($list);
+            return $item;
+        };
 
         Page.explorers = {};
 

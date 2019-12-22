@@ -27,7 +27,7 @@
                 if(Object.keys(obj).length === 0) return true;
                 let ret = true;
                 $.each(obj, function(key, val) {
-                    if(callback.call(val, val) === false) {
+                    if(callback.call(val, val, key) === false) {
                         ret = false;
                         return false;
                     }
@@ -567,6 +567,10 @@
             this.set('start', start);
             this.set('end', end);
         };
+        Part.prototype.eachEndpoint = function(callback) {
+            if(this.start) callback.call(this.start, this.start, 'incoming', this.end);
+            if(this.end) callback.call(this.end, this.end, 'outgoing', this.start);
+        };
 
         Part.prototype.isIn = function(part) {
             return this.hasLink(Concept.in, part);
@@ -757,6 +761,16 @@
 
         Part.prototype.eachOutLink = function(callback) {
             return this.eachLink('outgoing', callback);
+        };
+
+        Part.prototype.eachIsA = function(callback, recursive, checked) {
+            let self = this;
+            if(recursive && !checked) checked = {};
+            return self.each(['>', Concept.isA, '*'], function(node) {
+                callback.call(node, node, node.getId());
+                if(recursive && !checked[node.getId()] &&
+                    node.eachIsA(callback, true, checked) === false) return false;
+            });
         };
 
         Part.prototype.printLinks = function() {

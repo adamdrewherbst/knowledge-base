@@ -64,7 +64,7 @@
         <link rel="stylesheet" href="{{=URL('static','GoJS-master/assets/css/jquery-ui.min.css')}}">
         <link rel="stylesheet" href="{{=URL('static','css/main.css')}}">
 
-        {{#  As well as MathJax to auto-prettify mathematical symbols }}
+        {{#  As well as the JavaScript code for MathJax to auto-prettify mathematical symbols }}
 
         <script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=MML_CHTML"></script>
     </head>
@@ -80,8 +80,8 @@
         <div id="global-controls">
             <button id="save-button" type="button btn btn-primary">Save All Changes</button>
         </div>
-        <div id="concept-wrapper">
-            <div id="concept-explorer-template" class="concept-explorer">
+        <div id="concept-explorers">
+            <div class="concept-explorer list-template">
                 <div class="graph-wrapper concept-mode" mode="graph">
                     <div class="graph-controls explorer-controls">
                         <div class="controls-left">
@@ -123,18 +123,52 @@
                 </div>
                 <div class="explorer-edit-concept card">
                     <input class="explorer-edit-concept-id" type="hidden" value=""/>
-                    <div class="card-body">
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item">
-                                <input class="explorer-edit-name" type="text" placeholder="Concept Name..."/>
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs">
+                            <li class="nav-item">
+                                <a class="nav-link active explorer-custom-concept-tab" data-toggle="tab" role="tab" aria-selected="true">Custom</a>
                             </li>
-                            <li class="list-group-item">
-                                <textarea class="explorer-edit-description" rows="4" placeholder="Concept description..."></textarea>
-                            </li>
-                            <li class="list-group-item">
-                                <div class="explorer-edit-instance-of"></div>
+                            <li class="nav-item">
+                                <a class="nav-link explorer-select-concept-tab" data-toggle="tab" role="tab" aria-selected="false">Select</a>
                             </li>
                         </ul>
+                    </div>
+                    <div class="card-body tab-content">
+                        <div class="tab-pane active explorer-custom-concept-panel" role="tabpanel">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <div class="form-group">
+                                        <label>Name</label>
+                                        <input class="explorer-edit-name form-control" type="text" placeholder="Enter concept name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Description</label>
+                                        <textarea class="explorer-edit-description form-control" rows="4" placeholder="Enter concept description"></textarea>
+                                    </div>
+                                </li>
+                                <li class="list-group-item">
+                                    <div class="explorer-edit-instance-of"></div>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="tab-pane explorer-select-concept-panel" role="tabpanel">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <div class="form-group">
+                                        <label>Search</label>
+                                        <input class="explorer-select-concept-search form-control" type="text" placeholder="Enter search text">
+                                    </div>
+                                </li>
+                                <li class="list-group-item">
+                                    <div class="explorer-select-concept-results">
+                                        <div class="explorer-select-concept-result list-template">
+                                            <span class="explorer-select-concept-name"></span>
+                                            <span class="explorer-select-concept-description"></span>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
                 <div class="explorer-show-links card">
@@ -149,7 +183,7 @@
                             </div>
                         </div>
                         <div class="explorer-show-hide-individual">
-                            <div class="explorer-show-individual explorer-show-individual-template">
+                            <div class="explorer-show-individual list-template">
                                 <input type="checkbox" class="explorer-show-individual-button"/>
                                 <label class="explorer-show-individual-label"></label>
                             </div>
