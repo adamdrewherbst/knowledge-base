@@ -21,15 +21,18 @@
 
 
         Node.prototype.evaluate = function() {
-            let self = this;
+            let self = this, queue = [];
 
-            // identify the top context nodes of this relation
-            let queue = self.getTopNodes();
+            self.each(['<', Concept.in, '*', '>', Concept.isA], function(link) {
+                let end = link.getEnd();
+                if(queue.indexOf(end) < 0) queue.push(end);
+                queue.push(link);
+            });
 
             // for each such top node C
             while(!queue.isEmpty()) {
 
-                let part = queue.first();
+                let part = queue.shift();
                 // take every law predicate C is 'in'
                 node.eachOutgoing(['in', 'predicate'], function(predicate) {
 

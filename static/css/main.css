@@ -16,6 +16,13 @@
             display: none;
         }
 
+        #links {
+            background-color: #ff4;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
         #global-controls {
             width: 100%;
             flex-direction: row;

@@ -522,7 +522,7 @@
                     layerName: "Foreground"
                 },  // always have link label nodes in front of Links
                 $$(go.Shape, "Ellipse", {
-                    fill: '#bbb', width: 20, height: 20, stroke: null,
+                    fill: 'rgba(255,255,255,0)', width: 60, height: 40, stroke: null,
                     portId: "", fromLinkable: true, toLinkable: true, cursor: "pointer"
                 })
             ));
@@ -739,13 +739,14 @@
                             if(!concept || concept === Concept.isA || concept === Concept.in || concept === Concept.metaOf) return;
                             if(checked[concept.getId()]) return;
                             checked[concept.getId()] = true;
-                            if(!neighbor || other.hasLink(Concept.isA, neighbor)) {
+                            if(!neighbor || other.hasLink(Concept.isA, neighbor, true)) {
                                 self.addConceptResult($results, concept);
                             }
                         });
                     }, true);
                 });
             }
+            self.$partEdit.find('.explorer-custom-concept-tab').tab('show');
             self.$partEdit.find('.card-header').toggle(part.isLink());
             self.showCard(self.$partEdit, part);
         };
@@ -774,7 +775,7 @@
                         && !self.hasData(link, 'hidden', neighbor);
                 showable = showable || type === 'external';
                 if(showable) {
-                    Page.addListItem(self.$showLinks, function($checkbox) {
+                    Page.addListItem($showList, function($checkbox) {
                         $checkbox.val(link.getId());
                         $checkbox.find('label').html(link.displayString());
                         $checkbox.find('input').prop('checked', self.isShown(link)).change(function(e) {
@@ -895,16 +896,15 @@
         Explorer.prototype.getLinkType = function(link) {
             let self = this, start = link.getStart(), end = link.getEnd(), node = self.getNode();
 
-            if(start) {
-                if(end === node) return 'primary';
-                else if(start.hasLink(Concept.in, node)) {
-                    if(end) {
-                        if(end.hasLink(Concept.in, node)) return 'secondary';
-                        else if(end.hasLink(Concept.metaOf, node)) return 'meta';
-                        else return 'external';
-                    } else return 'dangling';
-                }
-            } else return 'dangling';
+            if(!start || !end) return 'dangling';
+            if(end === node) return 'primary';
+            let startType = start.getMainLinkType(), endType = end.getMainLinkType(),
+                startPrimary = start.hasLink(startType, node), endPrimary = end.hasLink(endType, node);
+            if(startPrimary) {
+                if(endType === Concept.in && endPrimary) return 'secondary';
+                if(endType === Concept.metaOf && endPrimary) return 'meta';
+                if(!endPrimary) return 'external';
+            }
         };
 
         Explorer.prototype.isShown = function(part) {

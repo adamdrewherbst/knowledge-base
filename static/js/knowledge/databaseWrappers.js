@@ -723,8 +723,12 @@
             return this.isMeta() ? Concept.metaOf : Concept.in;
         };
 
-        Part.prototype.hasLink = function(link, part) {
-            return this.has(['>', link, part]);
+        Part.prototype.hasLink = function(link, part, recursive) {
+            let self = this, hasLink = self.has(['>', link, part]);
+            if(hasLink || !recursive) return hasLink;
+            return !self.each(['>', link, '*'], function(node) {
+                return !node.hasLink(link, part, true);
+            });
         };
 
         Part.prototype.getLink = function(link, part) {
