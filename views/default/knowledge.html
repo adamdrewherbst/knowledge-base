@@ -73,11 +73,14 @@
 
         {{#
         # Here is the palette & diagram where the user can drag concepts from the palette onto the diagram and arrange them into
-        # a connected relation represented the problem at hand, or a general law.  This functionality is provided by the GoJS
+        # a connected relation representing the problem at hand, or a general law.  This functionality is provided by the GoJS
         # plugin and used mainly in diagram.js
         # }}
 
+        {{ include 'header.html' }}
+
         <div id="links">
+            <a href="{{=URL('default', 'description')}}">Description of the Project</a>
             <a href="https://github.com/adh38/knowledge-base">See the code for this site on GitHub</a>
         </div>
 

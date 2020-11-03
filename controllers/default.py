@@ -56,6 +56,10 @@ def knowledge():
     return dict()
 
 
+def description():
+    return locals()
+
+
 #   AJAX HANDLERS & HELPER FUNCTIONS
 #   The rest of the handlers are called by the JavaScript on the page, via AJAX.
 #   They load and save records from the database.

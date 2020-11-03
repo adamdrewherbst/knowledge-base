@@ -1,0 +1,8 @@
+{{ extend 'spacetime/layout.html' }}
+{{ include 'header.html' }}
+<div class='info-bar'>
+    <span class='info-item'>
+        <a href="{{=URL('spacetime', 'index', vars={'section': 'toc'})}}"><< Table of Contents</a>
+    </span>
+</div>
+{{ =form }}

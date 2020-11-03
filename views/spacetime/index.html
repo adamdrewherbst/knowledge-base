@@ -7,24 +7,20 @@
     <body>
         <div id="wrapper">
 
-            {{ def infoBar(): }}
-            <div class="info-bar">
-                <span class="info-item" id="nav-contact">Email: adamdrewherbst@gmail.com</span>
-                <span class="info-item" id="nav-toc">
-                    <a href="{{=URL('spacetime', 'index', vars={'section': 'toc'})}}">Table of Contents</a>
-                </span>
-            </div>
-            {{ return }}
-
-            {{ infoBar() }}
+            {{ include 'header.html' }}
 
             {{ def sectionNav(): }}
-                <div class="nav-prev">
+                <div class="nav-prev nav-item">
                 {{ if prevSection: }}
                     <a href="{{ =URL('spacetime', 'index', vars={'section': prevSection['file']})}}"><< {{= prevSection['title']}}</a>
                 {{ pass }}
                 </div>
-                <div class="nav-next">
+                <div class="nav-toc nav-item">
+                {{ if section != 'toc': }}
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': 'toc'})}}">Table of Contents</a>
+                {{ pass }}
+                </div>
+                <div class="nav-next nav-item">
                 {{ if nextSection: }}
                     <a href="{{ =URL('spacetime', 'index', vars={'section': nextSection['file']})}}">{{= nextSection['title']}} >></a>
                 {{ pass }}
@@ -50,7 +46,7 @@
                 {{ sectionNav() }}
             </div>
 
-            {{ infoBar() }}
+            {{ include 'header.html' }}
 
         </div>
     </body>
