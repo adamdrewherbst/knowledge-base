@@ -1,0 +1,73 @@
+<span class="section-title">Geodesic Motion</span>
+
+At the same time, according to the Einstein field equation, matter is associated with the Einstein tensor, which is the Ricci tensor with its “metric component” flipped.  That is, we can decompose a symmetric second-rank tensor into a multiple of the metric,
+
+\begin{equation*}
+	R_{\mu\nu,metric} = \frac{g^{\sigma\rho}R_{\sigma\rho}}{g^{\alpha\beta}g_{\alpha\beta}}g_{\mu\nu} = \frac14 R g_{\mu\nu}
+\end{equation*}
+
+and a tensor whose metric trace is zero (“orthogonal to the metric”), in analogy with the decomposition of vectors,
+
+\begin{equation*}
+	\vec a_b = \frac{\vec a \cdot \vec b}{\vec b \cdot \vec b} \  \vec b
+\end{equation*}
+
+and the Einstein tensor is
+
+\begin{equation*}
+	G_{\mu\nu} = R_{\mu\nu} - 2R_{\mu\nu,metric} = R_{\mu\nu} - \frac12 R g_{\mu\nu}
+\end{equation*}
+
+Einstein suspected that this tensor is the one determined by matter, because its divergence happens to be identically zero in any manifold, so that it naturally enforces the conservation of momentum and energy {{cite('einstein_matter',True)}}.
+<p>
+
+	That has the result that, locally, mass density is the sum of the Ricci eigenvalues.  But it is less straightforward to define the mass of a finite distribution.  However, this model is apparently a stationary spacetime or close to it, so that we can use Komar’s mass integral, which is a kind of volume integral of the Ricci curvature {{cite('komar_mass',True)}}.
+<p>
+
+	First of all, that has an interesting consequence.  Since mass and frequency are proportional, mass and period are inversely so, such that the product of mass and period is a constant (Planck’s constant).  But since the spacetime is stationary, the product of mass and period is the same as the integral of mass over one period, which by the Komar formula is essentially the curvature integrated over the spacetime hypervolume in one period.  That is, Planck’s constant can also be interpreted as the total curvature in one period.
+<p>
+
+	A natural question is whether the spin period is proportional to the periods of timelike geodesics over the loop.  Now, the time curvature varies as the inverse square of the geodesic period.  But we have seen in "<a href="{{=URL('spacetime','index',vars={'section':'planck_relation'})}}">The Planck-Einstein Relation</a>" that the effective radius of the waveform is proportional to the spin period, so that the spatial volume should scale as its cube.  If the two periods were proportional, the hypervolume of a period would thus scale as their fourth power, so that, the form of the spacetime being similar, the total curvature in a period would not be constant, and the Planck-Einstein relation would not hold.
+
+\begin{align*}
+R_{tt} \propto \frac{1}{T_{geodesic}^2} \\
+r_{eff} \propto T_{spin} \\
+V \propto r_{eff}^3 \propto T_{spin}^3 \\
+hypervolume \propto VT_{spin} \propto T_{spin}^4 \\
+total\ curvature \propto hypervolume\ \cdot\ curvature \propto \frac{T_{spin}^4}{T_{geodesic}^2} \\
+total\ curvature\ is\ constant\ \rightarrow\ \frac{T_{spin}^4}{T_{geodesic}^2} = constant
+\end{align*}
+
+	So apparently the geodesic and spin periods are not proportional, meaning that the mass in the waveform is not following timelike geodesics.  This suggests that the law of gravitational motion is not obeyed within the particle’s waveform, that is, on the smallest of scales.  But for general relativity to hold, the particle as a whole should appear to follow a geodesic.
+<p>
+
+	In particular, since energy and momentum are already conserved by virtue of the non-divergence of the Einstein tensor, geodesic motion in gravitational fields is the <span class="italic">only</span> additional condition required to ensure that general relativity is satisfied on macroscopic scales.
+<p>
+
+	More precisely, if we consider a family of geodesics that are (a) momentarily comoving with the particle, and (b) far enough from the singularity that they are not appreciably affected by it, the particle worldline should remain comoving with them, even though, in the midst of its own turbulent region of spacetime, that worldline may not constitute a geodesic.  (This assumes that this comoving geodesic family remains coherent, that is, its members remain more or less comoving with each other, which is to say the local curvature surrounding the particle is much smaller than its own curvature — which should hold in typical gravitational fields.)  The general idea is shown below:
+<p>
+
+
+<div id="fig:geodesic_motion" class="figure">
+<image width=60% src="{{=URL('static','spacetime/images/Geodesic_Motion.jpg')}}"></image>
+<div class="figure-caption">
+    Schematic illustration of the notion that the worldline (dashed red curve) must remain comoving with the asymptotic family of momentarily comoving geodesics (purple curves), in adherence with general relativity, even though the mass of the waveform (green squiggle) may not follow its own local timelike geodesics.
+</div>
+</div>
+
+But geodesic propagation of a soliton is a condition that we might expect to be naturally enforced by the wave equation.  After all, plane waves and wave packets in linear systems propagate at constant velocity.  And remember that the wave equation only has its familiar form
+
+\begin{equation*}
+	(-\frac{1}{c^2} \frac{\partial^2}{\partial t^2} + \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2} + \frac{\partial^2}{\partial z^2}) R_{\rho\sigma\mu\nu} = 0
+\end{equation*}
+
+in geodesic normal coordinates.
+<p>
+
+	Suppose that the waveform did deviate from its comoving geodesic neighborhood.  The deviation would have to occur along a particular spatial direction.  Yet the loop model has only one distinguished direction: the loop axis.  But then, towards which side of the axis would it veer?  The only difference is due to spin, which appears right-handed in one direction and left-handed in the other.  But the wave equation apparently makes no distinction between the two senses of rotation.
+<p>
+
+	Put another way: the average spatial variation of the waveform is symmetric across any given plane.  So by the normal form of the wave equation written above, the average time variation should be as well.  But if the waveform veers to one side of that plane, the variation of curvature along comoving geodesics on the two sides will be opposite - the curvature will grow on one side and shrink on the other.  And since the derivatives in the normal form of the equation are themselves measured along geodesics, that violates the symmetry of the equation.
+<p>
+
+	So it appears likely that the law of gravity will be naturally obeyed by these solitonic particles.

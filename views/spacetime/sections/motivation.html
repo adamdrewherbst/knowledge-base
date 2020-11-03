@@ -1,0 +1,204 @@
+<span class="section-title">Background and Motivation: Riemannian Geometry and Relativity</span>
+
+Imagine a continuum.  In a continuum there are continuous paths, and if it is a mathematical continuum, each path has a quantity, which we call its "interval".
+<p>
+What are the possible relations between the intervals of paths in the continuum?  This is a question Riemann answered basically as follows.
+<p>
+
+The simplest case is a one-dimensional continuum, that is, one that can be covered by a single path.  Call it \(C\).  We can draw \(C\) any old way.
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Of course we can still consider sub-paths of \(C\).  Suppose the interval of any path within \(C\) is the length you would measure on your screen.  But then, we can always label the points of \(C\) by a coordinate, and the scale of the coordinate may or may not respect the true interval.
+
+<div id="fig:1d_continuum_coordinates" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/1D_continuum_true_coordinate.jpg')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/1D_continuum_false_coordinate.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Now take a point \(a\) with coordinate \(x_a\), and make a graph of interval from \(a\) to all other points, for each coordinate system.
+
+<div id="fig:1d_continuum_interval_graphs" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/true_interval_graph.png')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/false_interval_graph.png')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+The graph is sensible, but it has a kink at \(x_a\), so we can't describe it easily with a smooth function.  So, instead of interval, we talk about interval <span class="italic">squared</span>.
+
+<div id="fig:1d_continuum_squared_interval_graphs" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/true_interval_squared_graph.png')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/false_interval_squared_graph.png')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+We could expand about \(a\):
+
+$$s^2 = c_0 + c_1 (x - x_a) + c_2 (x - x_a)^2 + c_3 (x - x_a)^3 + ...$$
+
+But the offset and first derivative vanish at \(a\), so it is a parabola to first order:
+
+$$ds^2 = c_2 dx^2$$
+$$ds = \sqrt{c_2 dx^2}$$
+
+This is the interval from \(a\) to nearby points.  But we can do the same thing from any point.  So each point \(x\) has a characteristic parabola.  Call the constant of the parabola \(g(x)\).  Then, the interval of any path is the integral of these line elements:
+
+$$\Delta s = \int_a^b ds = \int_a^b \sqrt{g(x) dx^2}$$
+
+We can add more dimensions to our continuum.  For a 2D surface, we can make an \(xy\) coordinate system.  Now we'll drop the assumption that interval is proportional to screen distance, to allow for curved surfaces.  But we can still draw it schematically.
+
+<div id="fig:2d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/2D_continuum.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Again we pick a point \(a\), with coordinates \((x_a,y_a)\).  But now, given a second point \(b\), there are many paths from \(a\) to \(b\).  So when we graph interval squared, we specifically use the paths that are straight lines in the coordinate map.
+
+<div id="fig:2d_continuum_coordinates" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/2D_continuum_coordinates.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Again, we could expand the resulting interval-squared function; since there are two variables, it takes this form:
+
+$$ s^2 = c_0 + c_1 (x - x_a) + c_2 (y - y_a) + c_3 (x - x_a)^2 + c_4 (x - x_a)(y - y_a) + c_5 (y - y_a)^2 + c_6 (x - x_a)^3 + ... $$
+
+But again, because this is interval squared, the offset and first derivatives vanish, so that to first order:
+
+$$ ds^2 = c_3 dx^2 + c_4 dx dy + c_5 dy^2 = \begin{pmatrix} dx & dy \end{pmatrix} \begin{pmatrix} c_3 & \frac12 c_4 \\ \frac12 c_4 & c_5 \end{pmatrix} \begin{pmatrix} dx \\ dy \end{pmatrix} $$
+
+That is, we have all second-order products of the coordinate differentials.  Again, each point \((x,y)\) has its characteristic coefficients, so we label them \(g_{xx}(x,y)\), \(g_{xy}(x,y)\), and \(g_{yy}(x,y)\).
+
+$$ ds^2 = g_{xx}(x,y) dx^2 + 2 g_{xy}(x,y) dx dy + g_{yy}(x,y) dy^2 = \begin{pmatrix} dx & dy \end{pmatrix} \begin{pmatrix} g_{xx} & g_{xy} \\ g_{xy} & g_{yy} \end{pmatrix} \begin{pmatrix} dx \\ dy \end{pmatrix} $$
+
+Being a function of two variables, the graph would be tricky to draw.  Instead, consider a level curve of \(ds^2\): a set of points that all have the same interval from \(a\).
+<p>
+Now here's where an interesting distinction pops up.  Let's assume \(g_{xx}\) and \(g_{yy}\) are nonzero, ie. our coordinate markers are not squished into a single point.  Then, if we plug in a constant for \(ds^2\), it turns out we only get one of two curves: an ellipse, or a hyperbola.  So the family of level curves of the interval function looks like one of these:
+
+<div id="fig:2d_metrics" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/elliptic_metric.png')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/hyperbolic_metric.png')}}"></image>
+<div class="figure-caption">
+    Curves of constant \(ds^2\), in any coordinate system of a mathematical continuum, are necessarily ellipses or hyperbolas.
+</div>
+</div>
+
+In the hyperbolic case, the squared interval itself can be either positive or negative, leading to the two color-coded families of curves.  Of course, a negative squared interval sounds strange.  But because squared interval, rather than interval itself, is the smooth way to describe the interval mathematically, and it admits a negative value, we should not discard it so quickly.
+<p>
+Remember, one of these curves is the set of points that have the same <span class="italic">true</span> interval from \(a\), drawn in our coordinate map.
+<p>
+Given one pair of coordinates, we can make a new pair as linear combinations of them.  By doing so, we can convert any coordinate ellipse or hyperbola into any other.  But we can't get an ellipse to change into a hyperbola.  So the continuum itself is either elliptic or hyperbolic.
+
+<div id="fig:elliptic_transformation" class="figure">
+<image width=25% src="{{=URL('static','spacetime/images/motivation/elliptic_metric.png')}}"></image>
+<image width=25% src="{{=URL('static','spacetime/images/motivation/elliptic_metric_2.png')}}"></image>
+<image width=25% src="{{=URL('static','spacetime/images/motivation/elliptic_metric_3.png')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+<div id="fig:hyperbolic_transformation" class="figure">
+<image width=25% src="{{=URL('static','spacetime/images/motivation/hyperbolic_metric.png')}}"></image>
+<image width=25% src="{{=URL('static','spacetime/images/motivation/hyperbolic_metric_2.png')}}"></image>
+<image width=25% src="{{=URL('static','spacetime/images/motivation/hyperbolic_metric_3.png')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+And we can apply this equally well to a continuum of any number of dimensions.  The Taylor expansion of the squared interval will still lead to the same matrix form; we call that matrix the "metric" of the continuum.  The sets of points with equal interval from \(a\), in the small-interval approximation, become ellipsoids and hyperboloids; that is, their cross sections are still ellipses and hyperbolas.
+
+<p>--------------------------------------------</p>
+
+If we live in, and are part of, such a continuum, then we should be able to perceive its intervals.  But we are finite beings, so we do not perceive all the intervals.  We can only measure some, and from those we can construct a partial coordinate system.  So let's consider a special type of coordinate system: one where a change of one coordinate represents a true interval that we have measured.
+<p>
+But it is still a coordinate system, regardless of what it represents.  And we know that in any coordinate system, a set of points an equal interval from \(a\) shows up as an ellipse or a hyperbola.
+<p>
+So what do we know how to measure, such that our measurements form an ellipse for points an equal interval from a given point?  Space, of course.  Just replace "interval" with "distance", and let the two coordinates represent two different directions of space.  When these directions are perpendicular, our measurements form the special case of a circle, \(ds^2 = dx^2 + dy^2\).  Otherwise, they form an eccentric ellipse.
+
+<div id="fig:spatial_measurement_right" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/circle_measure_right.png')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/circle_coordinates_right.png')}}"></image>
+<div class="figure-caption">
+    When we measure space along two perpendicular directions (left), our measurements of a set of equal intervals (right) have the equation of a circle.
+</div>
+</div>
+
+<div id="fig:spatial_measurement_right" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/circle_measure_skewed.png')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/circle_coordinates_skewed.png')}}"></image>
+<div class="figure-caption">
+    But when we measure along two skewed directions (left), our measurements of a set of equal intervals (right) have the equation of an eccentric ellipse.
+</div>
+</div>
+
+Of course, that seems kind of silly; mathematicians used our understanding of spatial relations to formulate the concept of a continuum in the first place.  Why run it backwards?
+<p>
+But that's what Riemann did.  Having constructed the equations above to describe 2D surfaces, he noted that they also describe 3D space as we know it - but only locally!  Remember, those equations are only the first order approximation of an arbitrary interval-squared function, so for an arbitrary continuum, they typically only apply in a small neighborhood around a point.  And if they don't apply globally, then, in analogy with 2D surfaces, we can say the continuum is "curved".
+<p>
+That's what led Riemann to hypothesize that the space around us is curved, and that its curvature could potentially be the source of the physical phenomena we perceive.
+<p>
+So the elliptic case describes three-dimensional space.  But we also perceive time.  In particular, at any point of space, we can perceive something evolving over time.  And if all our perceptions arise from the intervals of paths in the continuum, time must be one of these.  But we perceive the time evolution independently of all the spatial paths we can already perceive.  Such that these time paths must constitute a fourth dimension of the continuum.
+<p>
+If we make measurements of both time and space, and consider a two-dimensional set of such measurements - time, along with one dimension of space - we can again construct a coordinate system.  So for small intervals, they still must have an elliptic or hyperbolic form.
+<p>
+But if it were elliptic, the relation between time and space would be no different than that between two directions of space, so why should we perceive them so differently?
+<p>
+So the hyperbolic case already seems more likely.  Remember, the curves of constant interval look like this:
+
+<div id="fig:hyperbolic_metric" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/hyperbolic_metric.png')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+And remember, these coordinates are the measurements made by somebody; call them \(P\).  To have measured intervals from \(a\), \(P\) must have been present at \(a\).  So the path through time taken by \(P\) passes through \(a\).  Which path is it, on the coordinate map?
+<p>
+The simplest assumption is the most symmetric: the path of \(P\) is the one through the vertices of the hyperbolas.  So that means the y-axis, which now represents \(P\)'s measurement of time intervals, must pass through those vertices.
+
+<div id="fig:time_axis" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/time_axis_rest_frame.png')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+And which are the paths that \(P\) perceives as space?  Again, the most symmetric supposition is that the spatial path from \(a\) passes through the vertices of the other hyperbolas -- the ones with "negative squared interval".  In general, that makes \(P\)'s spatial paths the ones that are tangent to the "positive" hyperbolas.
+
+<div id="fig:space_axis" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/space_axis.png')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Remember, the two hyperbola families have "squared intervals" of opposite signs.  That sign difference thus distinguishes space from time mathematically, but we can remove the minus sign in practice whenever calculating an actual time or distance.
+<p>
+Now, as Einstein argued, all beings should perceive the continuum the same way.  So the trajectory of any other observer, \(Q\), should still pass through the same hyperbola family.  And the paths perceived as space by \(Q\) should still be tangent to them.
+
+<div id="fig:other_observer" class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/other_observer.png')}}"></image>
+<div class="figure-caption">
+    The time-path traveled by another observer, \(Q\), and \(Q\)'s spatial paths, as mapped according to \(P\)'s measurements.
+</div>
+</div>
+
+That's because the hyperbola represents a real set of points in the continuum, and so does \(Q\)'s spatial path.  Both are currently mapped according to \(P\)'s measurements instead of \(Q\)'s, but a change of mapping cannot affect whether a line intersects, or is tangent to, a hyperbola; at most it could change their shape.  Thus they must be tangent according to anybody's measurements.
+<p>
+Then, to make sure the continuum is perceived the same way by everyone, the last stipulation we need is the one that led to relativity in the first place: that the space-time slope of the asymptote of the hyperbolas should be the same for everyone.  We call that slope the speed of light.
+<p>
+Of course, those assumptions, taken together, are just the laws of special relativity.  So relativity arises naturally from the supposition that the universe is a continuum, and a basic understanding of how we perceive space and time.
+<p>
+But this is neither special nor general relativity; it is more general than either of them.  It is a continuum that has the hyperbolic relations of special relativity only locally, and does not necessarily obey Einstein's equations of gravitation.  In principle, it can be curved arbitrarily, and its curvature can follow some other law - although that law must of course reproduce the Einstein equations in domains and scales where these have been successful.
+<p>
+Thus the simplest philosophical and mathematical premises lead to a curved relativistic manifold as a description of the universe.  The question then, drawing from phenomena that have been recorded, is what forms of curvature might account for them, and what if any fundamental laws govern them.
+<p>
+The rest of this paper is a patchwork of speculations on these questions.
+

@@ -1,0 +1,26 @@
+<span class="section-title">Table of Contents</span>
+
+{{ def display(section):
+    if 'title' in section and section['title']: }}
+    <li>
+        {{ if 'file' in section and section['file']: }}
+        <a href="{{=URL('spacetime', 'index', vars={'section': section['file']})}}">{{=section['title']}}</a>
+        {{ else: }}
+        {{=section['title']}}
+        {{ pass }}
+    </li>
+    {{ pass }}
+
+    {{ if len(section['sections']) > 0: }}
+        <ul>
+        {{ for sub in section['sections']:
+            display(sub)
+            pass
+        }}
+        </ul>
+    {{ pass }}
+{{ return }}
+
+<ul>
+    {{ display(sections) }}
+</ul>

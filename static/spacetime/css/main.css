@@ -1,0 +1,103 @@
+#wrapper {
+    overflow: hidden;
+    margin-top: 25px;
+    margin-bottom: 100px;
+}
+
+#contact-info {
+    text-align: center;
+    font-size: 22px;
+    font-style: italic;
+    margin: 30px 0;
+}
+
+.info-bar {
+    display: block;
+    width: auto;
+    text-align: center;
+    font-size: 20px;
+    margin: 10px 30px;
+}
+.info-item {
+    margin-right: 20px;
+}
+
+.section-nav {
+    display: block;
+    width: auto;
+    font-size: 25px;
+    margin: 20px 30px;
+}
+.nav-prev {
+    float: left;
+}
+.nav-next {
+    float: right;
+}
+
+#bottom-nav {
+    margin-bottom: 80px;
+}
+
+#left-nav {
+    float: left;
+    width: 20%;
+    font-size: 18px;
+    display: none;
+}
+
+#content-wrapper {
+    display: block;
+    font-size: 22px;
+    padding: 20px 50px;
+}
+
+.dedication {
+    text-align: center;
+    font-style: italic;
+    font-weight: bold;
+    font-size: 34px;
+    color: #080;
+    margin: 80px 0;
+}
+
+.section-title {
+    font-weight: bold;
+    display: block;
+    text-align: center;
+    margin: 25px 0;
+}
+
+.subsection {
+    font-style: italic;
+    display: block;
+    margin: 50px 0 25px 0;
+}
+
+.figure {
+    margin: 30px 0;
+    text-align: center;
+}
+
+.figure-caption {
+    font-style: italic;
+    margin: 15px 15% 0 15%;
+}
+
+.italic {
+    font-style: italic;
+}
+
+.side-note {
+    font-weight: bold;
+    display: block;
+    margin: 20px 0;
+}
+
+.quotation {
+    padding: 20px 50px;
+    font-style: italic;
+    line-height: 150%;
+}
+
+

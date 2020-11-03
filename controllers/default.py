@@ -204,8 +204,8 @@ def index():
     if you need a simple wiki simply replace the two lines below with:
     return auth.wiki()
     """
-    response.flash = T("Hello World")
-    return dict(message=T('Welcome to the Concept Graph!'))
+    #response.flash = T("Hello World")
+    return dict(message=T('See My Paper About Spacetime!'))
 
 
 def user():

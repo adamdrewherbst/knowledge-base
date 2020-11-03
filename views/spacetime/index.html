@@ -1,0 +1,57 @@
+<html>
+    <head>
+        <link rel="stylesheet" href="{{=URL('static','spacetime/css/main.css')}}"/>
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </head>
+    <body>
+        <div id="wrapper">
+
+            {{ def infoBar(): }}
+            <div class="info-bar">
+                <span class="info-item" id="nav-contact">Email: adamdrewherbst@gmail.com</span>
+                <span class="info-item" id="nav-toc">
+                    <a href="{{=URL('spacetime', 'index', vars={'section': 'toc'})}}">Table of Contents</a>
+                </span>
+            </div>
+            {{ return }}
+
+            {{ infoBar() }}
+
+            {{ def sectionNav(): }}
+                <div class="nav-prev">
+                {{ if prevSection: }}
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': prevSection['file']})}}"><< {{= prevSection['title']}}</a>
+                {{ pass }}
+                </div>
+                <div class="nav-next">
+                {{ if nextSection: }}
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': nextSection['file']})}}">{{= nextSection['title']}} >></a>
+                {{ pass }}
+                </div>
+            {{ return }}
+
+            <div id="top-nav" class="section-nav">
+                {{ sectionNav() }}
+            </div>
+
+            <div id="content-wrapper">
+
+                {{ def cite(refName, paren=False): }}<span class="citation">
+                    {{if paren:}} ( {{pass}}
+                    <a href="{{=references[refName]['URL']}}">{{=references[refName]['inline']}}</a>
+                    {{if paren:}} ) {{pass}}
+                </span>{{ return }}
+
+                {{ include sectionFile }}
+            </div>
+
+            <div id="bottom-nav" class="section-nav">
+                {{ sectionNav() }}
+            </div>
+
+            {{ infoBar() }}
+
+        </div>
+    </body>
+</html>

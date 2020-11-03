@@ -1,0 +1,62 @@
+<span class="section-title">Curvature Waves</span>
+
+Why do two electrons repel each other?  The above considerations were topological in nature, but topology doesn’t appear to dictate the time evolution of the manifold.  But what we can say is that there is a buildup of twisting curvature in the space between the electrons, and, in keeping with the belt model, they move away from each other so as to relieve that local excess.
+<p>
+
+	So what equation describes the ongoing process of releasing local distortions in a medium?  There could be more than one candidate, but, as spacetime is a Lorentzian manifold, and as the distortion in this case is described by curvature, there is one that is especially attractive in its covariance and simplicity: the curvature wave equation.
+
+\begin{equation}
+	\label{eq:Riemann_wave}
+	\Box R_{\rho\sigma\mu\nu} = 0
+\end{equation}
+
+The left side is the d’Alambertian, or “spacetime Laplacian”, of the Riemann curvature tensor, and when expressed in an inertial frame it is clearly a wave equation:
+
+\begin{equation}
+	\label{eq:Riemann_wave_normal}
+	(-\frac{1}{c^2} \frac{\partial^2}{\partial t^2} + \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2} + \frac{\partial^2}{\partial z^2}) R_{\rho\sigma\mu\nu} = 0
+\end{equation}
+
+Due to the linearity of the d’Alambertian, the entire equation can be contracted, so that the Ricci and scalar curvatures are also waves.
+
+\begin{align*}
+	\Box R_{\mu\nu} = 0 \\
+    \Box R = 0
+\end{align*}
+
+Because the d’Alambertian is the generalization of the Laplacian, a solution to this equation is, in some sense, a “harmonic” manifold.
+<p>
+
+	This principle would also bear out the ideas of Clifford, who hypothesized that matter is nothing but the curvature of space, and “this property of being curved or distorted is continually being passed on from one portion of space to another after the manner of a wave” {{cite('clifford_space',True)}}.
+<p>
+
+	Interestingly, the two papers referenced above on neck-pinch singularities ({{cite('ricci_neckpinch_2012')}}, {{cite('ricci_neckpinch_2014')}}) were in the context of Ricci flow manifolds.  The Ricci flow equation is another means of describing a manifold in which curvature flows over time, but it is in principle more of a diffusion equation.
+<p>
+
+	However, some authors have studied variations of the Ricci flow equation that <span class="italic">are</span> wave, rather than diffusion, equations.  Notable is the example introduced and extensively investigated by Kong and Liu ({{cite('kong_liu_1')}}, {{cite('kong_liu_2')}}, {{cite('kong_liu_3')}}).  Here they substitute the first-order metric time derivative of the Ricci flow equation with a second-order derivative.  In fact, in {{cite('kong_liu_2')}}, they derive the corresponding evolution equation of the Riemann tensor, and its form is similar to the wave equation above, except that it contains additional terms.
+<p>
+
+	Also curious is the fact that the term "harmonic curvature" has been used previously in the literature ({{cite('harmonic_curvature_1980')}}, {{cite('harmonic_curvature_2003')}}), but in these studies, the interpretation is that the divergence of the Riemann tensor vanishes, rather than its Laplacian/d'Alambertian.  Furthermore, the authors specifically refer to harmonic manifolds with non-parallel Ricci tensor, which is the essential idea behind the twisting field described here.  But again, it is not clear whether there is a deeper conceptual connection between the two variations, or whether  the divergence equation should be preferable in principle.
+<p>
+
+	Nevertheless, in this paper we will continue to consider the wave equation of the Riemann tensor as the fundamental law governing the spacetime manifold, in order to develop the ideas somewhat concretely -- with the understanding that there are alternative possibilities.
+<p>
+
+
+
+If the curvature wave equation is the fundamental law of the manifold, then even isolated particles must be solutions of this equation.  They are “soliton” solutions, since they are localized yet persist in the same form over long periods of time.  Does that fit with the model of the electron described above?
+<p>
+
+	This wave equation is highly non-linear, because the derivatives of curvature are taken with respect to the metric of the manifold and these two quantities are strongly dependent.  (Of course, that nonlinearity is necessary in order for two soliton solutions to interact, rather than propagating right through each other as linear waves do.)  And the very high curvature near the singularity may render analysis difficult.  But as a first approach, we can consider the linear wave equation.  Even this version has singular solutions, where the function decays with radial distance from the singularity.  Furthermore, it has spherical solutions of the form
+
+\begin{equation}
+	f(r, \theta, \phi, t) = \frac{a}{r}sin(kr - \omega t + \alpha)
+\end{equation}
+
+This is interesting because it is conceptually similar to the radial twisting of the tangential curvature.  That twisting will cause the Ricci component along a “given” tangential direction (as defined by parallel transport) to oscillate spatially, and this solution suggests that the oscillation must propagate radially.  The difference is that, the twist rate being commensurate with the curvature, the wavelength and therefore frequency will decay with radial distance in our model, which if valid must be a non-linear effect; but the propagation speed will always be that of light.
+<p>
+
+	Since the propagation is along the radial geodesics, and these pass through the loop from one half-space to the other, the direction of propagation should be inward in one half-space and outward in the other. It’s not clear how the propagation would contribute to the interaction between particles, because the propagation is measured relative to the local Levi-Civita connection: along a timelike geodesic, spacelike Ricci eigenvectors twist relative to the connection.  We might suppose continuity would demand that two particles not be oriented with their propagation directions opposing, but it’s conceivable that this opposition would be effectively neutralized by the way that the connection is altered in the region between them, so that, at the halfway point, there would not be any temporal twisting at all.
+<p>
+
+	The interior of the loop is similar, except, in terms of the linear approximation, it is more like the superposition of two such solutions, where the singularities are at the two ends of the loop - even though, in the true curved space, these singularities happen to coincide.

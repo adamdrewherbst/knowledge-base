@@ -1,0 +1,52 @@
+<span class="section-title">The Higgs Field and Dark Energy</span>
+
+According to the Standard Model, the mass of an elementary particle is proportional to the average value of the Higgs field, by a coupling constant that varies by particle type.
+<p>
+
+	The Higgs is a scalar field that permeates all of spacetime.  In a continuum theory, any physical field should correspond to the curvature of the manifold.  So the Higgs field ought to be identifiable as the curvature that prevails in regions devoid of ordinary matter; that is, the vacuum curvature.  This fits, because the “dark energy” of the vacuum has positive energy density and equally negative pressure (in geometrized units), which by the Einstein equation corresponds to negative time curvature (the acceleration of the expansion of the universe) and equally positive spatial curvature.  In other words, the vacuum Ricci curvature is a multiple of the metric tensor - it is “isotropic” over all directions of spacetime, but for the sign flip between space and time.  As such, only one scalar is required to specify it.
+
+<div id="fig:higgs_field_isotropy" class="figure">
+<image width=30% src="{{=URL('static','spacetime/images/motivation/isotropic_tensor_spatial.jpg')}}"></image>
+<image width=30% src="{{=URL('static','spacetime/images/motivation/isotropic_tensor_spacetime.jpg')}}"></image>
+<div class="figure-caption">
+    All directions of spacetime -- whose components are perceived by observers to lie on a hyperbola -- have the same Ricci curvature in the vacuum, according to the
+    cosmological constant model of dark energy, except that it is negative along timelike (violet) directions and positive along spacelike (gold) ones.
+</div>
+</div>
+
+	First of all, if the manifold is governed by the wave equation, the vacuum curvature itself must satisfy it, in regions far from particulate matter.  In the simple case where the vacuum curvature, in addition to being isotropic and spatially homogeneous, does not change over time, all its derivatives are zero, so its d’Alambertian is as well.
+<p>
+
+	In general, the vacuum curvature may change over time, in which case it’s an open question whether it satisfies the wave equation.  One interesting point is that, the Ricci curvature being a multiple of a metric, the corresponding Einstein tensor is the negative of it.  And since the Einstein tensor always has zero divergence, the vacuum Ricci tensor does as well.  Zero divergence does not generally imply zero d’Alambertian (because the latter is the divergence of the gradient, not vice versa), but a prominent case where both are zero is the electric or magnetic field in free space under Maxwell theory, although these are vectors rather than tensors and the divergence is relative to space only.
+<p>
+
+	(Incidentally, if we did use the divergence equation mentioned in "<a href="{{=URL('spacetime','index',vars={'section':'curvature_waves'})}}">Curvature Waves</a>" ({{cite('harmonic_curvature_1980')}}, {{cite('harmonic_curvature_2003')}}), then any isotropic Ricci field would thus automatically satisfy it.  But we will continue to suppose that it could satisfy the wave equation as well.)
+<p>
+
+	So if the wave equation is the fundamental law, and the vacuum curvature satisfies it, there is no need to explain dark energy; it is the most simple kind of curvature wave, and particles are rather exotic distortions of it.  This is of course because the wave equation restricts only the derivatives of the Ricci tensor, not its value as in the Einstein field equations.
+<p>
+
+	As far as curvature, the main distinction between the vacuum field and a particle wave is apparently the time curvature: in the vacuum it is negative, while for a particle it is positive, which, combined with geodesic motion, is the explanation of gravity.  Before considering the interaction with the Higgs field, what is it about the form of the particle wave that predisposes it to have positive time curvature in the first place?
+<p>
+
+	Consider a set of timelike geodesics with the same speed relative to the worldline.  If the singularity is a neck pinch, they are parallel as they enter the loop, and parallel again where they exit.  Within the loop, they initially diverge (negative curvature), then converge over the middle region (positive), and diverge again (negative) to become parallel as they exit.  In two dimensions, a surface like this would have zero total curvature, because the geodesic cone angle undergoes no net change.  But in four dimensions, the quartic variance of the hypervolume element outweighs the inverse square variance of the curvature.  As timelike geodesics diverge from the singularity, they have negative curvature, but low spatial volume.  The volume is higher where they are converging; hence, the net positive curvature will be greater than the negative, so the particle will have net positive time curvature:
+<p>
+
+
+<div id="fig:timelike_geodesic_structure" class="figure">
+<image src="{{=URL('static','spacetime/images/Timelike_geodesic_structure.jpg')}}"></image>
+<div class="figure-caption">
+    Timelike geodesics within the loop (solid red curves), with the looping behavior omitted so as to show the overall curvature more clearly.  Near the ends (the singularities at two different times), the curvature is negative; in the middle region it is positive.  The spatial volume (black cross sections - in reality these would be three-dimensional) is higher when the curvature is positive, giving net positive curvature overall.
+</div>
+</div>
+
+	So, how would the vacuum influence this positive curvature in the particle?  The general idea is that the particle is surrounded by the vacuum, so the homogeneous isotropic vacuum curvature is the boundary condition imposed on the wave equation.  So the exact form of the particle will undoubtedly vary according to the vacuum, and the higher the vacuum curvature, the greater the effect.  So if that effect has to do with mass, then the mass should increase according to the vacuum.
+<p>
+
+	There could also be a relation to topological invariance here.  To illustrate, consider a local distortion of a two-dimensional surface, i.e. a warping of the surface that is entirely contained within a certain one-dimensional boundary.  If the distortion is smooth, the Gauss-Bonnet theorem ensures that its total Gaussian curvature is the same as the original undistorted region, because the Gaussian curvature of the entire surface is a topological invariant.  So if the original surface has constant curvature, e.g. it is a sphere, then, the area of the distortion being fixed, its curvature is proportional to that of the sphere.
+<p>
+
+	In four-dimensional spacetime, we have to use the Chern-Gauss-Bonnet theorem instead.  In this case the invariant integrand becomes a more complicated function of the Riemann curvature.  We might identify some critical radius beyond which the particle waveform is negligible; in principle, by interpolating the surrounding vacuum, we can say how much volume it would have occupied in the absence of the particle.  Then the Chern-Gauss-Bonnet integral of the particle must match that of this “displaced vacuum”.  This is the point that was alluded to at the end of "<a href="{{=URL('spacetime','index',vars={'section':'space_model'})}}">Space Model</a>": on the one hand, the loop and its associated twist are two topological features that, per the belt analogy, should basically "cancel each other out"; on the other hand, the creation of the loop structure itself may entail a net nonzero topological invariant integral, which can thus only occur in a spacetime with some curvature to it --- homogeneous, but <span class="italic">not</span> flat.  Hence, the higher this homogeneous curvature, the higher the topological invariant of the particle.
+<p>
+
+	If we could find a relation between the topological integral and the mass integral (since both are based on curvature), it might allow us to demonstrate that the particle mass scales with the vacuum (Higgs).  But that remains an open question.

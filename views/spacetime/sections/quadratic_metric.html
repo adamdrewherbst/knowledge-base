@@ -1,0 +1,173 @@
+<span class="section-title">Relativity</span>
+
+Because a path in the surface is made up of infinitesimal vectors, and the length of a vector is expressed by a dot product, we ended up with the quadratic form of the metric, of which we have to take the square root to find an actual distance.
+
+$$\lvert d\vec r \rvert^2 = (\hat x \, dx + \hat y \, dy) \cdot (\hat x \, dx + \hat y \, dy)
+ = (\hat x \cdot \hat x) dx^2 + 2(\hat x \cdot \hat y) dx \, dy + (\hat y \cdot \hat y) dy^2$$
+$$ := g_{xx} \, dx^2 + 2 g_{xy} \, dx \, dy + g_{yy} dy^2$$
+
+Of course, in a real surface, \(\lvert d\vec r \rvert^2\) has to be positive.  We <i>derive</i> the metrics of known surfaces so as to calculate their properties, and the fact that they were real surfaces to begin with ensures the metric will always be positive.
+<p>
+But the quadratic form of the metric admits negative values.  In particular, if the determinant of the metric,
+
+$$ g_{xx} \, g_{yy} - g_{xy}^2 $$
+
+is negative, then the metric <i>will</i> have negative values.  We can see this by considering a "level curve" of the metric: coordinates of points that are all the same metric value from a given point \(p\), ie. they are "equal distance from the center".  Since the metric is
+only a first-order approximation, these coordinates must be infinitesimal.  If the determinant is positive, then these level curves will be ellipses.  But if it is negative, they will be hyperbolas.
+
+<div class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/elliptic_metric.png')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/hyperbolic_metric.png')}}"></image>
+<div class="figure-caption">
+    Each curve is the coordinates of points that are the same "metric distance" from the center point.
+</div>
+</div>
+
+And in the hyperbolic case, the two color-coded families have opposite signs of "\(\lvert d\vec r \rvert^2\)".
+<p>
+The elliptic case is the one that occurs on real surfaces.  On a real surface, the metric represents distance; that's why Riemann formulated it in the first place.  And in the infinitesimal limit on a surface, the set of paths with the same distance from a point \(p\) is a true circle.  It's just that it can <i>map</i> to an eccentric ellipse in coordinate space if our axes are not perpendicular, and/or they have different scale factors.
+
+<div class="figure">
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_measure_right.png')}}"></image>
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_coordinates_right.png')}}"></image>
+<div class="figure-caption">
+    When we measure the points of a circle using two perpendicular, equally scaled axes, our coordinates form a circle as well.
+</div>
+</div>
+
+<div class="figure">
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_measure_skewed.png')}}"></image>
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_coordinates_skewed.png')}}"></image>
+<div class="figure-caption">
+    But when the axes are skewed, the resulting coordinates have the equation of an ellipse.
+</div>
+</div>
+
+The same thing happens in the 3D space around us.  If we label it with an \(xyz\) coordinate system, then consider infinitesimal paths of equal distance in just the \(xy\) plane, they still form circles and ellipses in coordinate space.  In fact, we might think that if
+used the right coordinate system - the Cartesian one - we could extend these paths indefinitely and they would still form proportional coordinate ellipses if they have equal distance from \(p\).  But by finding that the math of curved surfaces extends to three dimensions, Riemann showed that,
+if space is curved, no such coordinate system actually exists.
+<p>
+So what about the hyperbolic case?  It could just be a mathematical curiosity.
+<p>
+Of course, Einstein showed otherwise, through the two enormous paradigm shifts of special and general relativity.  But from the comfort of hindsight, we can speculate
+that the better part of that transition could have been achieved more simply, in light of Riemann's work.
+<p>
+One could have arrived at relativity by postulating only that spacetime <i>is</i> a continuum.  Because we already know from experience that space is Riemannian, ie. the coordinates of equal-metric curves form ellipses at <i>least</i> for
+small measurements, if not large ones.  So even if time is to be incorporated as a fourth dimension, the whole should still be Riemannian.  A point thus specifies both a location and instant, and paths include not only
+spatial paths, but trajectories.  The former are called "spacelike", the latter "timelike".  And since measurements of these paths can be either distances or times, we simply call them "intervals".
+<p>
+We already know by what type of metric the dimensions of space relate to each other: elliptic.
+So we are only left to find how space and time intervals relate.  But if they were also elliptic, time would be mathematically equivalent to a fourth dimension of space, so we should not perceive
+it as a different kind of quantity.
+<p>
+So really, the spacetime metric must be hyperbolic.  We have only to check that we can make it work.  As in the spatial case, our coordinates represent infinitesimal measurements relative to some point \(p\), but now we
+are measuring time intervals along with distances.  We are claiming that sets of infinitesimal paths of "equal interval" from \(p\) are measured as hyperbolas.
+<p>
+The most natural set of measurements we can use are those made by a single observer; call them \(A\).  So when we plot \(A\)'s measurements, we should end up with the most natural form of the hyperbola: the vertices
+intersect the space and time axes.
+
+<div class="figure">
+<image width=50% src="{{=URL('static','spacetime/images/motivation/rest_frame_axes.png')}}"></image>
+<div class="figure-caption">
+    \(A\)'s trajectory (\(dt\) axis) and the paths \(A\) perceives as space (red lines), on the map of \(A\)'s own measurements
+</div>
+</div>
+
+\(A\)'s time axis is also their trajectory, because they don't measure their self to have moved.  Also, we can see that \(A\)'s space axes are tangent to the time hyperbolas.
+<p>
+The trajectories of any other observer \(B\) who passed through point \(p\) must lie on this map too.  We could change our axes to represent \(B\)'s measurements instead.  Then the trajectory of \(B\) would pass
+through the vertex of the hyperbola, and their space axis would be tangent to it.  But a change of coordinates does not alter whether two real curves intersect or are tangent; and remember that the hyperbola represents the same real
+curve for both observers: a set of points with a certain path metric from \(p\).  Thus, \(B\)'s trajectory and space axis must intersect and be tangent to that hyperbola according to \(A\)'s measurements as well.
+
+<div class="figure">
+<image width=50% src="{{=URL('static','spacetime/images/motivation/moving_frame_axes.png')}}"></image>
+<div class="figure-caption">
+    \(B\)'s trajectory (black line) and the paths \(B\) perceives as space (orange lines), again on the map of \(A\)'s measurements
+</div>
+</div>
+
+To completely specify the nature of small measurements, we just need one more observation: that in order for the continuum to be perceived the same way by all observers, the space/time
+slope of the hyperbola's asymptote should be invariant.  Of course, we call that slope the speed of light.
+<p>
+But these are just the laws of relativity.  So relativity is really the <i>only</i> reasonable way for spacetime to be a continuum at all.
+<p>
+The question is, why would anyone postulate that the mathematical form of space and time is a single continuum?  But then, why would anyone postulate anything else?  Newton devoted
+much of the <a href="https://en.wikisource.org/wiki/The_Mathematical_Principles_of_Natural_Philosophy_(1846)/Definitions">"Scholium" section of the Principia</a> to explicitly defining absolute
+space and time; yet there was little justification to offer for it.  Newtonian space is infinite and Euclidean, and there is a distinct instance of it for each instant of time, making spacetime
+fundamentally a Cartesian product of a three-dimensional space and a one-dimensional time.  Newton had to choose his model from among the mathematical structures that were known at the time.
+<p>
+But what if the great integration of mathematics and physics, embodied by the Principia, had occurred after the development of intrinsic differential geometry?  Euclidean space is only a special case of a Riemannian
+manifold, that has the additional restrictions imposed by Euclid's postulates.  So the wiser assertion would have been only that space is Riemannian, because that
+implies fewer assumptions, allowing more room for the theory to be right.
+<p>
+And because the hyperbolic metric pops up naturally in intrinsic geometry -- to be excluded, it must be explicitly asserted that metric gives only positive values -- it might have been considered,
+and found to be a means of relating spatial and temporal measurements, without having to postulate time as an additional entity.  In other words, Occam's razor might have led naturally to the relativistic
+model of spacetime in the first place.  Then, the existence of an invariant maximum speed would have been a novel prediction of the theory, to be borne out later when the theories of electromagnetic and/or
+gravitational waves were developed and confirmed.  Who knows -- if Riemann hadn't died at 39, maybe he would have explored this avenue himself.
+<p>
+But how did that transition unfold historically?  First, Einstein found the hyperbolic metric of special relativity in order to <i>explain</i> the invariant speed that had already been uncovered by
+electromagnetism.  But for the time being, the Euclidean postulates were left in place.  However, even at this step the model of spacetime became simpler insofar as it postulated only
+one entity, with one metric, instead of two.
+<p>
+Because special relativity provided a single metric for any path in spacetime, the trajectories of bodies could be compared according to their "interval" (which is also the time measured by an observer on that trajectory).
+And not surprisingly, it was found that the "inertial" trajectories -- the family of paths that all maintain constant velocities relative to one another, hence the trajectories
+that will be followed by unforced bodies -- were also the mathematically distinguished paths according to their interval.  (Specifically, they were the paths of <i>maximum</i> interval between any two points, which may seem
+opposite of what one would guess, but it's just a result of the hyperbolic nature of the metric.)  That is, they are the generalizations of straight lines.  This result was apparently first published by Planck.
+<p>
+The next inconsistency that became apparent was that between special relativity and gravitation.  And it was only in the attempt to reconcile these that Einstein had his "happiest thought": that the <i>local</i> experience of
+an observer in gravitational free fall, is no different than the <i>local</i> experience of an observer drifting inertially,
+free of all forces.  In either case, all bodies in the vicinity experience the same gravitational acceleration -- finite in the first case, zero in the second -- so they only perceive each other as accelerating to the extent
+that they interact.  Only from a distance do the inertially moving and free-falling observers perceive themselves as accelerating toward or away from each other.
+
+<div class="figure">
+<image width=50% src="{{=URL('static','spacetime/images/motivation/gravitational_paths.jpg')}}"></image>
+<div class="figure-caption">
+    Trajectories of the Earth (green) and three observers: two in free fall, and one moving inertially, so far from the Earth as not to be deflected.
+    Due to the Earth, these trajectories accelerate relative to each other, but each observer perceives no acceleration of objects in their immediate vicinity.
+</div>
+</div>
+
+So, if the laws of physics were local in character, perhaps the same law could describe both types of motion.  But inertial trajectories were already known to be the maximal-interval ones according to the metric of spacetime:
+the "straight lines".  And the only type of structure in which "straight lines" can have relative acceleration, is a <i>curved</i> one.  In this case the term is "geodesics" rather than lines, but they are still the shortest
+or longest paths between two points.
+
+<div class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/hyperboloid_geodesics.jpg')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/sphere_geodesics.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Thus Einstein became aware that the Euclidean postulates needed to be let go to allow spacetime to curve, leaving even fewer assumptions than before.  The gravitational law of motion then became: free-falling bodies follow geodesics in a <i>curved</i> Riemannian manifold.
+<p>
+Of course, that meant the the curvature must correspond to the gravitational field, hence mass must induce curvature in its vicinity.  This led to the famous race for the field equation to describe how the presence of mass and energy induces
+curvature in the first place.  Once this was found, there were two coupled equations that together described how the same substance that induces curvature locally, then proceeds to flow along the geodesics induced by the substance around it.
+That is, the laws of gravity were now entirely local.
+<p>
+In fact, if all phenomena were gravitational, then at this point we could have let go of the notion of mass-energy altogether, by identifying it completely with the spacetime curvature it "induces".  A valid description of fundamental physics would then be, roughly speaking, "spacetime
+is a Riemannian continuum with a hyperbolic metric, whose curvature flows along its own geodesics" -- the more precise version would be the Einstein equations themselves.
+<p>
+Only because there are extra-gravitational phenomena do we need to retain a description of "bodies".  Bodies still induce curvature in the same way, but they do not necessarily move along geodesics.  When they don't, we ascribe this to a force, such as
+electromagnetism.
+<p>
+But now think back to the hypothetical case in which the hyperbolic Riemannian nature of spacetime had been postulated from the outset, simply because it contains the fewest entities and assumptions.
+<p>
+Without yet having postulated any further entities, such a theory would already have many possible degrees of freedom, in the curvature of the spacetime manifold.  Newton's theory of gravitation had one degree of freedom at each place and time: the mass density.
+Whereas Riemannian spacetime already has ten, in the components of the metric tensor.  Given a theory, its degrees of freedom are what we can play with so as to try to find the model that best describes our world.  By starting with unconstrained Riemannian spacetime,
+we are free to sculpt its curvature however we wish, in an attempt to recreate the patterns of matter and motion around us.  In particular, there is no reason to suppose that gravitation should be more amenable than any other phenomenon to a description in terms of spacetime curvature.
+Nor is there reason to suppose that it can better describe macroscopic than microscopic phenomena.
+<p>
+In the process, we can identify the law or laws that all those patterns of curvature adhere to, and it need not be the Einstein equations, as long as it reproduces their results where they have been successful.
+<p>
+That was the spirit of the unification program pursued by Einstein himself and a number of other physicists over the years, and it is adopted here as well.
+<p>
+Of course there is no need to invoke the order of history or imagine it differently in order to justify a particular approach.  I only lay it out this way because I had always been under the impression that curvature of spacetime was inextricably linked to gravity.
+But an understanding of the basic math shows this is not the case.  And by perusing the history we can see how such a conceptual entanglement arose in the popular understanding, so that we can more easily and confidently disentangle it.
+
+
+
+
+
+
+
+
