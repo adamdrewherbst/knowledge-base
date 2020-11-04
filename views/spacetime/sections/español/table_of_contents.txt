@@ -1,0 +1,30 @@
+toc,Tabla de Contenido
+abstract,Resumen
+introduction,Introducción
+,Antecedentes y Motivación
++riemannian_basics,Conceptos Básicos Riemannianos
++quadratic_metric,La Relatividad
++riemannian_concepts,Más Conceptos Riemannianos
+,La Carga
++belt_model,Modelo de Cinturón
++space_model,Modelo de Espacio (El Electrón)
++electric_field,El Campo Eléctrico
++curvature_waves,Ondas de Curvatura
++baryons,Los Bariones
++mesons_quark_generations,Mesones y Generaciones de Quarks
++lepton_generations,Generaciones de Leptones
+,El Giro Cuántico
++internal_spin,El Giro Interno
++external_spin,El Giro Externo
++spin_interaction,Interacción de Giros
++baryon_spin,El Giro de Bariones
+,La Masa
++planck_relation,La Relación Planck-Einstein
++geodesic_motion,La Moción Geodésica
++baryon_mass,La Masa de Bariones
++higgs_field,El Campo Higgs y la Energía Oscura
++higgs_boson,El Bosón de Higgs
++dark_matter,La Materia Oscura
++generational_mass_trend,La Tendencia Masiva de las Generaciones
++neutrino_oscillations,Oscilaciones de Neutrinos
+conclusion,Conclusión

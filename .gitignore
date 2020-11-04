@@ -6,3 +6,4 @@
 /errors/*
 /databases/*_relation.table
 /databases/*_relation_dependency.table
+/static/spacetime/misc.txt

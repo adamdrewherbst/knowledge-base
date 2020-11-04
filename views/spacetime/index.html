@@ -12,17 +12,17 @@
             {{ def sectionNav(): }}
                 <div class="nav-prev nav-item">
                 {{ if prevSection: }}
-                    <a href="{{ =URL('spacetime', 'index', vars={'section': prevSection['file']})}}"><< {{= prevSection['title']}}</a>
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': prevSection['file'], 'language': language})}}"><< {{= prevSection['title']}}</a>
                 {{ pass }}
                 </div>
                 <div class="nav-toc nav-item">
                 {{ if section != 'toc': }}
-                    <a href="{{ =URL('spacetime', 'index', vars={'section': 'toc'})}}">Table of Contents</a>
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': 'toc', 'language': language})}}"> {{= tableOfContentsTitle }}</a>
                 {{ pass }}
                 </div>
                 <div class="nav-next nav-item">
                 {{ if nextSection: }}
-                    <a href="{{ =URL('spacetime', 'index', vars={'section': nextSection['file']})}}">{{= nextSection['title']}} >></a>
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': nextSection['file'], 'language': language})}}">{{= nextSection['title']}} >></a>
                 {{ pass }}
                 </div>
             {{ return }}

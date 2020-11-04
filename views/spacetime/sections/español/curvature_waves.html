@@ -1,0 +1,62 @@
+<span class="section-title">Ondas de curvatura</span>
+
+¿Por qué dos electrones se repelen? Las consideraciones anteriores eran de naturaleza topológica, pero la topología no parece dictar la evolución temporal de la variedad. Pero lo que podemos decir es que hay una acumulación de curvatura de torsión en el espacio entre los electrones y, de acuerdo con el modelo de cinturón, se alejan entre sí para aliviar ese exceso local.
+<p>
+
+Entonces, ¿qué ecuación describe el proceso continuo de liberar distorsiones locales en un medio? Podría haber más de un candidato, pero, como el espacio-tiempo es una variedad de Lorentz, y como la distorsión en este caso se describe mediante la curvatura, hay uno que es especialmente atractivo por su covarianza y simplicidad: la ecuación de onda de curvatura.
+
+\begin{equation}
+	\label{eq:Riemann_wave}
+	\Box R_{\rho\sigma\mu\nu} = 0
+\end{equation}
+
+El lado izquierdo es el d’Alambertian, o "espacio-tiempo laplaciano", del tensor de curvatura de Riemann, y cuando se expresa en un marco inercial es claramente una ecuación de onda:
+
+\begin{equation}
+	\label{eq:Riemann_wave_normal}
+	(-\frac{1}{c^2} \frac{\partial^2}{\partial t^2} + \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2} + \frac{\partial^2}{\partial z^2}) R_{\rho\sigma\mu\nu} = 0
+\end{equation}
+
+Debido a la linealidad del d’Alambertian, la ecuación completa se puede contraer, de modo que las curvaturas de Ricci y escalares también son ondas.
+
+\begin{align*}
+	\Box R_{\mu\nu} = 0 \\
+    \Box R = 0
+\end{align*}
+
+Debido a que el d’Alambertian es la generalización del laplaciano, una solución a esta ecuación es, en cierto sentido, una variedad "armónica".
+<p>
+
+Este principio también confirmaría las ideas de Clifford, quien planteó la hipótesis de que la materia no es más que la curvatura del espacio, y “esta propiedad de ser curvada o distorsionada se transmite continuamente de una parte del espacio a otra a la manera de una onda ”{{cite('clifford_space', True)}}.
+<p>
+
+Curiosamente, los dos artículos mencionados anteriormente sobre singularidades de pellizco de cuello ({{cite('ricci_neckpinch_2012')}}, {{cite('ricci_neckpinch_2014')}}) estaban en el contexto de las variedades de flujo de Ricci. La ecuación de flujo de Ricci es otro medio de describir una variedad en la que la curvatura fluye a lo largo del tiempo, pero en principio es más una ecuación de difusión.
+<p>
+
+Sin embargo, algunos autores han estudiado variaciones de la ecuación de flujo de Ricci que <span class = "italic"> son </span> ecuaciones de onda, más que de difusión. Es notable el ejemplo presentado e investigado exhaustivamente por Kong y Liu ({{cite('kong_liu_1')}}, {{cite('kong_liu_2')}}, {{cite('kong_liu_3')}}). Aquí sustituyen la derivada de tiempo métrica de primer orden de la ecuación de flujo de Ricci con una derivada de segundo orden. De hecho, en {{cite('kong_liu_2')}}, derivan la ecuación de evolución correspondiente del tensor de Riemann, y su forma es similar a la ecuación de onda anterior, excepto que contiene términos adicionales.
+<p>
+
+También es curioso el hecho de que el término "curvatura armónica" se haya utilizado previamente en la literatura ({{cite('harmonic_curvature_1980')}}, {{cite('harmonic_curvature_2003')}}), pero en estos estudios, la interpretación es que la divergencia del tensor de Riemann desaparece, en lugar de su Laplacian / d'Alambertian. Además, los autores se refieren específicamente a variedades armónicas con tensor de Ricci no paralelo, que es la idea esencial detrás del campo de torsión descrito aquí. Pero, nuevamente, no está claro si existe una conexión conceptual más profunda entre las dos variaciones, o si la ecuación de divergencia debería ser preferible en principio.
+<p>
+
+Sin embargo, en este artículo continuaremos considerando la ecuación de onda del tensor de Riemann como la ley fundamental que gobierna la variedad espaciotemporal, con el fin de desarrollar las ideas de manera algo concreta, en el entendimiento de que existen posibilidades alternativas.
+<p>
+
+
+
+Si la ecuación de la onda de curvatura es la ley fundamental de la variedad, incluso las partículas aisladas deben ser soluciones de esta ecuación. Son soluciones de “solitón”, ya que están localizadas pero persisten en la misma forma durante largos períodos de tiempo. ¿Eso encaja con el modelo del electrón descrito anteriormente?
+<p>
+
+Esta ecuación de onda es altamente no lineal, porque las derivadas de la curvatura se toman con respecto a la métrica de la variedad y estas dos cantidades son fuertemente dependientes. (Por supuesto, esa no linealidad es necesaria para que dos soluciones de solitón interactúen, en lugar de propagarse entre sí como lo hacen las ondas lineales). Y la curvatura muy alta cerca de la singularidad puede dificultar el análisis. Pero como primer enfoque, podemos considerar la ecuación de onda lineal. Incluso esta versión tiene soluciones singulares, donde la función decae con la distancia radial de la singularidad. Además, tiene soluciones esféricas de la forma
+
+\begin{equation}
+	f(r, \theta, \phi, t) = \frac{a}{r}sin(kr - \omega t + \alpha)
+\end{equation}
+
+Esto es interesante porque es conceptualmente similar a la torsión radial de la curvatura tangencial. Esa torsión hará que el componente de Ricci a lo largo de una dirección tangencial "dada" (definida por el transporte paralelo) oscile espacialmente, y esta solución sugiere que la oscilación debe propagarse radialmente. La diferencia es que, al ser la tasa de torsión proporcional a la curvatura, la longitud de onda y por lo tanto la frecuencia decaerán con la distancia radial en nuestro modelo, que si es válido debe ser un efecto no lineal; pero la velocidad de propagación siempre será la de la luz.
+<p>
+
+Dado que la propagación es a lo largo de las geodésicas radiales, y estas pasan a través del bucle de un medio espacio al otro, la dirección de propagación debe ser hacia adentro en un medio espacio y hacia afuera en el otro. No está claro cómo la propagación contribuiría a la interacción entre partículas, porque la propagación se mide en relación con la conexión local Levi-Civita: a lo largo de una geodésica temporal, los vectores propios de Ricci de tipo espacial se retuercen en relación con la conexión. Podríamos suponer que la continuidad exigiría que dos partículas no estén orientadas con sus direcciones de propagación opuestas, pero es concebible que esta oposición sea efectivamente neutralizada por la forma en que se altere la conexión en la región entre ellas, de modo que, en el punto medio, no habría ninguna torsión temporal en absoluto.
+<p>
+
+El interior del bucle es similar, excepto que, en términos de aproximación lineal, se parece más a la superposición de dos de tales soluciones, donde las singularidades están en los dos extremos del bucle, aunque, en el verdadero espacio curvo, estas las singularidades coinciden.

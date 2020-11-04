@@ -1,0 +1,141 @@
+<span class="section-title">Riemannian Geometry: Basics</span>
+
+Consider a curve \(C\) in the plane:
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+We can think of each point of \(C\) as a vector \(\vec r\) from some origin \(O\).  Then we can label its points by some coordinate, \(x\).
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum_coordinate.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Notice how the scale of the coordinate doesn't have to correspond to true distance along \(C\).
+<p>
+A tangent vector at each point is \(\frac{d\vec r}{dx}\).  Its length varies according to the coordinate scale.
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum_tangent_vector.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+But what \(\frac{d\vec r}{dx}\) tells us is the displacement of the curve <span class="italic">per unit of \(x\)</span>.  So really, it is the \(x\) unit vector, \(\hat x\).
+
+$$\frac{d\vec r}{dx} = \hat x$$
+
+It is "unit" with respect to the coordinate of the curve, not with respect to distance in the plane!
+<p>
+Any path within \(C\) is a sequence of infinitesimal tangent vectors.
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum_path_vectors.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+We can write one such path element as
+
+$$d\vec r = \frac{d\vec r}{dx} \, dx = \hat x \, dx$$
+
+The squared length of the path element is its dot product with itself:
+
+$$\lvert d\vec r \rvert^2 = (\hat x \, dx) \cdot (\hat x \, dx) = (\hat x \cdot \hat x) \, dx^2$$
+
+But since a single path can wind back and forth, we have to parametrize it by something other than \(x\); call it \(t\).  Then a path element is
+
+$$d\vec r = \frac{d\vec r}{dt} dt = \frac{d\vec r}{dx} \frac{dx}{dt} dt = \hat x \frac{dx}{dt} dt$$
+
+And the length of the path is
+
+$$s = \int_a^b{\lvert \hat x \frac{dx}{dt} dt \rvert} = \int_a^b{\sqrt{(\hat x \cdot \hat x) \frac{dx}{dt}^2} dt}$$
+
+For the 1D case, such paths are really the only structures we can describe within \(C\).
+<p>
+So let's move on to a 2D surface, \(S\).  We can still describe its points as vectors from some origin \(O\), but now with two coordinates, \(x\) and \(y\).
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/2D_continuum_coordinate.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+And that gives us two unit vectors at each point, \(\frac{\partial\vec r}{\partial x} = \hat x\) and \(\frac{\partial\vec r}{\partial y} = \hat y\).  But a path element can be along an intermediate direction:
+
+$$d\vec r = \frac{\partial\vec r}{\partial x} dx + \frac{\partial\vec r}{\partial y} dy = \hat x \, dx + \hat y \, dy$$
+
+Again, to find its squared length, we take its self dot product.
+
+$$\lvert d\vec r \rvert^2 = (\hat x \, dx + \hat y \, dy) \cdot (\hat x \, dx + \hat y \, dy)
+    = (\hat x \cdot \hat x) dx^2 + 2(\hat x \cdot \hat y) dx dy + (\hat y \cdot \hat y) dy^2$$
+
+This expression can be written with matrices:
+
+$$\lvert d\vec r \rvert^2 = \begin{pmatrix} dx & dy \end{pmatrix} \begin{pmatrix} \hat x \cdot \hat x & \hat x \cdot \hat y \\ \hat x \cdot \hat y & \hat y \cdot \hat y \end{pmatrix} \begin{pmatrix} dx \\ dy \end{pmatrix}$$
+
+The matrix of dot products gets called the metric and given its own shorthand, since we can apply it to any path element \((dx, dy)\) to find its length.
+
+$$\begin{pmatrix} \hat x \cdot \hat x & \hat x \cdot \hat y \\ \hat x \cdot \hat y & \hat y \cdot \hat y \end{pmatrix}
+ = \begin{pmatrix} g_{xx} & g_{xy} \\ g_{xy} & g_{yy} \end{pmatrix} = g_{ij}$$
+
+Furthermore, we can take the dot product between any two infinitesimal vectors, \(d\vec u\) and \(d\vec v\), at a given point.
+
+$$d\vec u = \hat x \, dx_u + \hat y \, dy_u $$
+$$d\vec v = \hat x \, dx_v + \hat y \, dy_v $$
+$$d\vec u \cdot d\vec v = (\hat x \cdot \hat x)\, dx_u \, dx_v + (\hat x \cdot \hat y)\, dx_u \, dy_v
++ (\hat y \cdot \hat x)\, dy_u \, dx_v + (\hat y \cdot \hat y)\, dy_u \, dy_v $$
+$$= \begin{pmatrix} dx_u & dy_u \end{pmatrix} \begin{pmatrix} \hat x \cdot \hat x & \hat x \cdot \hat y \\ \hat x \cdot \hat y & \hat y \cdot \hat y \end{pmatrix} \begin{pmatrix} dx_v \\ dy_v \end{pmatrix}$$
+$$= \begin{pmatrix} dx_u & dy_u \end{pmatrix} \begin{pmatrix} g_{xx} & g_{xy} \\ g_{xy} & g_{yy} \end{pmatrix} \begin{pmatrix} dx_v \\ dy_v \end{pmatrix}$$
+$$:= g(d\vec u, d\vec v)$$
+
+and use this to get the angle between them.  So we can find lengths and angles, and thus areas as well, for any path or region of the surface, as long as we know the 3 dot products of the two unit vectors at each point.
+<p>
+We know the dot product of two given vectors will come out the same no matter what coordinate system we put on the surface; the vector components will change, but so will the dot products of the coordinate vectors, and these
+changes will cancel out.  Any linear function of vectors with that property is called a tensor, so the \(g_{ij}\) matrix is called the metric tensor.
+<p>
+What Riemann realized is that these quantities - length, angle, area - are the only ones that are really intrinsic to the surface.  The surface may have a hill on it, which we observe as having some elevation,
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/surface_with_hill.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+but that elevation is not intrinsic to the surface.  Rather, the hill is identified intrinsically by noting, for example, that the circumference of circular paths around a certain point (the peak) is <span class="italic">less</span> than \(\pi\) times their radius from that point.  This is the notion of intrinsic curvature, to be discussed in the next section.
+
+<div id="fig:1d_continuum" class="figure">
+<image width=70% src="{{=URL('static','spacetime/images/motivation/intrinsic_curvature.jpg')}}"></image>
+<div class="figure-caption">
+    If we limit ourselves to measurements within the surface, the radius of the red circles is measured along the purple curve, so ratio of circumference to radius will shrink with increasing radius.
+</div>
+</div>
+
+And according to that description, a surface with two distant hills is intrinsically identical to one with a hill and a pit ("upside-down hill").
+<p>
+The idea is that, if there were 2D beings living in the surface, they couldn't sense elevation, because it occurs in a dimension that extends out from the surface - a dimension of which they have no experience.
+<p>
+So if we have a coordinate system and associated metric tensor, we no longer need to describe how the surface is positioned in 3D space using our \(\vec r\) vectors.  More essential is how points, paths, and areas of the surface are positioned <span class="italic">relative to each other along paths in the surface itself</span>.
+<p>
+Thus Riemann pioneered the field of <span class="italic">intrinsic</span> geometry, yet we can see that it is also a shift toward <span class="italic">relative</span> geometry, so perhaps it is no surprise it should have enabled the formulation of the theory of relativity.
+<p>
+Also, now that we have this intrinsic structure, no longer anchored geometrically to the space outside it, we can add as many dimensions as we like.  Instead of a surface, we get a continuum, which is called a Riemannian manifold.  Thus we can describe a three- or four-dimensional curved continuum.
+<p>
+Riemann pointed this out, and he surmised on that basis that even the three-dimensional space around us likely has intrinsic curvature of its own.  Of course, general relativity proved him right on that count.  According to relativity, energy induces curvature in space as well as time, which becomes noticeable on large scales where much mass is present.
+<p>
+But at the end of his seminal paper ({{cite('riemann_hypotheses')}}), Riemann wasn't concerned much with curvature on large scales.  He said this:
+
+<div class="quotation" style="font-size: 24px">
+The questions about the infinitely great are for the interpretation of nature useless questions. But this is not the case with the questions about the infinitely small. It is upon the exactness with which we follow phenomena into the infinitely small that our knowledge of their causal relations essentially depends. The progress of recent centuries in the knowledge of mechanics depends almost entirely on the exactness of the construction which has become possible through the invention of the infinitesimal calculus, and through the simple principles discovered by Archimedes, Galileo, and Newton, and used by modern physic. But in the natural sciences which are still in want of simple principles for such constructions, we seek to discover the causal relations by following the phenomena into great minuteness, so far as the microscope permits. Questions about the measure-relations of space in the infinitely small are not therefore superfluous questions.
+<p>
+If we suppose that bodies exist independently of position, the curvature is everywhere constant, and it then results from astronomical measurements that it cannot be different from zero; or at any rate its reciprocal must be an area in comparison with which the range of our telescopes may be neglected. But if this independence of bodies from position does not exist, we cannot draw conclusions from metric relations of the great, to those of the infinitely small; in that case the curvature at each point may have an arbitrary value in three directions, provided that the total curvature of every measurable portion of space does not differ sensibly from zero .... Now it seems that the empirical notions on which the metrical determinations of space are founded, the notion of a solid body and of a ray of light, cease to be valid for the infinitely small. We are therefore quite at liberty to suppose that the metric relations of space in the infinitely small do not conform to the hypotheses of geometry; and we ought in fact to suppose it, if we can thereby obtain a simpler explanation of phenomena.
+</div>
+
+
+
+

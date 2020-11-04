@@ -1,0 +1,43 @@
+<span class="section-title">The Electric Field</span>
+
+How does the electric field relate to the curvature?  Here, it is helpful to consider two electrons in close proximity.  How do their curvature fields combine in the region between them?  The difficulty is that these fields are not defined with respect to some immutable “base space”, such that we can simply add their corresponding tensor components at each point.  The manifold is at once the field and the space.
+<p>
+
+	But the intuition behind the curvature field was that space must twist, in a real sense, in order to compensate topologically for the formation of the loop.  The curvature field is the mathematical expression of that twist, but we should still be justified in talking in terms of the twisting of space itself.  So, if one electron applies a twist to a given region of space, and another electron applies a twist of the same handedness to the same region, how can the effect be other than a sum of the two twists?  Such that the local twist rates of the two electrons will add.
+<p>
+
+	For simplicity, suppose the two electrons are oriented symmetrically, that is, with their loop axes aligned to the displacement between them.  Now, if the twist rate of each electron is a radially decaying function, then the sum of the two rates will have a minimum at the point halfway between them - but it will not be zero.  Yet we know the electric field halfway between two equal charges is zero.  This suggests that the electric field is proportional not to the twist rate, but to its derivative, which <span class="italic">is</span> zero at that point:
+<p>
+
+
+<div id="fig:twist_rate" class="figure">
+<image width=42% src="{{=URL('static','spacetime/images/twist_rate_like_charges.png')}}"></image>
+<image width=42% src="{{=URL('static','spacetime/images/twist_rate_opposite_charges.png')}}"></image>
+<div class="figure-caption">
+    Net twist rate in the region between two like charges (left) and opposite charges (right).  The derivative corresponds to the electric field, such that, at the midpoint, it is zero for like charges and nonzero for opposite, as expected.
+</div>
+</div>
+
+This also makes sense because the twist rate itself is not directional anyway.  It is either right- or left-handed regardless of which way you look along the helical axis.  Whereas the derivative can tell us in which direction the twist rate becomes more or less right-handed.
+<p>
+
+	Likewise, the twist rates between two opposite charges will subtract.  This time, the twist rate will be zero halfway between them, but its derivative will not, such that the electric field is nonzero, as expected.
+<p>
+
+	This appears to support the superposition principle of electric fields: if the twist rates add, so do their derivatives.  The situation is more complicated when their directions differ, but at least we would expect them to pick an intermediate direction, and for the resulting rate to vary with their own, which corresponds conceptually to vector addition.
+
+This raises an interesting possibility.  If the electric field is the derivative of the twist rate, and the electric field of a point charge varies as the inverse square of the radius, the twist rate itself will vary as the inverse of the radius.  And if the helical curvature, as in Euclidean space, is the square of the twist rate, it will then vary as the inverse square of the radius, just like the electric field.
+
+\begin{align}
+    E \propto \frac{1}{r^2} \\
+    E \propto \frac{d}{dr} (twist\ rate) \\
+    \rightarrow twist\ rate \propto \frac{1}{r} \\
+    curvature \propto (twist\ rate)^2 \\
+    \rightarrow curvature \propto \frac{1}{r^2} \propto E
+\end{align}
+
+And if space is flat on average, the positive tangential curvature should equal the negative radial curvature, such that it will also have an inverse square profile.  Of course, one surface whose positive curvature varies as the inverse square of its radius is a sphere, or really any closed 2D surface.  (Actually this is only strictly true in Euclidean space; here, it is an approximation that should hold as long as we are not too close to the neck-pinch singularity, since surface-area to radius ratio behaves very differently near the singularity.)  So it is possible that the tangential geodesic sections form closed surfaces, just like the ones inside the loop.  If for some as-yet-unknown reason this were a fundamental characteristic of the electron space, then Gauss’ law of electric flux would effectively result from the Gauss-Bonnet theorem, which says that the total curvature on such a surface is independent of its shape and size.
+<p>
+
+	However, it might be impossible to achieve this in a smooth manifold.  That’s because a closed geodesic section outside the loop would cross all radial geodesics, whereas the ones inside the loop are effectively only crossing the geodesics from one half-space, as they transition to the other half-space.  So the external curvature would be weaker than the internal, since it is not sufficient to close a single half-space; and as a result, there would be a kind of kink in the curvature across the singularity.  Then again, the curvature approaches infinity at the singularity anyway, so this might not be too out of place.  Or, if the external sections do not close, their radial trend might still be dictated, in the interest of continuity, by the fact that the internal sections do close; such that they would still have an inverse square profile.
+
