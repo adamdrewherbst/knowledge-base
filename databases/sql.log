@@ -594,3 +594,86 @@ CREATE TABLE part(
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
 success!
+timestamp: 2020-11-05T16:05:01.357492
+CREATE TABLE auth_user(
+    id INT AUTO_INCREMENT NOT NULL,
+    first_name VARCHAR(128),
+    last_name VARCHAR(128),
+    email VARCHAR(512),
+    password VARCHAR(512),
+    registration_key VARCHAR(512),
+    reset_password_key VARCHAR(512),
+    registration_id VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2020-11-05T16:05:01.473355
+CREATE TABLE auth_group(
+    id INT AUTO_INCREMENT NOT NULL,
+    role VARCHAR(512),
+    description LONGTEXT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2020-11-05T16:05:01.650727
+CREATE TABLE auth_membership(
+    id INT AUTO_INCREMENT NOT NULL,
+    user_id INT  , INDEX user_id__idx (user_id), FOREIGN KEY (user_id) REFERENCES auth_user (id) ON DELETE CASCADE,
+    group_id INT  , INDEX group_id__idx (group_id), FOREIGN KEY (group_id) REFERENCES auth_group (id) ON DELETE CASCADE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2020-11-05T16:05:01.790691
+CREATE TABLE auth_permission(
+    id INT AUTO_INCREMENT NOT NULL,
+    group_id INT  , INDEX group_id__idx (group_id), FOREIGN KEY (group_id) REFERENCES auth_group (id) ON DELETE CASCADE,
+    name VARCHAR(512),
+    table_name VARCHAR(512),
+    record_id INT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2020-11-05T16:05:01.863700
+CREATE TABLE auth_event(
+    id INT AUTO_INCREMENT NOT NULL,
+    time_stamp DATETIME,
+    client_ip VARCHAR(512),
+    user_id INT  , INDEX user_id__idx (user_id), FOREIGN KEY (user_id) REFERENCES auth_user (id) ON DELETE CASCADE,
+    origin VARCHAR(512),
+    description LONGTEXT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2020-11-05T16:05:02.008543
+CREATE TABLE auth_cas(
+    id INT AUTO_INCREMENT NOT NULL,
+    user_id INT  , INDEX user_id__idx (user_id), FOREIGN KEY (user_id) REFERENCES auth_user (id) ON DELETE CASCADE,
+    created_on DATETIME,
+    service VARCHAR(512),
+    ticket VARCHAR(512),
+    renew CHAR(1),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2020-11-05T16:35:45.445402
+CREATE TABLE painting(
+    id INT AUTO_INCREMENT NOT NULL,
+    image VARCHAR(512),
+    title VARCHAR(512),
+    start_date DATE,
+    start_date_has_month CHAR(1),
+    start_date_has_day CHAR(1),
+    end_date DATE,
+    end_date_has_month CHAR(1),
+    end_date_has_day CHAR(1),
+    location VARCHAR(512),
+    medium VARCHAR(512),
+    width_inches INT,
+    height_inches INT,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2020-11-05T17:42:57.271662
+ALTER TABLE painting ADD description VARCHAR(512);
+success!
+success!

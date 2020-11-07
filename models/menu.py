@@ -5,9 +5,9 @@
 # Customize your APP title, subtitle and menus here
 # ----------------------------------------------------------------------------------------------------------------------
 
-response.logo = A(B('web', SPAN(2), 'py'), XML('&trade;&nbsp;'),
-                  _class="navbar-brand", _href="http://www.web2py.com/",
-                  _id="web2py-logo")
+#response.logo = A(B('web', SPAN(2), 'py'), XML('&trade;&nbsp;'),
+#                  _class="navbar-brand", _href="http://www.web2py.com/",
+#                  _id="web2py-logo")
 response.title = request.application.replace('_', ' ').title()
 response.subtitle = ''
 
@@ -29,10 +29,24 @@ response.google_analytics_id = None
 # ----------------------------------------------------------------------------------------------------------------------
 
 response.menu = [
-    (T('Home'), False, URL('default', 'index'), [])
+    (T('Home'), False, URL(request.controller, 'index'), [])
 ]
 
-DEVELOPMENT_MENU = True
+if request.controller == 'paintings':
+    years = {}
+    for painting in db(db.painting).iterselect(db.painting.start_date, db.painting.end_date):
+        if painting.start_date is not None:
+            years[painting.start_date.year] = True
+        if painting.end_date is not None:
+            years[painting.end_date.year] = True
+    yearMenu = [['All', False, URL('paintings','paintings')]] + [[str(year), False, URL('paintings', 'paintings/'+str(year))] for year in years]
+    response.menu += [
+        ['About Me', False, URL('paintings', 'about')],
+        ['Paintings', False, URL('paintings', 'paintings'), yearMenu]
+    ]
+
+
+DEVELOPMENT_MENU = False
 
 
 # ----------------------------------------------------------------------------------------------------------------------

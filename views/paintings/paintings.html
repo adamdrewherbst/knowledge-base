@@ -1,0 +1,39 @@
+{{left_sidebar_enabled,right_sidebar_enabled=False,('message' in globals())}}
+{{extend 'paintings/layout.html'}}
+
+<div class="panel-group" id="painting-filters" role="tablist" aria-multiselectable="true">
+    <div class="panel panel-default">
+        <div class="panel-heading" role="tab" id="filter-header">
+            <h4 class="panel-title">
+                <a role="button" data-toggle="collapse" data-parent="#painting-filters" href="#filter-list" aria-expanded="true" aria-controls="filter-list">
+                    Filters
+                </a>
+            </h4>
+        </div>
+        <div id="filter-list" class="panel-collapse collapse {{='in' if filtered else ''}}" role="tabpanel" aria-labelledby="filter-header">
+            <div class="panel-body">
+                {{=form}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+{{for painting in paintings: }}
+    <div class="col-xs-6 col-md-2">
+        <a href="{{=URL('paintings', 'painting.html/'+str(painting.id))}}" class="thumbnail">
+            <img src="{{=URL('static', 'paintings/images/'+painting.image)}}" alt="{{=painting.title}}">
+        </a>
+    </div>
+{{ pass }}
+</div>
+
+{{ if auth.is_logged_in(): }}
+<p><a href="{{=URL('paintings', 'painting_update')}}" class="btn btn-primary" role="button">New Painting</a></p>
+{{ pass }}
+
+
+
+
+
+

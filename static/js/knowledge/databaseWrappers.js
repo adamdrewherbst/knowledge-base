@@ -226,9 +226,6 @@
             if(records.stored[id]) return;
             records.stored[id] = true;
 
-            console.log('storing ' + this.type.tableName + ' ' + id);
-            console.log(record);
-
             if(record.deleted) {
                 delete this.records[id];
                 return;
@@ -400,8 +397,8 @@
             });
         };
 
-        Concept.prototype.toString = function() {
-            return this.name + ' (' + this.id + ')';
+        Concept.prototype.toString = function(display) {
+            return this.name + (display ? '' : ' (' + this.id + ')');
         };
 
 
@@ -655,6 +652,7 @@
                     return 'incoming';
                     break;
             }
+            return undefined;
         };
 
         Part.prototype.has = function(chain, index, direction) {
@@ -717,6 +715,11 @@
         Part.prototype.each = function(chain, callback) {
             let parts = this.getAll(chain);
             return Misc.each(parts, callback);
+        };
+
+        Part.prototype.printEach = function(chain) {
+            let parts = this.getAll(chain);
+            return Misc.each(parts, function(part) { console.log(part.toString()); });
         };
 
         Part.prototype.getMainLinkType = function() {
@@ -932,24 +935,26 @@
             console.log(this.toString());
         };
 
-        Part.prototype.toString = function() {
+        Part.prototype.toString = function(display) {
+            let selfStr = '';
+            if(this.concept.getName()) {
+                selfStr = this.concept.toString(display);
+            } else {
+                let parent = this.getFirst(['>', Concept.isA, '*']);
+                if(parent) selfStr = '(' + parent.getConcept().toString(display) + ')';
+            };
+            selfStr += display ? '' :  ' [' + this.id + ']';
             if(this.isNode()) {
-                return this.concept.toString() + ' [' + this.id + ']';
+                return selfStr;
             } else if(this.isLink()) {
-                return (this.start ? this.start.toString() : 'null')
-                    + ' > ' + this.concept.toString() + ' [' + this.id + '] > '
+                return (this.start ? this.start.toString(display) : 'null')
+                    + ' > ' + selfStr + ' > '
                     + (this.end ? this.end.toString() : 'null');
             }
         };
 
         Part.prototype.displayString = function() {
-            if(this.isNode()) {
-                return this.concept.toString();
-            } else if(this.isLink()) {
-                return (this.start ? this.start.displayString() : 'null')
-                    + ' > ' + this.concept.toString() + ' > '
-                    + (this.end ? this.end.displayString() : 'null');
-            }
+            return this.toString(true);
         };
 
 

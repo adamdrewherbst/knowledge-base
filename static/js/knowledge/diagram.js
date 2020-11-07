@@ -76,6 +76,11 @@
                     if(keys.length === 1) self.open(context[keys[0]]);
                 }
             });
+            self.$wrapper.find('.concept-evaluate-button').click(function(e) {
+                if(self.node) {
+                    self.node.evaluate();
+                }
+            });
 
             self.$showLinks = self.$wrapper.find('.explorer-show-links');
             self.$showLinksId = self.$showLinks.find('.explorer-show-links-id');
@@ -476,6 +481,7 @@
                     },
                     new go.Binding('fill', '', function(data, node) {
                         if(data.isMeta) return '#cc3';
+                        if(data.mapped) return '#c39'
                         return '#6c6';
                     }),
                     new go.Binding("figure")),
@@ -496,7 +502,8 @@
                             isA += data.isA[id].getName() + ',';
                         }
                         if(isA.length > 1) name += ' (' + isA.substring(0, isA.length-1) + ')';
-                        return (name || '...') + ' [' + data.id + ']';
+                        let mapping = data.mapped ? (' > ' + data.mapped) : '';
+                        return (name || '...') + ' [' + data.id + ']' + mapping;
                     }))
                 ),
                 // handle mouse enter/leave events to show/hide the ports
@@ -562,7 +569,8 @@
                                 margin: 10
                             },
                             new go.Binding("text", "", function(data, link) {
-                                return (data.name || '...') + ' [' + data.id + ']';
+                                let mapping = data.mapped ? ' > ' + data.mapped : '';
+                                return (data.name || '...') + ' [' + data.id + ']' + mapping;
                             })
                         )
                     ),

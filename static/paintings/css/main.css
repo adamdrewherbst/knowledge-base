@@ -1,0 +1,22 @@
+.navbar-fixed-top, .footer {
+    background-color: #eef;
+}
+.navbar-fixed-top .nav>li>a {
+    color: #880;
+}
+
+.filter-form {
+    display: flex;
+    justify-content: space-between;
+}
+.filter-form > .form-group {
+}
+.filter-form label {
+    margin-right: 10px;
+}
+.filter-form .form-control {
+    display: inline-block;
+    width: auto;
+    padding: 6px 6px;
+    height: 28px;
+}

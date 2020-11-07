@@ -1,0 +1,51 @@
+{{left_sidebar_enabled,right_sidebar_enabled=False,('message' in globals())}}
+{{extend 'paintings/layout.html'}}
+{{idStr = str(record.id)}}
+
+<div class="row">
+    <div class="col-sm-12 col-md-12">
+        <div class="thumbnail">
+            <img src="{{=URL('static', 'paintings/images/'+record.image)}}" alt="Image not available">
+            <div class="caption">
+                <h3>{{=record.title}}</h3>
+                <p>{{=record.description}}</p>
+                <p>
+                    {{
+                    date = ''
+                    if record.start_date is not None:
+                        if record.start_date_has_month:
+                            date += record.start_date.strftime('%B') + ' '
+                            if record.start_date_has_day:
+                                date += str(record.start_date.day) + ', '
+                                pass
+                            pass
+                        date += str(record.start_date.year)
+                        if record.end_date:
+                            date += ' - '
+                            pass
+                        pass
+                    if record.end_date is not None:
+                        if record.end_date_has_month:
+                            date += record.end_date.strftime('%B') + ' '
+                            if record.end_date_has_day:
+                                date += str(record.end_date.day) + ', '
+                                pass
+                            pass
+                        date += str(record.end_date.year)
+                        pass
+                    }}
+                    {{=date}}
+                </p>
+                <p>{{=record.location}}</p>
+                <p>{{=record.medium}}</p>
+                <p>{{=record.width_inches}}" x {{=record.height_inches}}"</p>
+                {{ if auth.is_logged_in(): }}
+                <p>
+                    <a href="{{=URL('paintings', 'painting_update/'+idStr)}}" class="btn btn-primary" role="button">Edit</a>
+                    <a href="{{=URL('paintings', 'painting_delete/'+idStr, vars={'from_record':True})}}" class="btn btn-default" role="button">Remove</a>
+                </p>
+                {{ pass }}
+            </div>
+        </div>
+    </div>
+</div>

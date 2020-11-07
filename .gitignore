@@ -6,4 +6,7 @@
 /errors/*
 /databases/*_relation.table
 /databases/*_relation_dependency.table
+/databases/*_auth_*.table
+/databases/*_painting.table
 /static/spacetime/misc.txt
+/static/paintings/images/*

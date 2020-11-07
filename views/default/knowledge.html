@@ -94,6 +94,7 @@
                         <div class="controls-left">
                             <button class="concept-create-button btn btn-primary" type="button">New Concept</button>
                             <button class="concept-level-up-button btn btn-primary" type="button">Up A Level</button>
+                            <button class="concept-evaluate-button btn btn-primary" type="button">Evaluate</button>
                         </div>
                         <div class="controls-right">
                             <button class="explorer-mode-button btn btn-primary" mode="palette" type="button">Palette</button>
@@ -260,9 +261,9 @@
 
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/databaseWrappers.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/diagram.js')}}"></script>
+    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/evaluate.js')}}"></script>
 <!--    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/interface.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/nodeData.js')}}"></script>
-    <script type="text/javascript" src="{{=URL('static', 'js/knowledge/evaluate.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/represent.js')}}"></script>
     <script type="text/javascript" src="{{=URL('static', 'js/knowledge/suggest.js')}}"></script>-->
 
@@ -295,7 +296,7 @@
                 Concept.metaOf = root.getFirst(['<in<META>of', null]).getConcept();
 
                 let explorer = new Explorer();
-                explorer.open(1);
+                explorer.open(108);
             });
         });
     </script>
