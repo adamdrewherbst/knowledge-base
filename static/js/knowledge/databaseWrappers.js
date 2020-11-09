@@ -639,20 +639,23 @@
             return ret;
         };
 
-        Part.getDirection = function(str) {
+        Part.getDirection = function(str, opposite) {
             if(typeof str !== 'string') return null;
             str = str.toLowerCase();
             switch(str) {
                 case '>':
                 case 'outgoing':
-                    return 'outgoing';
+                    return opposite ? 'incoming' : 'outgoing';
                     break;
                 case '<':
                 case 'incoming':
-                    return 'incoming';
+                    return opposite ? 'outgoing' : 'incoming';
                     break;
             }
             return undefined;
+        };
+        Part.getOppositeDirection = function(str) {
+            return Part.getDirection(str, true);
         };
 
         Part.prototype.has = function(chain, index, direction) {
@@ -848,11 +851,13 @@
         Part.prototype.updateGoData = function(diagram, show) {
             let self = this, model = diagram.model, goData = self.getGoData(diagram), fcn = null,
                 updateLinkLabel = false;
+            let map = Page.displayedMap, match = map ? map.getMatch(self) : null;
             if(show) {
                 let data = {
                     id: self.getId(),
                     name: self.getName(),
-                    isMeta: self.isMeta()
+                    isMeta: self.isMeta(),
+                    mappedId: match ? match.getId() : null
                 };
                 if(self.isLink()) {
                     if(!self.start || !self.end) return;

@@ -19,10 +19,9 @@
 
         */
 
-
         Part.prototype.prepEvaluate = function() {
             let self = this;
-            self.evaluateQueue = [];
+            self.resetEvaluate();
 
             self.each(['<', Concept.in, '*'], function(member) {
                 member.eachLink(function(link, dir, neighbor) {
@@ -35,20 +34,31 @@
 
 
         Part.prototype.evaluate = function(steps) {
-            let self = this;
-            if(!self.evaluateQueue) self.prepEvaluate();
-            if(!Page.displayedMap) {
-                let part = self.evaluateQueue.pop();
-                let map = new Map(self);
-                map.match(part, part);
-                if(!isNaN(steps)) steps--;
+            let self = this, fully = isNaN(steps);
+            Page.evalSteps = steps;
+
+            if(!self.evaluateQueue || self.evaluateQueue.length < 1) self.prepEvaluate();
+
+            while(fully || Page.evalSteps > 0) {
+                if(!Page.displayedMap) {
+                    let part = self.evaluateQueue.pop();
+                    if(!part) return;
+                    console.log('NOW DOING PART ' + part.toString());
+                    let map = new Map(self);
+                    map.match(part, part);
+                    if(!fully) Page.evalSteps--;
+                }
+                Page.displayedMap.extend();
             }
-            Page.displayedMap.extend(steps);
+
+            if(fully || steps > 10) Map.printMaps();
         };
 
 
         Part.prototype.resetEvaluate = function() {
             this.evaluateQueue = [];
+            let ids = Object.keys(Map.map);
+            ids.forEach(id => Map.map[id].unregister());
         };
 
 
@@ -122,28 +132,33 @@
             self.map[pid] = lawPart;
 
             // if this map doesn't have an assigned predicate yet, it must come from the part we are matching
-            if(!self.predicate) self.setPredicate(lawPart.getFirst(['>',Concept.in,'predicate']));
+            if(!self.predicate) {
+                let p = lawPart.getFirst(['>',Concept.in,'predicate']);
+                self.setPredicate(p);
+                if(p) console.log('  set law to ' + p.getFirst(['>',Concept.metaOf,'*']).toString());
+            }
 
-            console.log('matched ' + part.toString() + ' to ' + lawPart.toString());
+            console.log('  matched ' + part.toString() + ' to ' + lawPart.toString());
             Page.displayMap(self);
 
             // prioritize which links of the matched part should be matched next
             let valid = lawPart.eachLink(function(lawLink, lawDirection) {
 
-                // only neighbors that are within the law
+                console.log('    checking link ' + lawLink.toString());
+
                 let lawNeighbor = lawLink.getEndpoint(lawDirection);
                 let linkInPredicate = false, neighborInPredicate = false, priority = -1;
 
                 if(self.law) {
-                    if(!self.inLaw(lawNeighbor)) return true;
-
                     // if this link is already matched, make sure its connection to the matched part is mirrored in the relation
                     let link = self.getMatch(lawLink);
-                    if(link) return link.isNeighbor(part, lawDirection);
+                    if(link) return link.isNeighbor(part, Part.getOppositeDirection(lawDirection));
 
                     linkInPredicate = self.inPredicate(lawLink);
                     neighborInPredicate = self.inPredicate(lawNeighbor);
                     let linkRequired = self.predicateComplete || linkInPredicate;
+
+                    if(!self.inLaw(lawNeighbor) && !linkInPredicate) return true;
 
                     // first, links between parts that have already been matched
                     if(lawNeighbor.isLink() && self.hasMatch(lawNeighbor.getEndpoint(lawDirection))) {
@@ -162,8 +177,10 @@
                 if(!self.waiting[id]) self.waiting[id] = {};
                 self.waiting[id].link = lawLink;
                 self.waiting[id].from = lawPart;
+                self.waiting[id].to = lawNeighbor;
                 self.waiting[id].direction = lawDirection;
                 self.waiting[id].priority = priority;
+                console.log('    waiting on ' + lawLink.toString());
                 return true;
             });
 
@@ -173,8 +190,6 @@
                 if(!self.match(part.getEnd(), lawPart.getEnd())) return false;
             }
 
-            delete self.waiting[lid];
-
             if(self.predicateSet)
                 self.predicateComplete = Misc.each(self.predicateSet, function(part) {
                     return self.hasMatch(part);
@@ -183,51 +198,62 @@
             return true;
         };
 
-        Map.prototype.extend = function(steps) {
-            if(!isNaN(steps)) {
-                if(steps < 1) return;
-                steps--;
+        Map.prototype.extend = function() {
+            if(!isNaN(Page.evalSteps)) {
+                if(Page.evalSteps < 1) return;
+                Page.evalSteps--;
             }
             let self = this;
 
             console.log('\nextending:');
 
             // find the highest priority link waiting to be matched
-            let best = null;
+            let bestInd = -1, best = null;
             $.each(self.waiting, function(i, entry) {
-                if(!best || (entry.priority >= 0 && entry.priority < best.priority)) best = entry;
-                //console.log((entry.link ? entry.link.toString() : 'NONE') + ', priority ' + entry.priority);
+                if(!best || (entry.priority >= 0 && entry.priority < best.priority)) {
+                    best = entry;
+                    bestInd = i;
+                }
             });
 
             // if nothing left to match, register this map
             if(!best) {
                 Page.displayMap(self.fromMap);
+                console.log('RETURNING TO MAP ' + (self.fromMap ? self.fromMap.id : '<none>'));
                 if(self.predicateComplete) self.register();
                 return;
             }
 
-            console.log('\nchose ' + best.link.toString());
-
             // try to find a match for the link
-            let lawPart = best.from, lawLink = best.link, lawDirection = best.direction,
+            let lawLink = best.link, lawPart = best.from, lawNeighbor = best.to, lawDirection = best.direction,
+                priority = best.priority,
                 part = self.getMatch(lawPart);
 
-            console.log('checking links of ' + part.toString());
+            delete self.waiting[bestInd];
+
+            console.log('trying to match ' + lawLink.toString());
 
             // try all neighbors in the relation that match the link in the law
             part.eachLink(lawDirection, function(link, dir, neighbor) {
-                //if(!self.inRelation(neighbor)) return;
+
+                // don't allow a link to be matched to itself
+                if(link === lawLink) return;
+
+                // if the link is to a part not 'in' the law, the matched link must be to the same exact part
+                if(self.law && !self.inLaw(lawNeighbor) && neighbor !== lawNeighbor) return;
+
+                // otherwise, all that matters is that the concepts of the two links match
                 if(link.getConcept() === lawLink.getConcept()) {
-                    console.log('matches ' + link.toString());
                     let newMap = self.clone();
-                    if(newMap.match(link, lawLink)) newMap.extend(steps);
+                    console.log('NEW MAP: ' + newMap.id);
+                    if(newMap.match(link, lawLink)) newMap.extend();
                 }
             });
 
             // we can try to extend this map without having matched that link, as long as it wasn't required
             if(best.priority > 0) {
                 delete self.waiting[lawLink.getId()];
-                self.extend(steps);
+                self.extend();
             }
         };
 
@@ -240,7 +266,19 @@
         };
 
         Map.prototype.register = function() {
-            Map.map[Map.nextId++] = this;
+            let self = this;
+            Map.map[self.id] = self;
+            Page.eachExplorer(function(e) {
+                e.addMapOption(self.id);
+            });
+        };
+
+        Map.prototype.unregister = function() {
+            let self = this;
+            delete Map.map[self.id];
+            Page.eachExplorer(function(e) {
+                e.removeMapOption(self.id);
+            });
         };
 
         Map.prototype.eachPair = function(callback) {
@@ -263,7 +301,10 @@
             map.predicateSet = this.predicateSet;
             map.lawSet = this.lawSet;
             Object.assign(map.map, this.map);
-            Object.assign(map.waiting, this.waiting);
+            for(let id in this.waiting) {
+                map.waiting[id] = {};
+                Object.assign(map.waiting[id], this.waiting[id]);
+            }
             map.predicateComplete = this.predicateComplete;
             return map;
         };
@@ -272,6 +313,22 @@
         };
 
         Map.prototype.setTentative = function(tentative) {
+        };
+
+        Map.prototype.toString = function() {
+            let str = '';
+            for(let id in this.map) {
+                str += '' + id + ': ' + this.map[id].id + ', ';
+            }
+            if(str.length > 2) str = str.substring(0, str.length-2);
+            return str;
+        };
+
+        Map.printMaps = function() {
+            for(let id in Map.map) {
+                console.log('MAP ' + id);
+                console.log(Map.map[id].toString());
+            }
         };
 
 
@@ -283,7 +340,7 @@
                     let part = Part.get(goPart);
                     if(!part) return;
                     let match = map ? map.getMatch(part) : null;
-                    part.setGoData(d, 'mapped', match ? match.getId() : null);
+                    part.setGoData(d, 'mappedId', match ? match.getId() : null);
                 });
                 d.requestUpdate();
             });

@@ -85,14 +85,23 @@
         }
 
         .explorer-controls {
-            display: block;
+            display: flex;
+            justify-content: space-between;
             margin-bottom: 10px;
         }
         .controls-left {
-            float: left;
+            flex-grow: 1;
+        }
+        .controls-middle {
+            flex-grow: 1;
+            text-align: center;
+        }
+        .controls-middle * {
+            display: inline-block;
         }
         .controls-right {
-            float: right;
+            flex-grow: 1;
+            text-align: right;
         }
 
         .show-hide-menu {

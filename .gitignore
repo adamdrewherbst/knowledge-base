@@ -10,3 +10,4 @@
 /databases/*_painting.table
 /static/spacetime/misc.txt
 /static/paintings/images/*
+/static/lodash/*

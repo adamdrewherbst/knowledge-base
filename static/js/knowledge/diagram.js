@@ -76,10 +76,20 @@
                     if(keys.length === 1) self.open(context[keys[0]]);
                 }
             });
+            self.$wrapper.find('.show-external-button').click(function(e) {
+
+            });
             self.$wrapper.find('.concept-evaluate-button').click(function(e) {
                 if(self.node) {
-                    self.node.evaluate();
+                    self.node.evaluate(100);
                 }
+            });
+
+            for(let id in Map.map) self.addMapOption(id);
+            self.$wrapper.find('.show-map-select').change(function(e) {
+                let id = $(this).val();
+                if(!isNaN(id)) id = parseInt(id);
+                Page.displayMap(id in Map.map ? Map.map[id] : null);
             });
 
             self.$showLinks = self.$wrapper.find('.explorer-show-links');
@@ -212,6 +222,14 @@
 
         Explorer.prototype.getPalette = function() {
             return this.modes.palette.diagram;
+        };
+
+        Explorer.prototype.addMapOption = function(id) {
+            this.$wrapper.find('.show-map-select').append('<option value="' + id + '">' + id + '</option>');
+        };
+
+        Explorer.prototype.removeMapOption = function(id) {
+            this.$wrapper.find('.show-map-select > option[value="' + id + '"]').remove();
         };
 
 
@@ -481,7 +499,7 @@
                     },
                     new go.Binding('fill', '', function(data, node) {
                         if(data.isMeta) return '#cc3';
-                        if(data.mapped) return '#c39'
+                        if(data.mappedId) return '#c39'
                         return '#6c6';
                     }),
                     new go.Binding("figure")),
@@ -502,7 +520,7 @@
                             isA += data.isA[id].getName() + ',';
                         }
                         if(isA.length > 1) name += ' (' + isA.substring(0, isA.length-1) + ')';
-                        let mapping = data.mapped ? (' > ' + data.mapped) : '';
+                        let mapping = data.mappedId ? (' > ' + data.mappedId) : '';
                         return (name || '...') + ' [' + data.id + ']' + mapping;
                     }))
                 ),
@@ -569,7 +587,7 @@
                                 margin: 10
                             },
                             new go.Binding("text", "", function(data, link) {
-                                let mapping = data.mapped ? ' > ' + data.mapped : '';
+                                let mapping = data.mappedId ? ' > ' + data.mappedId : '';
                                 return (data.name || '...') + ' [' + data.id + ']' + mapping;
                             })
                         )
@@ -838,6 +856,8 @@
             }
             let isShown = self.isShown(part);
 
+            //console.log((include ? '' : 'un') + 'set ' + part.toString() + ' ' + field + ' by ' + refPart.toString());
+
             if(field === 'secondary') {
                 let inLink = part.getLink(Concept.in, self.getNode()),
                     isSecondary = Misc.hasIndex(self.data, part.getId(), 'secondary');
@@ -893,7 +913,9 @@
                     if(link.getConcept() === Concept.isA) self.setData(start, 'isA', end, !shown);
                 }
 
-                if((!start || self.isShown(start)) && (!end || self.isShown(end)) && type !== 'external') {
+                if((start && !self.isShown(start)) || (end && !self.isShown(end))) {
+                    self.setData(link, 'shown', link, false);
+                } else if(type !== 'external') {
                     self.setData(link, 'shown', link, true);
                 }
             }
@@ -916,8 +938,8 @@
         };
 
         Explorer.prototype.isShown = function(part) {
-            let self = this;
-            return Misc.hasIndex(self.data, part.getId(), 'shown') && !Misc.hasIndex(self.data, part.getId(), 'hidden');
+            let self = this, pid = part.getId();
+            return Misc.hasIndex(self.data, pid, 'shown') && !Misc.hasIndex(self.data, pid, 'hidden');
         };
 
         Explorer.prototype.isHidden = function(part) {
