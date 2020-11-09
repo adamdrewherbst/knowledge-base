@@ -574,7 +574,7 @@
         };
 
         Part.prototype.isMeta = function() {
-            return this.getName() === 'META' || this.has('>in>META') || this.has('>is a>*>in>META');
+            return this.getName() === 'META' || this.has(['>',Concept.in,'>META']) || this.has(['>',Concept.isA,'*',Concept.in,'META']);
         };
 
         Part.prototype.isGeneral = function() {

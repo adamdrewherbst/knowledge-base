@@ -76,8 +76,26 @@
                     if(keys.length === 1) self.open(context[keys[0]]);
                 }
             });
-            self.$wrapper.find('.show-external-button').click(function(e) {
-
+            self.$wrapper.find('.show-external-button,.hide-external-button').click(function(e) {
+                if(!self.node) return;
+                let show = $(this).hasClass('show-external-button');
+                let diagram = self.getActiveDiagram(), selection = diagram.selection.iterator, parts = {};
+                if(selection.count < 1) {
+                    parts = self.node.getAll(['<',Concept.in,'*']);
+                } else while(selection.next()) {
+                    let part = Part.get(selection.value);
+                    if(part && part.has(['>',Concept.in,self.node])) parts[part.getId()] = part;
+                }
+                for(let id in parts) {
+                    let part = parts[id];
+                    part.eachLink(function(link, dir, neighbor) {
+                        if(self.getLinkType(link) === 'external') {
+                            self.setData(link, 'shown', link, show);
+                            console.log((show ? 'showed' : 'hid') + ' ' + link.toString());
+                        }
+                    });
+                }
+                self.updateShown();
             });
             self.$wrapper.find('.concept-evaluate-button').click(function(e) {
                 if(self.node) {
@@ -125,7 +143,6 @@
             });
 
             self.setMode('graph');
-            self.showingMeta = {};
 
             Page.addExplorer(self);
         }
@@ -163,7 +180,11 @@
             Page.clearDiagram(diagram);
 
             self.data = {};
-            self.setData(self.node, 'shown', self.node, true, true);
+            self.setData(self.node, 'shown', self.node, true);
+            self.node.each(['<',Concept.metaOf], function(metaLink) {
+                self.setData(metaLink, 'hidden', metaLink, true);
+            });
+            self.updateShown();
         };
 
         Explorer.prototype.updateLayout = function() {
@@ -687,7 +708,6 @@
                         console.log(parent);
                         if(!parent || !parent.isNode()) continue;
                         let node = Part.create();
-                        self.showingMeta[node.getId()] = true;
                         diagram.model.set(it.value.data, 'id', node.getId());
                         node.addLink(parent.getMainLinkType(), self.node);
                         node.addLink(Concept.isA, parent);
