@@ -51,7 +51,10 @@
                 Page.displayedMap.extend();
             }
 
-            if(fully || steps > 10) Map.printMaps();
+            // upon completion, get rid of obselete references
+            if(fully) {
+                for(let id in Map.map) delete Map.map[id].fromMap;
+            }
         };
 
 
@@ -101,7 +104,7 @@
             let self = this;
             self.predicate = predicate;
             if(!predicate) return;
-            self.law = predicate.getFirst(['>',Concept.metaOf,'*']);
+            self.law = predicate.getFirst(['>',Concept.of,'*']);
             self.predicateSet = self.predicate.getAll(['<',Concept.in,'*']);
             Misc.each(self.predicateSet, function(part) {
                 if(part.start) self.predicateSet[part.start.getId()] = part.start;
@@ -191,7 +194,7 @@
                     // the first step is to find a link that is in a predicate
                     let predicate = lawLink.getFirst(['>',Concept.in,'predicate']);
                     if(!predicate) return true;
-                    let law = predicate.getFirst(['>',Concept.metaOf,'*']);
+                    let law = predicate.getFirst(['>',Concept.of,'*']);
                     if(Map.checkedLaw[law.getId()]) return true;
                     priority = 0;
                 }
@@ -337,7 +340,51 @@
             return map;
         };
 
-        Map.prototype.append = function() {
+        Map.prototype.apply = function() {
+            let self = this;
+            Page.newLinks = {};
+            self.law.eachIn(function(lawPart) {
+                self.appendPart(lawPart);
+            });
+            Page.eachExplorer(function(e) {
+                Misc.each(Page.newLinks, function(link) {
+                    e.checkLink(link);
+                });
+                e.updateShown();
+            });
+        };
+
+        Map.prototype.appendPart = function(lawPart) {
+            let self = this, start = lawPart.getStart(), end = lawPart.getEnd();
+            if(!self.inLaw(lawPart) && (!start || !self.inLaw(start)) && (!end || !self.inLaw(end))) {
+                console.log('not appending ' + lawPart.toString());
+                return lawPart;
+            }
+            let part = self.getMatch(lawPart);
+            if(part) return part;
+            let data = {};
+            if(lawPart.isLink()) data.concept = lawPart.getConcept();
+            part = Part.create(data);
+            part.appended = true;
+            self.map[part.getId()] = lawPart;
+            self.map[lawPart.getId()] = part;
+            lawPart.eachNeighbor(function(lawNeighbor, lawDirection) {
+                if(lawNeighbor.isMeta()) return;
+                let neighbor = self.appendPart(lawNeighbor);
+                part.setNeighbor(neighbor, lawDirection);
+                if(lawNeighbor === lawPart.start) part.setStart(neighbor);
+                if(lawNeighbor === lawPart.end) part.setEnd(neighbor);
+            });
+            if(part.isLink()) {
+                Page.newLinks[part.getId()] = part;
+            } else {
+                Part.create({
+                    concept: Concept.in,
+                    start: part,
+                    end: self.relation
+                })
+            }
+            return part;
         };
 
         Map.prototype.setTentative = function(tentative) {

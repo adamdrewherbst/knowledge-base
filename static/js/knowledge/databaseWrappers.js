@@ -424,12 +424,6 @@
             return Part.table.get(data);
         }
 
-        Part.opposite = function(direction) {
-            if(direction === 'incoming') return 'outgoing';
-            if(direction === 'outgoing') return 'incoming';
-            return null;
-        };
-
         Part.updateReferences = function() {
             Part.table.each(function(part) {
                 let updates = {incoming: {}, outgoing: {}};
@@ -560,6 +554,12 @@
             if(direction === 'outgoing') return this.end;
             return null;
         };
+        Part.prototype.setStart = function(start) {
+            this.set('start', start);
+        };
+        Part.prototype.setEnd = function(end) {
+            this.set('end', end);
+        };
         Part.prototype.setEndpoints = function(start, end) {
             this.set('start', start);
             this.set('end', end);
@@ -572,16 +572,35 @@
         Part.prototype.isIn = function(part) {
             return this.hasLink(Concept.in, part);
         };
+        Part.prototype.getIn = function() {
+            return this.getAll(['<',Concept.in,'*']);
+        };
+        Part.prototype.eachIn = function(callback) {
+            let self = this;
+            return Misc.each(self.getIn(), callback);
+        };
+
+        Part.prototype.isOf = function(part) {
+            return this.hasLink(Concept.of, part);
+        };
+        Part.prototype.getOf = function() {
+            return this.getAll(['<',Concept.of,'*']);
+        };
+        Part.prototype.eachOf = function(callback) {
+            let self = this;
+            return Misc.each(self.getOf(), callback);
+        };
 
         Part.prototype.isMeta = function() {
+            if(this.isLink()) return this.getConcept() === Concept.in || this.getConcept() === Concept.of;
             return this.getName() === 'META' || this.has(['>',Concept.in,'>META']) || this.has(['>',Concept.isA,'*',Concept.in,'META']);
         };
 
         Part.prototype.isGeneral = function() {
             let self = this;
             if(self.isNode()) {
-                return !self.each('>in>*', function(context) {
-                    return context.has('>is a>*>in>META');
+                return !self.eachIn(['>',Concept.in,'*'], function(context) {
+                    return context.has(['>',Concept.isA,'*',Concept.in,'META']);
                 });
             } else if(self.isLink()) {
                 return self.getStart && self.getStart().isGeneral()
@@ -594,7 +613,7 @@
             if(this.isNeighbor(part, direction) == include) return true;
             if(include) this.neighbors[direction][part.getId()] = part;
             else delete this.neighbors[direction][part.getId()];
-            part.setNeighbor(this, Part.opposite(direction), include);
+            part.setNeighbor(this, Part.getOppositeDirection(direction), include);
         };
 
         Part.prototype.isNeighbor = function(part, direction) {
@@ -672,7 +691,7 @@
             if(index >= chain.length) return true;
 
             if(data === null) {
-                return direction && self.getEndpoint(Part.opposite(direction)) && self.getEndpoint(direction) === null;
+                return direction && self.getEndpoint(Part.getOppositeDirection(direction)) && self.getEndpoint(direction) === null;
             }
 
             return !self.eachNeighbor(direction, function(neighbor) {
@@ -697,7 +716,7 @@
                 }
                 $.each(parts, function(p, part) {
                     if(data === null) {
-                        if(direction && part.getEndpoint(Part.opposite(direction)) && part.getEndpoint(direction) === null) {
+                        if(direction && part.getEndpoint(Part.getOppositeDirection(direction)) && part.getEndpoint(direction) === null) {
                             neighbors[p] = part;
                         }
                     } else {
@@ -726,7 +745,7 @@
         };
 
         Part.prototype.getMainLinkType = function() {
-            return this.isMeta() ? Concept.metaOf : Concept.in;
+            return this.isMeta() ? Concept.of : Concept.in;
         };
 
         Part.prototype.hasLink = function(link, part, recursive) {
@@ -829,6 +848,14 @@
                     explorer.updateShown();
                 }
             });
+            for(let id in Map.map) {
+                let map = Map.map[id].map;
+                if(map.hasOwnProperty(oldId)) {
+                    map[newId] = map[oldId];
+                    delete map[oldId];
+                    map[map[newId]] = newId;
+                }
+            }
         };
 
         Part.prototype.showIsA = function(diagram, node, show) {

@@ -78,7 +78,11 @@
             });
             self.$wrapper.find('.show-external-button,.hide-external-button').click(function(e) {
                 if(!self.node) return;
-                let show = $(this).hasClass('show-external-button');
+                let $this = $(this), show = $this.hasClass('show-external-button');
+                self.showingExternal = show;
+                $this.toggleClass('show-external-button', !show);
+                $this.toggleClass('hide-external-button', show);
+                $this.text(show ? 'Hide' : 'Show');
                 let diagram = self.getActiveDiagram(), selection = diagram.selection.iterator, parts = {};
                 if(selection.count < 1) {
                     parts = self.node.getAll(['<',Concept.in,'*']);
@@ -100,6 +104,13 @@
             self.$wrapper.find('.concept-evaluate-button').click(function(e) {
                 if(self.node) {
                     self.node.evaluate(100);
+                }
+            });
+            self.$wrapper.find('.apply-map-button').click(function(e) {
+                let id = self.$wrapper.find('.show-map-select').val();
+                if(id in Map.map) {
+                    Map.map[id].apply();
+                    Page.updateExplorers();
                 }
             });
 
@@ -142,6 +153,8 @@
                 self.partEditing.setDescription(self.$descriptionEdit.val());
             });
 
+            self.showingExternal = false;
+
             self.setMode('graph');
 
             Page.addExplorer(self);
@@ -181,7 +194,7 @@
 
             self.data = {};
             self.setData(self.node, 'shown', self.node, true);
-            self.node.each(['<',Concept.metaOf], function(metaLink) {
+            self.node.each(['<',Concept.of], function(metaLink) {
                 self.setData(metaLink, 'hidden', metaLink, true);
             });
             self.updateShown();
@@ -782,7 +795,7 @@
                         node.eachLink(function(link, dir, neighbor) {
                             if(dir === direction) return;
                             let concept = link.getConcept();
-                            if(!concept || concept === Concept.isA || concept === Concept.in || concept === Concept.metaOf) return;
+                            if(!concept || concept === Concept.isA || concept === Concept.in || concept === Concept.of) return;
                             if(checked[concept.getId()]) return;
                             checked[concept.getId()] = true;
                             if(!neighbor || other.hasLink(Concept.isA, neighbor, true)) {
@@ -928,14 +941,14 @@
                 if(type === 'secondary') {
                     self.setData(start, 'secondary', link, true);
                 } else if(type === 'external') {
-                    let shown = self.isShown(link);
+                    let shown = self.isShown(link) || (self.showingExternal && !self.isHidden(link));
                     self.setData(end, 'shown', link, shown);
                     if(link.getConcept() === Concept.isA) self.setData(start, 'isA', end, !shown);
                 }
 
                 if((start && !self.isShown(start)) || (end && !self.isShown(end))) {
                     self.setData(link, 'shown', link, false);
-                } else if(type !== 'external') {
+                } else if(type !== 'external' || self.showingExternal) {
                     self.setData(link, 'shown', link, true);
                 }
             }
@@ -952,7 +965,7 @@
                 startPrimary = start.hasLink(startType, node), endPrimary = end.hasLink(endType, node);
             if(startPrimary) {
                 if(endType === Concept.in && endPrimary) return 'secondary';
-                if(endType === Concept.metaOf && endPrimary) return 'meta';
+                if(endType === Concept.of && endPrimary) return 'meta';
                 if(!endPrimary) return 'external';
             }
         };
@@ -1030,7 +1043,6 @@
                 }
             }
         };
-
 
 
         Page.clearList = function($list) {
