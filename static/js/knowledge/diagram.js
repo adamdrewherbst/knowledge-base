@@ -76,29 +76,19 @@
                     if(keys.length === 1) self.open(context[keys[0]]);
                 }
             });
-            self.$wrapper.find('.show-external-button,.hide-external-button').click(function(e) {
+            self.$wrapper.find('.toggle-links').click(function(e) {
                 if(!self.node) return;
-                let $this = $(this), show = $this.hasClass('show-external-button');
-                self.showingExternal = show;
-                $this.toggleClass('show-external-button', !show);
-                $this.toggleClass('hide-external-button', show);
+                let $this = $(this), show = $this.hasClass('show-links');
+                $this.toggleClass('show-links', !show);
+                $this.toggleClass('hide-links', show);
                 $this.text(show ? 'Hide' : 'Show');
-                let diagram = self.getActiveDiagram(), selection = diagram.selection.iterator, parts = {};
-                if(selection.count < 1) {
-                    parts = self.node.getAll(['<',Concept.in,'*']);
-                } else while(selection.next()) {
-                    let part = Part.get(selection.value);
-                    if(part && part.has(['>',Concept.in,self.node])) parts[part.getId()] = part;
-                }
-                for(let id in parts) {
-                    let part = parts[id];
-                    part.eachLink(function(link, dir, neighbor) {
-                        if(self.getLinkType(link) === 'external') {
-                            self.setData(link, 'shown', link, show);
-                            console.log((show ? 'showed' : 'hid') + ' ' + link.toString());
-                        }
-                    });
-                }
+
+                if($this.hasClass('links-external')) type = 'external';
+                else if($this.hasClass('links-meta')) type = 'meta';
+
+                if(show) self.shownLinkTypes[type] = true;
+                else delete self.shownLinkTypes[type];
+                self.checkAllLinks();
                 self.updateShown();
             });
             self.$wrapper.find('.concept-evaluate-button').click(function(e) {
@@ -153,7 +143,7 @@
                 self.partEditing.setDescription(self.$descriptionEdit.val());
             });
 
-            self.showingExternal = false;
+            self.shownLinkTypes = {'primary': true, 'secondary': true};
 
             self.setMode('graph');
 
@@ -194,9 +184,6 @@
 
             self.data = {};
             self.setData(self.node, 'shown', self.node, true);
-            self.node.each(['<',Concept.of], function(metaLink) {
-                self.setData(metaLink, 'hidden', metaLink, true);
-            });
             self.updateShown();
         };
 
@@ -877,6 +864,7 @@
 
         Explorer.prototype.setData = function(part, field, refPart, include, apply) {
             let self = this;
+            if(!part || !refPart) return;
             let partId = part.getId(), refId = refPart ? refPart.getId() : null;
 
             let wasShown = self.isShown(part);
@@ -901,11 +889,11 @@
                 self.checkLink(part);
             }
 
-            if(wasShown !== isShown) {
+            //if(wasShown !== isShown) {
                 part.eachLink(function(link, direction, neighbor) {
                     self.checkLink(link);
                 });
-            }
+            //}
 
             if(apply) self.updateShown();
         };
@@ -922,52 +910,58 @@
                     }
                 });
                 Misc.deleteIndex(self.data, link.getId());
-                if(apply) self.updateShown();
                 return;
             }
 
             let start = link.getStart(), end = link.getEnd(), type = self.getLinkType(link);
-
-            if(type === 'primary' || type === 'secondary') {
-                self.setData(link, 'hidden', end, self.isHidden(end));
-                let hidden = self.isHidden(link);
-                self.setData(start, 'shown', link, !hidden);
-                let hideStart = (type === 'secondary' && hidden)
-                    || (type === 'primary' && (self.hasData(link, 'hidden', link) || self.hasData(link, 'hidden', end)));
-                self.setData(start, 'hidden', link, hideStart);
-            }
+            let isMeta = type.startsWith('meta-'), mainType = isMeta ? type.substring(5) : type;
+            let proximal = mainType === 'external' ? start : end, distal = proximal === start ? end : start;
 
             if(self.getMode() === 'graph') {
-                if(type === 'secondary') {
-                    self.setData(start, 'secondary', link, true);
-                } else if(type === 'external') {
-                    let shown = self.isShown(link) || (self.showingExternal && !self.isHidden(link));
-                    self.setData(end, 'shown', link, shown);
-                    if(link.getConcept() === Concept.isA) self.setData(start, 'isA', end, !shown);
-                }
+                let typeShown = mainType in self.shownLinkTypes;
+                if(isMeta) typeShown = typeShown && mainType !== 'secondary' && 'meta' in self.shownLinkTypes;
+                let linkHidden = self.hasData(link, 'hidden', link) || (proximal && self.isHidden(proximal));
 
-                if((start && !self.isShown(start)) || (end && !self.isShown(end))) {
-                    self.setData(link, 'shown', link, false);
-                } else if(type !== 'external' || self.showingExternal) {
-                    self.setData(link, 'shown', link, true);
+                if(distal) {
+                    self.setData(distal, 'shown', link, typeShown && !linkHidden);
+                    self.setData(distal, 'hidden', link, (mainType === 'primary' || type === 'secondary') && linkHidden);
+                    self.setData(distal, 'secondary', link, mainType === 'secondary' && !linkHidden);
+                    self.setData(link, 'hidden', distal, type === 'primary' && Misc.hasIndex(self.data, distal.getId(), 'secondary'));
                 }
+                self.setData(link, 'shown', link, (!start || self.isShown(start)) && (!end || self.isShown(end)));
+
+                if(proximal && distal)
+                    self.setData(proximal, 'isA', distal, mainType === 'external' && !self.isShown(link));
+            } else if(self.getMode() === 'palette') {
+                self.setData(distal, 'shown', link, mainType === 'primary');
             }
+        };
 
-            if(apply) self.updateShown();
+        Explorer.prototype.checkAllLinks = function() {
+            let self = this, links = {};
+            self.node.each(['<','*','*'], function(part) {
+                part.eachLink(function(link) {
+                    links[link.getId()] = link;
+                });
+            });
+            Misc.each(links, function(link) {
+                self.checkLink(link);
+            });
         };
 
         Explorer.prototype.getLinkType = function(link) {
             let self = this, start = link.getStart(), end = link.getEnd(), node = self.getNode();
 
             if(!start || !end) return 'dangling';
-            if(end === node) return 'primary';
+            if(end === node) return start.isMeta() ? 'meta-primary' : 'primary';
             let startType = start.getMainLinkType(), endType = end.getMainLinkType(),
                 startPrimary = start.hasLink(startType, node), endPrimary = end.hasLink(endType, node);
+            if(endPrimary && end.isMeta()) return 'meta-secondary';
             if(startPrimary) {
-                if(endType === Concept.in && endPrimary) return 'secondary';
-                if(endType === Concept.of && endPrimary) return 'meta';
-                if(!endPrimary) return 'external';
+                if(endPrimary) return end.isMeta() ? 'meta-secondary' : 'secondary';
+                else return start.isMeta() ? 'meta-external' : 'external';
             }
+            return '';
         };
 
         Explorer.prototype.isShown = function(part) {

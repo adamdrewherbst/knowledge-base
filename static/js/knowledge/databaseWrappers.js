@@ -840,8 +840,10 @@
             let self = this;
             Page.eachExplorer(function(explorer) {
                 if(self.oldId !== undefined) explorer.updatePartId(self);
-                if(self.isLink()) explorer.checkLink(self, true);
-                else if(self.isNode()) {
+                if(self.isLink()) {
+                    explorer.checkLink(self);
+                    explorer.updateShown();
+                } else if(self.isNode()) {
                     self.eachLink(function(link) {
                         explorer.checkLink(link);
                     });
