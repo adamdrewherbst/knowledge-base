@@ -677,3 +677,11 @@ timestamp: 2020-11-05T17:42:57.271662
 ALTER TABLE painting ADD description VARCHAR(512);
 success!
 success!
+timestamp: 2020-11-12T00:01:05.764789
+CREATE TABLE representation(
+    id INT AUTO_INCREMENT NOT NULL,
+    concept INT  , INDEX concept__idx (concept), FOREIGN KEY (concept) REFERENCES concept (id) ON DELETE CASCADE,
+    commands VARCHAR(512),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!

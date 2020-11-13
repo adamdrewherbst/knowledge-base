@@ -2,6 +2,7 @@
 /static/GoJS-master.zip
 /static/jquery-ui-1.12.1.custom/*
 /static/jquery-ui-1.12.1.custom.zip
+/static/misc.txt
 /sessions/*
 /errors/*
 /databases/*_relation.table
