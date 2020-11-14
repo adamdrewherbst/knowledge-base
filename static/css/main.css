@@ -26,6 +26,14 @@
             margin: 0 50px;
         }
 
+        #project-description {
+            font-size: 20px;
+        }
+
+        .indented {
+            margin-left: 60px;
+        }
+
         #global-controls {
             width: 100%;
             flex-direction: row;
