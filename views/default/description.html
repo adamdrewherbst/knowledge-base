@@ -53,11 +53,12 @@ Here 'my force' represents a specific force mentioned in a specific problem.
 Each concept has an ID, description, synonyms, etc., so multiple concepts can have the same
 name and we can still distinguish one from another.
 <p>
-In addition to the special 'IS A' concept which organizes concepts hierarchically, there is
+In addition to the special 'IS A' concept which organizes concepts in terms of inheritance, there is
 an 'IN' concept which organizes them into categories.  For example:
 <p>
     <div class="indented">
-      force IN physics<br>
+      force IN Newtonian physics<br>
+      Newtonian physics IN physics<br>
       vector IN mathematics<br>
       geometry IN mathematics
     </div>
@@ -74,15 +75,10 @@ within the problem's vertex:
 <p>
     <div class="indented">
       'my force' IN 'problem 17'<br>
-      'my body' IN 'problem 17'
+      'my force' IS A force<br>
+      'my body' IN 'problem 17'<br>
+      'my body' IS A body
     </div>
-<p>
-Each general law, such as the law of conservation of energy, is also given its own vertex,
-and each concept within its description is 'IN' it.
-<p>
-A general law also has one or more predicates - each predicate also receives a vertex, eg.
-'predicate 1' IS A predicate, and the subgraph of the law that corresponds to the predicate
-is all marked as 'IN' the predicate.
 <p>
 Aside from the IN edges that group them into the same description, and the 'IS A' edges that
 state what concepts they instantiate, the vertices in either a law or problem description have
@@ -97,117 +93,126 @@ edges between them to indicate the relations between them.  For example,
       'other velocity' AT 'time 2'
     </div>
 <p>
-Hence, just as classes and instances are represented by the same type of entity, a 'concept', a general
-law and a specific case are each represented by a simple directed graph.
+Each general law, such as the law of conservation of energy, is also given its own vertex,
+and each concept within its description is 'IN' it.
+<p>
+A general law also has one or more predicates - each predicate also receives a vertex, eg.
+<p>
+    <div class="indented">
+        'predicate 1' OF 'Newton's 2nd Law'<br>
+        'predicate 1' IS A predicate
+    </div>
+<p>
+where 'predicate' and 'OF' are built-in meta-concepts.
+<p>
+The subgraph of the law that corresponds to the predicate is all marked as 'IN' the predicate.
+But there is a key difference: the predicate does not consist of vertices, but rather <i>the edges between them</i>.
+Remember, each vertex defines a unique concept; it is only the edges that share common concepts, so these are
+what can be used to test whether the law applies to the problem.
+<p>
+Consequently, we have to allow edges to terminate on other edges, as well as vertices, so that we can have edges
+marking each predicate edge as being 'IN' the predicate.  In practice we do this by storing both vertices and edges
+under the general heading of 'parts'; a part can optionally have a 'start' and 'end', making it an edge, and these
+fields can refer to any other part, whether edge or vertex.
+<p>
+Hence, just as classes and instances are represented by the same type of entity (a 'concept'), a general
+law and a specific case are each represented by a simple directed graph.  If we use the 'IN' edges to properly
+categorize each new concept or relation, the entire knowledge graph will remain a single connected entity.
 <p>
 After a student builds a problem description, we need to find any general laws that can be applied to
-it.  This means, firstly, finding a predicate that contains instances of the same concepts that are
-instantiated in the problem.  Given the structure of our graph, this is easy.  We just start with any vertex
-of the problem, follow any of its 'IS A' links to a general concept, then follow any other 'IS A' link
-backward to another instance, and see if that vertex has an 'IN' link to a vertex which 'IS A' predicate.
-In other words, starting from the chosen problem vertex V, we look for this path:
+it.  This means, firstly, finding a predicate that 'matches' the problem.  Since any predicate is itself a graph,
+and the problem is a graph, a 'match' is really an isomorphism -- between the predicate, and any subgraph of the problem.
 <p>
-    <div class="indented">
-      V > IS A > * < IS A > IN > predicate:P
-    </div>
+A key point here is that a predicate will include edges that extend to concepts <i>outside</i> its law.  Typically,
+most of these will be 'IS A' links: for example, any law of physics that applies to a body is predicated first and foremost
+on the existence of the body, hence the law contains a vertex which 'IS A body', and that 'IS A' link is part of the predicate.
+Such 'external links' need not be 'IS A', though presumably most are.
 <p>
-where * is the wildcard and left and right karets indicate edge direction.  The vertex in parentheses is
-the predicate of interest.  To see if P matches our problem, we take the subgraph P describes:
+Any problem that matches that predicate will therefore have a matching link <i>to the same external vertex</i>.  In this way
+it becomes easy to check for matching predicates; we simply start from each of the problem's 'external vertices',
+and try to build two matching subgraphs, one link at a time, extending one of them into any predicate that links to the same
+external vertex, and the other into the problem graph.  We do this recursively so as to catch all possible ways the predicate
+can be applied to the given problem.
 <p>
-    <div class="indented">
-      * > IN > P
-    </div>
-<p>
-and we look for any isomorphism between that subgraph and our problem graph.  While this is a hard
+In graph theory, this is known as the "subgraph isomorphism problem".  While this is a hard
 problem in general, most of the laws and problems students are dealing with will have relatively small graphs,
 and hence the algorithm can run in reasonable time.
 <p>
-After a student builds a problem description, using the 'IS A' concept to state what each part of
-the problem is ('my body' IS A body, 'my force' IS A force, etc), and other edges to describe the
-relations between those parts ('my force' OF 'body 1', 'my force' ON 'body 2', 'velocity 1' OF 'body 1',
-'velocity 1' AT 'time 1'), we then look for any general law that can be applied to the problem.
-that exist within the categories the problem belongs to.  We take their predicate subgraphs, and
-see if there is an isomorphism from the predicate to the problem.  If so, we apply the law, by taking
+If we find such an isomorphism from a given predicate, we can apply the associated law, by taking
 all the structure of the law outside that predicate, and appending it to the problem graph, making
-sure we don't append vertices that are already there.
+sure we don't append parts that are already there.  (To avoid this, we simply extend the matching algorithm,
+allowing it to match edges outside the predicate, but not requiring them -- we only require that, for a vertex
+outside the predicate to be included in the match, <i>all</i> of its edges to predicate vertices must be
+matched.  Then, we only append structure that has not already been matched.)
 <p>
-We can do this iteratively in order to solve a problem.  Of course, the computer couln't do this alone,
+We can do this iteratively in order to solve a problem.  Of course, the computer couldn't feasibly do this alone,
 because the number of ways all possible laws could be applied would lead to combinatorial explosion.
 But that's fine, because we want the student to learn, not just watch.  Instead, the computer can suggest laws
-that could be applied at each step, and the student chooses which to apply.  This way they start
-to develop a feel for the most efficient ways to solve various problems, and they also start to
+that could be applied at each step, and the student chooses which to apply.  This way they can make mistakes,
+and they can start to develop a feel for the most efficient ways to solve various problems.  They also start to
 recognize the predicate patterns on their own because they are displayed explicitly on the screen.
 <p>
 REPRESENTATION
 <p>
-Although the graph representation is the core and should always remain accessible, we can build
-additional interfaces that make building and solving a problem more intuitive.  This is vital, as
+Although the graph is the core and should always remain accessible, we can build
+additional interfaces that make building and solving a problem much more intuitive.  This is vital, as
 a student should not have to learn complex graph syntax while they're trying to learn the subject
 at hand.  Instead, each concept record can store rules in a simple programming language, used to
-visualize it as a picture or symbol, using primitive shapes and symbols and relationships that the
-computer understands.  This would provide a more intuitive drag-and-drop experience.
+visualize it as a picture or symbol, using built-in primitive shapes and symbols.
+This would provide a more intuitive drag-and-drop experience.
 <p>
 For example, the 'body' concept might contain a visualization program like this:
 <p>
     <div class="indented">
-    this.origin = position.of>this.wrt>origin>of>WCS<br>
     Circle circle<br>
-    circle.center = this.origin<br>
+    circle.center.x = coordinate.OF>position>OF>this.WRT>x_axis>OF>wcs<br>
+    circle.center.y = coordinate.OF>position>OF>this.WRT>y_axis>OF>wcs<br>
     circle.radius = 50
     </div>
 <p>
-Here the Circle type, with its center and radius members, would be built into the website and hence
-automatically parsed and displayed.
+Here the Circle type, with its center and radius members, is a built-in visual primitive that can be parsed and displayed.
+Meanwhile, the right-hand sides of the 'center' assignment statements are a shorthand to identify graph parts.  In this case
+we are retrieving a vertex which 'IS A coordinate' and has the two edge-vertex sequences separated by periods, where the right
+caret indicates the direction of the edges. ('WRT' is short for 'with respect to'.)  In particular, we are retrieving the <i>value</i>
+stored in that vertex; every vertex can have a value stored in it.
 <p>
-The right side of the first line is a graph query that retrieves
-the 'value' field of the vertex which 'IS A position', and has an 'of' edge to this vertex and a 'wrt' (with respect to)
-edge to a vertex which 'IS A origin' and has an 'of' edge to a vertex which 'IS A WCS' (world coordinate system).
-<p>
-'WCS (world coordinate system)' is a concept that would be instantiated by default in any user-created graph so
-as to allow it to be visualized.  Whenever the user drags and drops a visual element, the vertex it represents is
-implicitly given angles and distances relative to the WCS via relationships like:
-<p>
-    <div class="indented">
-    Arrow arrow<br>
-    arrow.start = position.of>this.wrt>WCS<br>
-    arrow.delta = component.of>this.wrt>WCS
-    </div>
-<p>
-The Arrow type with its start and delta members are built into the website so the computer can parse
-and display them.  The expressions after the equal signs are graph queries - so we are retrieving the
-value stored in the 'position' vertex which has an 'of' edge pointing to this vertex, and a 'wrt' edge
-pointing to a vertex having an instance of the 'world_coordinate_system' concept.
-<p>
-(Here world_coordinate_system is a concept that would be included in a problem graph by
-default, and when building the picture, the user would implicitly be setting angles and
-distances with respect to ('wrt') the world_coordinate_system)
-<p>
-These visual elements would be interactive, so for example, the user could grab the tip of the arrow
-and drag it to a new pixel.  The binding is two-way - that is, since the arrow has been bound to the
-<p>
-Note that the above program depends on the value of the 'position' and 'coordinates' vertices, hence these
-would have to be resolved first.  There would be additional rules for resolving values.  So the 'position'
-concept might have these rules:
+'wcs (world coordinate system)' is a concept that would be instantiated by default in any user-created graph so
+as to allow it to be visualized -- depending, perhaps, on what 'visualization package' the user chose for their problem.
+It is effectively an interface between the graph and the visualization module.  It would include a minimal structure:
 <p>
     <div class="indented">
-    this.value[d.name] = component.of>this.wrt>(direction d)
+        x_axis OF wcs<br>
+        y_axis OF wcs
     </div>
 <p>
-Meanwhile the 'x_direction' concept, which 'IS A>direction', would say:
+The assignments to graph vertices are two-way.  That is, not only would the circle update itself according to the body's world
+position, but if the user drags it to a new location, the 'coordinate' vertices would have their values updated accordingly.
+<p>
+There would be additional rules for resolving the values of vertices.  For example, the 'product' concept would say:
 <p>
     <div class="indented">
-    this.name = 'x'
+    value = 1<br>
+    value *= *.OF&lt;this
     </div>
 <p>
-Rules would be inherited by concepts that instantiate this one via an 'IS A' edge, and they
-could add to it or override any part of it.  For example, the 'force' concept, which 'IS A>vector',
-might say
+In other words, any product is 1 if nothing is being multiplied.  For each operand, which the product will point to via an 'OF'
+edge, the product's value is multiplied by the operand value.  The operand isn't necessarily an instance of anything in particular,
+so we simply match it with the wildcard '*'.  Note that the graph shorthand retrieves the 'value' of the referenced
+vertex by default, so we don't have to include that.
+<p>
+In this way, each 'representation command' in one graph part that references another part, creates a dependency between them.  Whenever
+we need to visualize the problem, write it symbolically (eg. as equations), or calculate the values of its members, we iterate through
+the graph, resolving any commands that have no waiting dependencies, and as we resolve them, their values propagate to the commands that
+were waiting on them.  Thus we resolve the graph into more familiar representations.
+<p>
+All value/representation rules of a given concept would be inherited by concepts that instantiate it via an 'IS A' edge, and these
+'child concepts' could add to it or override any part of it.  For example, the 'force' concept, which 'IS A vector', might say
 <p>
     <div class="indented">
     arrow.color = '#fb6'
     </div>
 <p>
-to specify that forces will be represented by arrows of a specific color.
+thus modifying the 'arrow' field that was defined in 'vector' to specify that forces will be represented by arrows of a specific color.
             </div>
         </div>
     </body>
