@@ -30,41 +30,200 @@ class Circle {
 Drawable.instances = {Circle: Circle};
 
 
+class Dependency {
+    constructor() {
+        this.id = Dependency.nextId++;
+        this.resolved = true;
+        this.dependsOn = {};
+        this.dependsOnMe = {};
+        this.children = {};
+    }
+
+    static nextId = 1;
+
+    dependOn(dep, include) {
+        include = include || (include === undefined);
+        if(include) this.dependsOn[dep.getId()] = dep;
+        else delete this.dependsOn[dep.getId()];
+    }
+
+    dependOnMe(dep, include) {
+        include = include || (include === undefined);
+        if(include) this.dependsOnMe[dep.getId()] = dep;
+        else delete this.dependsOnMe[dep.getId()];
+    }
+
+    isResolved(check) {
+        if(check) return this.check(true);
+        return this.resolved;
+    }
+
+    check(recur) {
+        for(let id in this.dependsOn) {
+            let dep = this.dependsOn[id];
+            if(!dep.resolved(recur)) return false;
+        }
+        return true;
+    }
+
+    resolve(dep) {
+        check();
+    }
+
+    addChild(child) {
+        this.children[child.getId()] = child;
+        this.dependOn(child);
+    }
+}
+
+
+class Scope {
+    constructor(part, paths) {
+        this.part = part;
+        this.paths = paths;
+        this.nextId = 1;
+        this.maps = [];
+        this.variables = {};
+        this.commands = [];
+    }
+
+    map() {
+        let self = this, re = /[^<>]/;
+        self.paths.forEach(function(pathStr, pathInd) {
+
+            //parse the path string into an array and give ID's to its parts
+            let index = 0, match = null, direction = null, chain = [], ids = [];
+            while((match = re.exec(pathStr)) !== null) {
+
+                //first parse the direction indicator
+                if(match.index > 0) {
+                    let dir = pathStr[match.index-1];
+                    if(dir !== direction) {
+                        direction = dir;
+                        chain.push(direction);
+                    }
+                }
+
+                //then the concept and/or variable name
+                let part = str.match(/^([A-Za-z]+)(?::([A-Za-z]+))?/);
+                if(part[1] in self.variables) {
+                    let variable = self.variables[part[1]];
+                    chain.push(variable.concept);
+                    ids.push(variable.id);
+                } else {
+                    let concept = part[1], variable = part[2], id = self.nextId++;
+                    chain.push(concept);
+                    ids.push(id);
+                    if(variable) {
+                        self.variables[variable] = {id: id, concept: concept};
+                    }
+                }
+            }
+
+            //listen for the path on our part
+            self.part.on(chain, function(path) {
+
+                //when found, make a map of it
+                let map = {from: {}, to: {}};
+                path.forEach(function(id, i) {
+                    map.from[ids[i]] = id;
+                    map.to[id] = ids[i];
+                });
+                self.addPathMap(map, pathInd);
+            }, {
+                returnType: 'ids'
+            });
+        });
+    }
+
+    addPathMap(map, pathInd) {
+        let self = this;
+        map.paths = {pathInd: true};
+        self.addMap(map);
+
+        //see if this path map can be merged with any of our existing maps
+        self.maps.forEach(function(other) {
+            if(other.paths[pathInd]) return;
+            for(let id in other.from)
+                if(map.from.hasOwnProperty(id) && map.from[id] !== other.from[id]) return;
+            for(let id in other.to)
+                if(map.to.hasOwnProperty(id) && map.to[id] !== other.to[id]) return;
+            self.addMap({
+                paths: Object.assign({}, map.paths, other.paths),
+                from: Object.assign({}, map.from, other.from),
+                to: Object.assign({}, map.to, other.to)
+            });
+        });
+    }
+
+    addMap(map) {
+        this.maps.push(map);
+        let complete = true;
+        for(let i = 0; i < this.nextId; i++) {
+            if(!(i in map.from)) {
+                complete = false;
+                break;
+            }
+        }
+        if(complete) {
+            this.compile();
+        }
+    }
+
+    compile(map) {
+        let self = this, prevCommand = null;
+        self.commands.forEach(function(commandStr) {
+            let command = new Command(self, commandStr);
+            command.parse();
+            if(prevCommand) command.dependOn(prevCommand);
+            prevCommand = command;
+        });
+    }
+}
+
+
 class Command {
-    constructor(str) {
+    constructor(scope, str) {
+        this.scope = scope;
         this.str = str;
-        this.arr = [];
         this.index = 0;
+        this.editing = null;
+        this.operator = null;
+        this.references = {};
+        this.arr = [];
     }
 
     parse() {
-        let match = null;
-        while((match = Reference.regex.main.exec(this.str)) !== null) {
-            let reference = new Reference(this.str.substring(match.index, match.index + match[0].length));
-            reference.parse();
-            this.addReference(reference, refMatch.index, refMatch[0].length);
+        let reToken = /[^\s]+/, inString = false;
+        while((match = reToken.exec(this.str)) !== null) {
+            let token = match[0], first = token[0], last = token[token.length-1];
+            if(inString && last === inString) inString = false;
+            else if(first === "'" || first === '"') inString = first;
+            else this.addReference(Reference.parse(token));
         }
         if(this.index < this.str.length)
             this.arr.push(this.str.substring(this.index, this.str.length));
     }
 
     addReference(reference, index, length) {
+        if(!reference) return;
         if(index > this.index)
             this.arr.push(this.str.substring(this.index, index));
         this.arr.push(reference);
         this.index = index + length;
+        this.dependOn(reference);
     }
 }
 
 
 class Reference {
-    constructor(str) {
+    constructor(str, start) {
         this.str = str;
-        this.primaryChain = null;
-        this.chains = [];
+        this.field = null;
     }
 
-    parse() {
+    static parse(str) {
+
         let refPart = Reference.regex.part.exec(this.str),
             chainMatch = null;
 
@@ -110,6 +269,15 @@ class Reference {
 
     addChain(chain) {
         this.chains.push(chain);
+    }
+
+    static parse(command) {
+        while((refMatch = Reference.regex.main.exec(command.getString())) !== null) {
+            let refStr = refMatch[0],
+                reference = new Reference(refStr, refMatch.index);
+            reference.parse();
+            command.addReference(reference);
+        }
     }
 }
 
