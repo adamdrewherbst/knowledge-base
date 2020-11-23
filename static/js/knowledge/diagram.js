@@ -133,6 +133,7 @@
 
             self.$nameEdit = self.$partEdit.find('.explorer-edit-name');
             self.$descriptionEdit = self.$partEdit.find('.explorer-edit-description');
+            self.$commandsEdit = self.$partEdit.find('.explorer-edit-commands');
             self.$instanceOfEdit = self.$partEdit.find('.explorer-edit-instance-of').attr('id', 'explorer-edit-instance-of-' + this.id);
             self.instanceOfPalette = self.makePalette(self.$instanceOfEdit);
 
@@ -141,6 +142,9 @@
             });
             self.$descriptionEdit.change(function(e) {
                 self.partEditing.setDescription(self.$descriptionEdit.val());
+            });
+            self.$commandsEdit.change(function(e) {
+                self.partEditing.setCommands(self.$commandsEdit.val());
             });
 
             self.shownLinkTypes = {'primary': true, 'secondary': true};

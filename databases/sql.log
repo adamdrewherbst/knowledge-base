@@ -685,3 +685,9 @@ CREATE TABLE representation(
     PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET utf8;
 success!
+timestamp: 2020-11-23T05:23:02.055643
+ALTER TABLE concept ADD commands VARCHAR(512);
+success!
+timestamp: 2020-11-23T05:23:02.353887
+ALTER TABLE concept DROP COLUMN value;
+success!

@@ -133,6 +133,7 @@
                             records.concept[id] = {
                                 name: record.name || '',
                                 description: record.description || '',
+                                commands: record.commands || ''
                             };
                         } else if(record instanceof Part) {
                             records.part[id] = {
@@ -351,6 +352,13 @@
             this.set('description', description);
         };
 
+        Concept.prototype.getCommands = function() {
+            return this.get('commands');
+        };
+        Concept.prototype.setCommands = function(commands) {
+            this.set('commands', commands);
+        };
+
         Concept.prototype.getNode = function() {
             return this.node;
         };
@@ -406,6 +414,7 @@
             Record.prototype.constructor.call(this);
             this.table = Part.table;
             this.neighbors = {'incoming': {}, 'outgoing': {}};
+            this.data = new Dependency();
         }
         Part.prototype = Object.create(Record.prototype);
         Part.constructor = Part;
@@ -515,6 +524,14 @@
         Part.prototype.setDescription = function(description) {
             this.concept.setDescription(description);
             this.concept.updatePage();
+        };
+
+        Part.prototype.getCommands = function() {
+            return this.concept.getCommands();
+        };
+
+        Part.prototype.setCommands = function(commands) {
+            this.concept.setCommands(commands);
         };
 
         Part.prototype.matches = function(data) {

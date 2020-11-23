@@ -164,6 +164,10 @@
                                         <label>Description</label>
                                         <textarea class="explorer-edit-description form-control" rows="4" placeholder="Enter concept description"></textarea>
                                     </div>
+                                    <div class="form-group">
+                                        <label>Commands</label>
+                                        <textarea class="explorer-edit-commands form-control" rows="4" placeholder="Enter commands"></textarea>
+                                    </div>
                                 </li>
                                 <li class="list-group-item">
                                     <div class="explorer-edit-instance-of"></div>
@@ -290,6 +294,8 @@
     <script type="text/javascript">
 
         $(document).ready(function() {
+
+            Part.buildRegex();
 
             // below the diagram is the HTML5 canvas that will be used to visualize the relation
             // (the canvas is created in knowledge.html, and visualization happens in represent.js)

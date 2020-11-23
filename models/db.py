@@ -154,16 +154,12 @@ if request.controller == 'default':
     db.define_table('concept',
         Field('name', 'string'),
         Field('description', 'string'),
-        Field('value', 'string'))
+        Field('commands', 'string'))
 
     db.define_table('part',
         Field('concept', db.concept),
         Field('start', 'reference part'),
         Field('end', 'reference part'))
-
-    db.define_table('representation',
-        Field('concept', db.concept),
-        Field('commands', 'string'))
 
 elif request.controller == 'paintings':
     import os

@@ -1,45 +1,16 @@
-class Drawable {
-    constructor() {}
-    draw(context) {}
-}
-
-class Circle {
-
-    constructor(center, radius) {
-        this.setCenter(center);
-        this.setRadius(radius);
-    }
-
-    setCenter(center) {
-        this.center = center;
-    }
-    getCenter() {
-        return this.center;
-    }
-    setRadius(radius) {
-        this.radius = radius;
-    }
-    getRadius() {
-        return this.radius;
-    }
-    draw(context) {
-        context.drawCircle(this.center.x, this.center.y, this.radius);
-    }
-}
-
-Drawable.instances = {Circle: Circle};
-
-
 class Dependency {
     constructor() {
         this.id = Dependency.nextId++;
+        Dependency.record[this.id] = this;
         this.resolved = true;
         this.dependsOn = {};
         this.dependsOnMe = {};
         this.children = {};
     }
 
-    static nextId = 1;
+    getId() {
+        return this.id;
+    }
 
     dependOn(dep, include) {
         include = include || (include === undefined);
@@ -70,25 +41,65 @@ class Dependency {
         check();
     }
 
-    addChild(child) {
-        this.children[child.getId()] = child;
+    addChild(name, type) {
+        if(!type) type = Dependency;
+        let child = new type();
+        this.children[name] = child;
         this.dependOn(child);
+    }
+
+    getChild(name) {
+        return this.children[name];
+    }
+
+    getField(path) {
+        if(!path) return this;
+        let re = /[A-Za-z]+/g, name = re.exec(path);
+        if(!name) return null;
+        let child = this.getChild(name);
+        if(!child) return null;
+        return child.getField(path.substring(re.lastIndex));
+    }
+
+    getValue(path) {
+        let field = this.getField(path);
+        if(!field) return null;
+        return field.value;
+    }
+
+    setValue(path, value) {
+        if(value === undefined) {
+            value = path;
+            path = undefined;
+        }
+        let field = this.getField(path);
+        if(!field) return false;
+        field.value = value;
+        return true;
     }
 }
 
+Dependency.nextId = 1;
+Dependency.record = {};
+
 
 class Scope {
-    constructor(part, paths) {
+    constructor(part, paths, commands) {
         this.part = part;
-        this.paths = paths;
+        this.paths = paths || [];
+        this.commands = commands || [];
         this.nextId = 1;
         this.maps = [];
         this.variables = {};
-        this.commands = [];
+        this.children = [];
+    }
+
+    addChild(scope) {
+        this.children.push(scope);
     }
 
     map() {
-        let self = this, re = /[^<>]/;
+        let self = this, re = /[^<>]/g;
         self.paths.forEach(function(pathStr, pathInd) {
 
             //parse the path string into an array and give ID's to its parts
@@ -151,7 +162,7 @@ class Scope {
             self.addMap({
                 paths: Object.assign({}, map.paths, other.paths),
                 from: Object.assign({}, map.from, other.from),
-                to: Object.assign({}, map.to, other.to)
+                to: Object.assign({}, map.to, other.to),
             });
         });
     }
@@ -166,14 +177,20 @@ class Scope {
             }
         }
         if(complete) {
-            this.compile();
+            this.compile(map);
         }
     }
 
     compile(map) {
-        let self = this, prevCommand = null;
+        let self = this, variables = {'this': self.part}, prevCommand = null;
+        if(map) {
+            for(let name in this.variables) {
+                variables[name] = map.from[this.variables[name].id];
+            }
+        }
         self.commands.forEach(function(commandStr) {
-            let command = new Command(self, commandStr);
+            if(!commandStr) return;
+            let command = new Command(self, variables, commandStr);
             command.parse();
             if(prevCommand) command.dependOn(prevCommand);
             prevCommand = command;
@@ -182,27 +199,45 @@ class Scope {
 }
 
 
-class Command {
-    constructor(scope, str) {
+class Command extends Dependency {
+    constructor(scope, variables, str) {
+        super();
         this.scope = scope;
+        this.variables = variables;
         this.str = str;
         this.index = 0;
-        this.editing = null;
         this.operator = null;
-        this.references = {};
+        this.twoWay = false;
         this.arr = [];
     }
 
     parse() {
-        let reToken = /[^\s]+/, inString = false;
+        let declaration = this.str.match(Part.regex.declaration);
+        if(declaration !== null) {
+            let type = Drawable.instances[declaration[1]], name = declaration[2];
+            this.variables[name] = new type();
+            return;
+        }
+        let reToken = /[^\s]+/g, inString = false, match = null;
         while((match = reToken.exec(this.str)) !== null) {
             let token = match[0], first = token[0], last = token[token.length-1];
             if(inString && last === inString) inString = false;
             else if(first === "'" || first === '"') inString = first;
-            else this.addReference(Reference.parse(token));
+            else {
+                let reference = Reference.parse(token, this.variables);
+                if(reference) this.addReference(reference);
+                else if(!this.operator) this.setOperator(token);
+            }
         }
         if(this.index < this.str.length)
             this.arr.push(this.str.substring(this.index, this.str.length));
+    }
+
+    setOperator(operator) {
+        this.operator = operator;
+        if(operator == '<=>') {
+            this.twoWay = true;
+        }
     }
 
     addReference(reference, index, length) {
@@ -213,156 +248,186 @@ class Command {
         this.index = index + length;
         this.dependOn(reference);
     }
+
+    resolve(dep) {
+        super.resolve(dep);
+        if(this.resolved) {
+        }
+    }
 }
 
 
-class Reference {
-    constructor(str, start) {
-        this.str = str;
-        this.field = null;
+class Reference extends Dependency {
+    constructor(field) {
+        super();
+        this.field = field;
+        this.parsed = false;
+        this.arr = [];
+        this.index = 0;
+        this.len = 0;
     }
 
-    static parse(str) {
+    addPiece(piece) {
+        this.arr.push(piece);
+        if(piece instanceof Reference) self.dependOn(piece);
+        this.checkChain();
+        return this.field ? true : false;
+    }
 
-        let refPart = Reference.regex.part.exec(this.str),
-            chainMatch = null;
+    checkChain() {
+        let self = this, i = 0;
+        for(i = self.index; i < self.arr.length; i++) {
+            let piece = self.arr[i];
+            if(typeof piece === 'string')
+                self.field = self.field.getChild(piece);
+            else if(piece instanceof Reference && piece.isResolved())
+                self.field = self.field.getChild(piece.getValue());
+            else break;
+        }
+        self.index = i;
+        if(self.parsed && self.index == self.arr.length) {
+            self.dependOn(self.field);
+        }
+    }
 
-        while((chainMatch = Reference.regex.chain.exec(this.str)) !== null) {
+    resolve(dep) {
+        let self = this;
+        if(dep === self.field) {
+            self.setValue(self.field.getValue());
+            self.propagate();
+        } else if(self.arr.indexOf(dep) >= 0) {
+            self.checkChain();
+        }
+    }
 
-            let chainStr = chainMatch[0],
-                toThis = chainMatch[1] === 'this',
-                partMatch = null,
-                chain = [];
+    static parse(str, variables) {
 
-            while((partMatch = Reference.regex.part.exec(chainStr)) !== null) {
+        //determine which part is referred to
+        let first = str.match(/^[A-Za-z]+/), root = null, offset = 0;
+        if(!first) return false;
+        if(first[0] in variables) {
+            root = variables[first[0]];
+            str = str.substring(first[0].length);
+            offset = first[0].length;
+        } else {
+            root = variables['this'];
+            str = '.' + str;
+            offset = -1;
+        }
+        if(!root) return false;
 
-                let concept = partMatch[1],
-                    variable = partMatch[2],
-                    direction = partMatch[3];
+        if(root instanceof Part) root = root.getData();
 
-                if(toThis) {
-                    if(concept === 'this') continue;
-                    chain.unshift(Part.getOppositeDirection(direction));
-                    if(variable) chain.unshift(variable);
-                    chain.unshift(concept);
-                } else {
-                    if(chainArr.length == 0) chain.push(direction);
-                    chain.push(concept);
-                    if(variable) chain.push(variable);
-                    chain.push(direction);
+        let ref = new Reference();
+
+        let re = /\.([A-Za-z]+)/g, match = null;
+        while((match = re.exec(str)) !== null) {
+
+            if(!ref.addPiece(match[1])) return false;
+
+            let nextIndex = re.lastIndex;
+            if(nextIndex < str.length) {
+                if(str[nextIndex] === '[')  {
+                    let nested = Reference.parse(str.substring(nextIndex+1), variables);
+                    if(!nested) return false;
+                    ref.addPiece(nested);
+                    re.lastIndex = nextIndex + 1 + nested.len + 1;
+                } else if(str[nextIndex] === ']') {
+                    break;
+                } else if(str[nextIndex] !== '.') {
+                    return false;
                 }
             }
-
-            if(toThis) {
-                chain.push(refPart[1]);
-                this.setPrimaryChain(chain);
-            } else {
-                chain.unshift(refPart[1]);
-                this.addChain(chain);
-            }
         }
-    }
 
-    setPrimaryChain(chain) {
-        this.primaryChain = chain;
-    }
-
-    addChain(chain) {
-        this.chains.push(chain);
-    }
-
-    static parse(command) {
-        while((refMatch = Reference.regex.main.exec(command.getString())) !== null) {
-            let refStr = refMatch[0],
-                reference = new Reference(refStr, refMatch.index);
-            reference.parse();
-            command.addReference(reference);
-        }
+        ref.len = re.lastIndex + offset;
+        ref.parsed = true;
+        ref.checkChain();
+        return ref;
     }
 }
+
+
+class Drawable extends Dependency {
+    constructor() {
+        super();
+    }
+    draw(context) {}
+}
+
+class Point extends Drawable {
+    constructor() {
+        super();
+        this.addChild('x');
+        this.addChild('y');
+    }
+
+    draw(context) {
+
+    }
+}
+
+class Circle extends Drawable {
+
+    constructor() {
+        super();
+        this.addChild('center', Point);
+        this.addChild('radius');
+    }
+
+    draw(context) {
+        context.drawCircle(this.get('center.x'), this.get('center.y'), this.get('radius'));
+    }
+}
+
+Drawable.instances = {Point: Point, Circle: Circle};
+
+
+Part.prototype.getData = function() {
+    return this.data;
+};
 
 
 Part.prototype.parseCommands = function() {
     let self = this;
-    self.data = {};
+    self.scope = new Scope(self);
 
-    self.commands.forEach(function(commandStr) {
-        let arr = commandStr.split(/\s+/);
+    let commandStr = self.getCommands(), re = Part.regex.predicate, predicate = null, index = 0;
 
-        //define a drawable primitive
-        if(arr[0] in Drawable.instances) {
-            self.data[arr[1]] = new Drawable.instances[arr[0]]();
-            return;
+    while((predicate = re.exec(commandStr)) !== null) {
+
+        if(predicate.index > index) {
+            let commands = commandStr.substring(index, predicate.index).trim().split(/\s*\n\s*/);
+            self.scope.commands.push(...commands);
         }
 
-        //default case: assign/modify a data field
-        let command = new Command();
+        let paths = predicate[0].replace('{','').trim().split(/\s*&\s*/),
+            end = commandStr.indexOf('}', predicate.index),
+            commands = commandStr.substring(re.lastIndex, end).trim().split(/\s*\n\s*/),
+            scope = new Scope(self, paths, commands);
+        self.scope.addChild(scope);
+        re.lastIndex = end+1;
 
-        let refMatch = null;
-        while((refMatch = Part.regex.reference.exec(commandStr)) !== null) {
+        index = re.lastIndex;
+    }
 
-            let reference = new Reference(command);
-            reference.parse();
-            command.addReference(reference, refMatch.index, refMatch[0].length);
+    if(commandStr.length > index) {
+        let commands = commandStr.substring(index).trim().split(/\s*\n\s*/);
+        self.scope.commands.push(...commands);
+    }
 
-            let ref = command.substring(refMatch.index, refMatch.index + refMatch[0].length),
-                refPart = Part.regex.part.exec(ref),
-                chainMatch = null;
-
-            while((chainMatch = Part.regex.chain.exec(ref)) !== null) {
-
-                let chain = chainMatch[0],
-                    toThis = chainMatch[1] === 'this',
-                    partMatch = null,
-                    chainArr = [];
-
-                while((partMatch = Part.regex.part.exec(chain)) !== null) {
-
-                    let concept = partMatch[1],
-                        variable = partMatch[2],
-                        direction = partMatch[3];
-
-                    if(toThis) {
-                        if(concept === 'this') continue;
-                        chainArr.unshift(Part.getOppositeDirection(direction));
-                        if(variable) chainArr.unshift(variable);
-                        chainArr.unshift(concept);
-                    } else {
-                        if(chainArr.length == 0) chainArr.push(direction);
-                        chainArr.push(concept);
-                        if(variable) chainArr.push(variable);
-                        chainArr.push(direction);
-                    }
-                }
-
-                if(toThis) {
-                    chainArr.push(refPart[1]);
-                    reference.setPrimaryChain(chainArr);
-                } else {
-                    chainArr.unshift(refPart[1]);
-                    reference.addChain(chainArr);
-                }
-            }
-        }
-    });
+    self.scope.compile();
 };
 
 Part.buildRegex = function() {
-    let alpha = '[A-Za-z]+',
-        part = '(' + alpha + ')(:' + alpha + ')?([><])?',
-        chain = '\.(?:' + part ')+',
-        reference = part + '(?:' + chain + ')+';
+    let declaration = new RegExp('\s*(' + Object.keys(Drawable.instances).join('|') + ') ([A-Za-z]+)'),
+        predicate = /\s*(([<>]?[A-Za-z]+(?::[A-Za-z]+)?)+(?:\s*&\s*)?)+\s*{/g;
 
     Part.regex = {
-        alpha: new RegExp(alpha),
-        part: new RegExp(part),
-        chain: new RegExp(chain),
-        reference: new RegExp(reference)
+        declaration: declaration,
+        predicate: predicate
     };
 };
-
-Part.
-
 
 
 
