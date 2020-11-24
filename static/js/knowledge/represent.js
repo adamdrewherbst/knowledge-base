@@ -41,11 +41,17 @@ class Dependency {
         check();
     }
 
-    addChild(name, type) {
-        if(!type) type = Dependency;
-        let child = new type();
+    addChild(name, value) {
+        if(value === undefined) value = Dependency;
+        let child = value;
+        if(typeof value === 'function')
+            child = new value();
+        if(child instanceof Part)
+            child = child.getData();
+        if(!(child instanceof Dependency)) return false;
         this.children[name] = child;
         this.dependOn(child);
+        return child;
     }
 
     getChild(name) {
@@ -83,7 +89,7 @@ Dependency.nextId = 1;
 Dependency.record = {};
 
 
-class Scope {
+class Block {
     constructor(part, paths, commands) {
         this.part = part;
         this.paths = paths || [];
@@ -91,38 +97,28 @@ class Scope {
         this.nextId = 1;
         this.maps = [];
         this.variables = {};
-        this.children = [];
-    }
-
-    addChild(scope) {
-        this.children.push(scope);
     }
 
     map() {
-        let self = this, re = /[^<>]/g;
+        let self = this, re = /([<>])([A-Za-z]+)(?::([A-Za-z]+))?/g;
         self.paths.forEach(function(pathStr, pathInd) {
 
             //parse the path string into an array and give ID's to its parts
-            let index = 0, match = null, direction = null, chain = [], ids = [];
+            let index = 0, match = null, chain = [], ids = [];
             while((match = re.exec(pathStr)) !== null) {
 
+                let direction = match[1], concept = match[2], variable = match[3];
+
                 //first parse the direction indicator
-                if(match.index > 0) {
-                    let dir = pathStr[match.index-1];
-                    if(dir !== direction) {
-                        direction = dir;
-                        chain.push(direction);
-                    }
-                }
+                chain.push(direction);
 
                 //then the concept and/or variable name
-                let part = str.match(/^([A-Za-z]+)(?::([A-Za-z]+))?/);
-                if(part[1] in self.variables) {
-                    let variable = self.variables[part[1]];
+                if(concept in self.variables && !variable) {
+                    let variable = self.variables[concept];
                     chain.push(variable.concept);
                     ids.push(variable.id);
                 } else {
-                    let concept = part[1], variable = part[2], id = self.nextId++;
+                    let id = self.nextId++;
                     chain.push(concept);
                     ids.push(id);
                     if(variable) {
@@ -132,7 +128,7 @@ class Scope {
             }
 
             //listen for the path on our part
-            self.part.on(chain, function(path) {
+            self.part.each(chain, function(path) {
 
                 //when found, make a map of it
                 let map = {from: {}, to: {}};
@@ -142,6 +138,7 @@ class Scope {
                 });
                 self.addPathMap(map, pathInd);
             }, {
+                dynamic: true,
                 returnType: 'ids'
             });
         });
@@ -177,20 +174,59 @@ class Scope {
             }
         }
         if(complete) {
-            this.compile(map);
+            this.makeScope(map);
         }
     }
 
-    compile(map) {
-        let self = this, variables = {'this': self.part}, prevCommand = null;
+    makeScope(map) {
+        let self = this, variables = {'this': self.part};
         if(map) {
             for(let name in this.variables) {
                 variables[name] = map.from[this.variables[name].id];
             }
         }
+        let scope = new Scope(self.part.scope, variables, self.commands);
+    }
+}
+
+
+class Scope {
+    constructor(parent, variables, commands) {
+        this.setParent(parent);
+        this.data = new Dependency();
+        if(typeof variables === 'object')
+            for(let name in variables) {
+                this.data.addChild(name, variables[name]);
+            }
+        this.commands = commands || [];
+        this.children = [];
+    }
+
+    setParent(parent) {
+        this.parent = parent;
+        if(parent) parent.addChild(this);
+    }
+
+    addChild(scope) {
+        this.children.push(scope);
+    }
+
+    addVariable(name, value) {
+        this.data.addChild(name, value);
+    }
+
+    getVariable(name) {
+        let variable = this.data.getChild(name);
+        if(variable) return variable;
+        if(this.parent) return this.parent.getVariable(name);
+        return null;
+    }
+
+    compile() {
+        let self = this, prevCommand = null;
         self.commands.forEach(function(commandStr) {
             if(!commandStr) return;
-            let command = new Command(self, variables, commandStr);
+            let command = new Command(self, commandStr);
             command.parse();
             if(prevCommand) command.dependOn(prevCommand);
             prevCommand = command;
@@ -200,10 +236,9 @@ class Scope {
 
 
 class Command extends Dependency {
-    constructor(scope, variables, str) {
+    constructor(scope, str) {
         super();
         this.scope = scope;
-        this.variables = variables;
         this.str = str;
         this.index = 0;
         this.operator = null;
@@ -215,7 +250,7 @@ class Command extends Dependency {
         let declaration = this.str.match(Part.regex.declaration);
         if(declaration !== null) {
             let type = Drawable.instances[declaration[1]], name = declaration[2];
-            this.variables[name] = new type();
+            this.scope.addVariable(name, type);
             return;
         }
         let reToken = /[^\s]+/g, inString = false, match = null;
@@ -224,7 +259,7 @@ class Command extends Dependency {
             if(inString && last === inString) inString = false;
             else if(first === "'" || first === '"') inString = first;
             else {
-                let reference = Reference.parse(token, this.variables);
+                let reference = Reference.parse(token, this.scope);
                 if(reference) this.addReference(reference);
                 else if(!this.operator) this.setOperator(token);
             }
@@ -300,23 +335,21 @@ class Reference extends Dependency {
         }
     }
 
-    static parse(str, variables) {
+    static parse(str, scope) {
 
         //determine which part is referred to
         let first = str.match(/^[A-Za-z]+/), root = null, offset = 0;
         if(!first) return false;
-        if(first[0] in variables) {
-            root = variables[first[0]];
+        let variable = scope.getVariable(first[0]);
+        if(variable) {
+            root = variable;
             str = str.substring(first[0].length);
             offset = first[0].length;
         } else {
-            root = variables['this'];
+            root = scope.getThis();
             str = '.' + str;
             offset = -1;
         }
-        if(!root) return false;
-
-        if(root instanceof Part) root = root.getData();
 
         let ref = new Reference();
 
@@ -328,7 +361,7 @@ class Reference extends Dependency {
             let nextIndex = re.lastIndex;
             if(nextIndex < str.length) {
                 if(str[nextIndex] === '[')  {
-                    let nested = Reference.parse(str.substring(nextIndex+1), variables);
+                    let nested = Reference.parse(str.substring(nextIndex+1), scope);
                     if(!nested) return false;
                     ref.addPiece(nested);
                     re.lastIndex = nextIndex + 1 + nested.len + 1;
@@ -390,7 +423,7 @@ Part.prototype.getData = function() {
 
 Part.prototype.parseCommands = function() {
     let self = this;
-    self.scope = new Scope(self);
+    self.scope = new Scope();
 
     let commandStr = self.getCommands(), re = Part.regex.predicate, predicate = null, index = 0;
 
@@ -404,10 +437,10 @@ Part.prototype.parseCommands = function() {
         let paths = predicate[0].replace('{','').trim().split(/\s*&\s*/),
             end = commandStr.indexOf('}', predicate.index),
             commands = commandStr.substring(re.lastIndex, end).trim().split(/\s*\n\s*/),
-            scope = new Scope(self, paths, commands);
-        self.scope.addChild(scope);
-        re.lastIndex = end+1;
+            block = new Block(self, paths, commands);
+        block.map();
 
+        re.lastIndex = end+1;
         index = re.lastIndex;
     }
 
@@ -428,7 +461,6 @@ Part.buildRegex = function() {
         predicate: predicate
     };
 };
-
 
 
 

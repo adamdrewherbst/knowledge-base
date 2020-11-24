@@ -414,7 +414,6 @@
             Record.prototype.constructor.call(this);
             this.table = Part.table;
             this.neighbors = {'incoming': {}, 'outgoing': {}};
-            this.data = new Dependency();
         }
         Part.prototype = Object.create(Record.prototype);
         Part.constructor = Part;
@@ -657,7 +656,7 @@
 
         Part.parseChain = function(chain) {
             if(!Array.isArray(chain)) chain = [chain];
-            let ret = [], re = new RegExp(/[<|>]/g), match = null;
+            let ret = [], re = new RegExp(/[<>]/g), match = null;
             chain.forEach(function(data) {
                 if(typeof data === 'string') {
                     let ind = 0;
@@ -751,9 +750,22 @@
             return parts;
         };
 
-        Part.prototype.each = function(chain, callback) {
-            let parts = this.getAll(chain);
+        Part.prototype.each = function(chain, callback, opts) {
+
+            let parts = this.getAll(chain, opts);
             return Misc.each(parts, callback);
+
+            if(opts && opts.dynamic) {
+                let chain = self.parseChain(chain), direction = Part.getDirection(chain[0]), data = chain[1];
+                this.on('neighbor-added', function(neighbor, neighborDirection) {
+                    if(neighborDirection === direction && neighbor.matches(data)) {
+                        if(opts.returnType === 'ids') {
+                            opts.ids.push(neighbor.getId());
+                        }
+                        neighbor.each(chain.slice(2), callback, opts);
+                    }
+                });
+            }
         };
 
         Part.prototype.printEach = function(chain) {
