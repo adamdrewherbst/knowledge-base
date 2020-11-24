@@ -414,6 +414,8 @@
             Record.prototype.constructor.call(this);
             this.table = Part.table;
             this.neighbors = {'incoming': {}, 'outgoing': {}};
+            this.handlers = {};
+            this.scope = new Scope();
         }
         Part.prototype = Object.create(Record.prototype);
         Part.constructor = Part;
@@ -447,6 +449,22 @@
                     }
                 }
             });
+        };
+
+
+        Part.prototype.on = function(event, callback) {
+            if(!(event in this.handlers)) this.handlers[event] = [];
+            this.handlers[event].push(callback);
+        };
+
+        Part.prototype.trigger = function(event) {
+            let self = this;
+            if(Array.isArray(self.handlers[event])) {
+                let args = Array.prototype.slice.call(arguments, 1);
+                self.handlers[event].forEach(function(callback) {
+                    callback.apply(self, args);
+                });
+            }
         };
 
 
@@ -531,6 +549,10 @@
 
         Part.prototype.setCommands = function(commands) {
             this.concept.setCommands(commands);
+        };
+
+        Part.prototype.getData = function() {
+            return this.scope.getData();
         };
 
         Part.prototype.matches = function(data) {
@@ -627,8 +649,13 @@
         Part.prototype.setNeighbor = function(part, direction, include) {
             include = include === undefined || include;
             if(this.isNeighbor(part, direction) == include) return true;
-            if(include) this.neighbors[direction][part.getId()] = part;
-            else delete this.neighbors[direction][part.getId()];
+            if(include) {
+                this.neighbors[direction][part.getId()] = part;
+                this.trigger('neighbor-added', part, direction);
+            } else {
+                delete this.neighbors[direction][part.getId()];
+                this.trigger('neighbor-removed', part, direction);
+            }
             part.setNeighbor(this, Part.getOppositeDirection(direction), include);
         };
 
@@ -715,30 +742,44 @@
             })
         };
 
-        Part.prototype.getFirst = function(chain) {
-            let endpoints = this.getAll(chain), keys = Object.keys(endpoints);
+        Part.prototype.getFirst = function(chain, opts) {
+            let paths = this.getAll(chain, opts), keys = Object.keys(paths);
             if(keys.length === 0) return null;
-            return endpoints[keys[0]];
+            return paths[keys[0]];
         };
 
-        Part.prototype.getAll = function(chain) {
+        Part.prototype.getAll = function(chain, opts) {
+
             chain = Part.parseChain(chain);
-            let self = this, parts = {}, neighbors = {}, direction = undefined;
+
+            let self = this, parts = {}, neighbors = {}, direction = undefined, dir = null;
             parts[self.id] = self;
+
+            //used when returning the whole path
+            let returnPath = opts && opts.returnPath ? true : false,
+                of = null, paths = null, newPaths = null;
+            if(returnPath) {
+                paths = [[self]];
+            }
+
             chain.forEach(function(data) {
                 if(dir = Part.getDirection(data)) {
                     direction = dir;
                     return;
                 }
+                if(returnPath) of = {};
                 $.each(parts, function(p, part) {
+                    if(returnPath) of[p] = {};
                     if(data === null) {
                         if(direction && part.getEndpoint(Part.getOppositeDirection(direction)) && part.getEndpoint(direction) === null) {
                             neighbors[p] = part;
+                            if(returnPath) of[p][p] = part;
                         }
                     } else {
                         part.eachNeighbor(direction, function(neighbor) {
                             if(neighbor.matches(data)) {
                                 neighbors[neighbor.getId()] = neighbor;
+                                if(returnPath) of[p][neighbor.getId()] = neighbor;
                             }
                         });
                     }
@@ -746,23 +787,45 @@
                 parts = neighbors;
                 if(data === null) return false;
                 neighbors = {};
+
+                if(returnPath) {
+                    newPaths = [];
+                    paths.forEach(function(path) {
+                        let end = path[path.length-1].getId();
+                        for(let n in of[end]) {
+                            let newPath = path[0] === self ? [] : path.slice();
+                            if(n !== end) newPath.push(of[end][n]);
+                            newPaths.push(newPath);
+                        }
+                    });
+                    paths = newPaths;
+                }
             });
-            return parts;
+            return returnPath ? paths : parts;
         };
 
         Part.prototype.each = function(chain, callback, opts) {
 
-            let parts = this.getAll(chain, opts);
-            return Misc.each(parts, callback);
+            let chains = this.getAll(chain, opts);
+            return Misc.each(chains, callback);
 
             if(opts && opts.dynamic) {
-                let chain = self.parseChain(chain), direction = Part.getDirection(chain[0]), data = chain[1];
+                let chain = self.parseChain(chain);
+                if(chain.length === 0) {
+                    let ret = this;
+                    if(opts.returnType === 'ids') ret = opts.ids;
+                    callback.call(this, ret);
+                }
+                let direction = Part.getDirection(chain[0]), data = chain[1];
                 this.on('neighbor-added', function(neighbor, neighborDirection) {
                     if(neighborDirection === direction && neighbor.matches(data)) {
+                        let newOpts = opts;
                         if(opts.returnType === 'ids') {
-                            opts.ids.push(neighbor.getId());
+                            newOpts = Object.assign({}, opts);
+                            newOpts.ids = opts.ids ? opts.ids.slice() : [];
+                            newOpts.ids.push(neighbor.getId());
                         }
-                        neighbor.each(chain.slice(2), callback, opts);
+                        neighbor.each(chain.slice(2), callback, newOpts);
                     }
                 });
             }

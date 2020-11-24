@@ -132,21 +132,22 @@ class Block {
 
                 //when found, make a map of it
                 let map = {from: {}, to: {}};
-                path.forEach(function(id, i) {
-                    map.from[ids[i]] = id;
-                    map.to[id] = ids[i];
+                path.forEach(function(part, i) {
+                    map.from[ids[i]] = part;
+                    map.to[part.getId()] = ids[i];
                 });
                 self.addPathMap(map, pathInd);
             }, {
                 dynamic: true,
-                returnType: 'ids'
+                returnPath: true
             });
         });
     }
 
     addPathMap(map, pathInd) {
         let self = this;
-        map.paths = {pathInd: true};
+        map.paths = {};
+        map.paths[pathInd] = true;
         self.addMap(map);
 
         //see if this path map can be merged with any of our existing maps
@@ -167,7 +168,7 @@ class Block {
     addMap(map) {
         this.maps.push(map);
         let complete = true;
-        for(let i = 0; i < this.nextId; i++) {
+        for(let i = 1; i < this.nextId; i++) {
             if(!(i in map.from)) {
                 complete = false;
                 break;
@@ -196,7 +197,7 @@ class Scope {
         this.data = new Dependency();
         if(typeof variables === 'object')
             for(let name in variables) {
-                this.data.addChild(name, variables[name]);
+                this.addVariable(name, variables[name]);
             }
         this.commands = commands || [];
         this.children = [];
@@ -209,6 +210,10 @@ class Scope {
 
     addChild(scope) {
         this.children.push(scope);
+    }
+
+    getData() {
+        return this.data;
     }
 
     addVariable(name, value) {
@@ -416,14 +421,10 @@ class Circle extends Drawable {
 Drawable.instances = {Point: Point, Circle: Circle};
 
 
-Part.prototype.getData = function() {
-    return this.data;
-};
-
-
 Part.prototype.parseCommands = function() {
     let self = this;
     self.scope = new Scope();
+    self.blocks = [];
 
     let commandStr = self.getCommands(), re = Part.regex.predicate, predicate = null, index = 0;
 
@@ -438,6 +439,7 @@ Part.prototype.parseCommands = function() {
             end = commandStr.indexOf('}', predicate.index),
             commands = commandStr.substring(re.lastIndex, end).trim().split(/\s*\n\s*/),
             block = new Block(self, paths, commands);
+        self.blocks.push(block);
         block.map();
 
         re.lastIndex = end+1;
