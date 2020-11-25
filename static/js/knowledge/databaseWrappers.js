@@ -415,7 +415,6 @@
             this.table = Part.table;
             this.neighbors = {'incoming': {}, 'outgoing': {}};
             this.handlers = {};
-            this.scope = new Scope();
         }
         Part.prototype = Object.create(Record.prototype);
         Part.constructor = Part;
@@ -549,10 +548,6 @@
 
         Part.prototype.setCommands = function(commands) {
             this.concept.setCommands(commands);
-        };
-
-        Part.prototype.getData = function() {
-            return this.scope.getData();
         };
 
         Part.prototype.matches = function(data) {

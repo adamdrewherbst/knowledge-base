@@ -14,31 +14,46 @@ class Dependency {
 
     dependOn(dep, include) {
         include = include || (include === undefined);
+        if(this.dependsOn.hasOwnProperty(dep.getId()) == include) return;
         if(include) this.dependsOn[dep.getId()] = dep;
         else delete this.dependsOn[dep.getId()];
+        dep.dependOnMe(this);
     }
 
     dependOnMe(dep, include) {
         include = include || (include === undefined);
+        if(this.dependsOnMe.hasOwnProperty(dep.getId()) == include) return;
         if(include) this.dependsOnMe[dep.getId()] = dep;
         else delete this.dependsOnMe[dep.getId()];
+        dep.dependOn(this);
     }
 
-    isResolved(check) {
-        if(check) return this.check(true);
+    isResolved() {
         return this.resolved;
     }
 
     check(recur) {
+        this.resolved = true;
         for(let id in this.dependsOn) {
             let dep = this.dependsOn[id];
-            if(!dep.resolved(recur)) return false;
+            if(recur) dep.check(true);
+            if(!dep.isResolved()) {
+                this.resolved = false;
+                break;
+            }
         }
-        return true;
+        if(this.isResolved()) this.propagate();
     }
 
     resolve(dep) {
         check();
+    }
+
+    propagate() {
+        for(let id in this.dependsOnMe) {
+            let dep = this.dependsOnMe[id];
+            dep.resolve(this);
+        }
     }
 
     addChild(name, value) {
@@ -82,6 +97,15 @@ class Dependency {
         if(!field) return false;
         field.value = value;
         return true;
+    }
+
+    eachLeaf(callback, path) {
+        if(typeof path !== 'string') path = '';
+        if(this.children.length === 0)
+            callback.call(this, path);
+        $.each(this.children, function(name, child) {
+            child.eachLeaf(callback, path + '.' + name);
+        });
     }
 }
 
@@ -227,6 +251,10 @@ class Scope {
         return null;
     }
 
+    getField(path) {
+        return this.data.getField(path);
+    }
+
     compile() {
         let self = this, prevCommand = null;
         self.commands.forEach(function(commandStr) {
@@ -249,6 +277,8 @@ class Command extends Dependency {
         this.operator = null;
         this.twoWay = false;
         this.arr = [];
+        this.references = [];
+        this.referenceResolved = [];
     }
 
     parse() {
@@ -265,7 +295,7 @@ class Command extends Dependency {
             else if(first === "'" || first === '"') inString = first;
             else {
                 let reference = Reference.parse(token, this.scope);
-                if(reference) this.addReference(reference);
+                if(reference) this.addReference(reference, match.index);
                 else if(!this.operator) this.setOperator(token);
             }
         }
@@ -275,32 +305,85 @@ class Command extends Dependency {
 
     setOperator(operator) {
         this.operator = operator;
-        if(operator == '<=>') {
+        if(operator === '<=>') {
             this.twoWay = true;
         }
     }
 
-    addReference(reference, index, length) {
+    addReference(reference, index) {
         if(!reference) return;
         if(index > this.index)
             this.arr.push(this.str.substring(this.index, index));
-        this.arr.push(reference);
-        this.index = index + length;
+        this.arr.push(this.references.length);
+        this.references.push(reference);
+        this.referenceResolved.push(false);
+        this.index = index + reference.length;
         this.dependOn(reference);
     }
 
+    allReferencesResolved() {
+        for(let i = 0; i < self.references.length; i++) {
+            if(!this.twoWay && i == 0) continue;
+            let resolved = self.referenceResolved[i];
+            if(this.twoWay && resolved) return true;
+            if(!this.twoWay && !resolved) return false;
+        }
+        return !this.twoWay;
+    }
+
+    identifySubFields() {
+        let self = this;
+        self.subFields = [];
+        self.references[0].eachLeaf(function(path) {
+            for(let i = 1; i < self.references.length; i++) {
+                let otherRef = self.references[i];
+                if(otherRef.hasField(path)) self.subFields.push(path);
+            }
+        });
+    }
+
     resolve(dep) {
-        super.resolve(dep);
-        if(this.resolved) {
+        let self = this, index = self.references.indexOf(dep);
+        if(dep instanceof Reference) {
+            if(index >= 0) {
+                self.references.splice(index, 1, dep.getField());
+                let read = self.twoWay || index > 0,
+                    edit = self.twoWay || index == 0;
+                if(read) self.dependOn(dep.getField());
+                if(edit) self.dependOnMe(dep.getField());
+            }
+        } else {
+            self.referenceResolved[index] = true;
+            if(!self.allReferencesResolved()) return;
+            self.identifySubFields();
+            self.subFields.forEach(function(sub) {
+                if(self.twoWay) {
+                    let edit = self.references[(index+1)%2].getField(sub),
+                        read = self.references[index].getField(sub);
+                    edit.setValue(read.getValue());
+                    edit.resolve(read);
+                } else {
+                    let edit = self.references[0].getField(sub), value = edit.getValue(), expr = 'value';
+                    for(let i = 1; i < self.arr.length; i++) {
+                        let piece = self.arr[i];
+                        if(typeof piece === 'string') expr += ' ' + piece;
+                        else if(typeof piece === 'number') expr += ' ' + self.references[piece].getField(sub).getValue();
+                    }
+                    eval(expr);
+                    edit.setValue(value);
+                }
+            });
         }
     }
 }
 
 
 class Reference extends Dependency {
-    constructor(field) {
+    constructor(field, read, edit) {
         super();
         this.field = field;
+        this.read = read;
+        this.edit = edit;
         this.parsed = false;
         this.arr = [];
         this.index = 0;
@@ -310,80 +393,53 @@ class Reference extends Dependency {
     addPiece(piece) {
         this.arr.push(piece);
         if(piece instanceof Reference) self.dependOn(piece);
-        this.checkChain();
-        return this.field ? true : false;
     }
 
-    checkChain() {
+    check() {
         let self = this, i = 0;
         for(i = self.index; i < self.arr.length; i++) {
             let piece = self.arr[i];
             if(typeof piece === 'string')
-                self.field = self.field.getChild(piece);
+                self.field = self.field.getField(piece);
             else if(piece instanceof Reference && piece.isResolved())
                 self.field = self.field.getChild(piece.getValue());
             else break;
         }
         self.index = i;
-        if(self.parsed && self.index == self.arr.length) {
-            self.dependOn(self.field);
-        }
-    }
-
-    resolve(dep) {
-        let self = this;
-        if(dep === self.field) {
-            self.setValue(self.field.getValue());
-            self.propagate();
-        } else if(self.arr.indexOf(dep) >= 0) {
-            self.checkChain();
-        }
+        super.check();
     }
 
     static parse(str, scope) {
 
         //determine which part is referred to
-        let first = str.match(/^[A-Za-z]+/), root = null, offset = 0;
-        if(!first) return false;
-        let variable = scope.getVariable(first[0]);
-        if(variable) {
-            root = variable;
-            str = str.substring(first[0].length);
-            offset = first[0].length;
-        } else {
-            root = scope.getThis();
-            str = '.' + str;
-            offset = -1;
-        }
+        let re = Reference.regex, match = re.exec(str);
+        if(!match) return false;
 
-        let ref = new Reference();
+        let field = scope.getField(match[0]);
+        if(!field) field = scope.getField('this.' + match[0]);
+        if(!field) return false;
 
-        let re = /\.([A-Za-z]+)/g, match = null;
-        while((match = re.exec(str)) !== null) {
+        let ref = new Reference(field);
 
-            if(!ref.addPiece(match[1])) return false;
-
-            let nextIndex = re.lastIndex;
-            if(nextIndex < str.length) {
-                if(str[nextIndex] === '[')  {
-                    let nested = Reference.parse(str.substring(nextIndex+1), scope);
-                    if(!nested) return false;
-                    ref.addPiece(nested);
-                    re.lastIndex = nextIndex + 1 + nested.len + 1;
-                } else if(str[nextIndex] === ']') {
-                    break;
-                } else if(str[nextIndex] !== '.') {
-                    return false;
-                }
+        while(str[re.lastIndex++] === '[') {
+            let nested = Reference.parse(str, scope);
+            if(!nested || str[re.lastIndex++] !== ']') return false;
+            ref.addPiece(nested);
+            if(str[re.lastIndex] === '.') {
+                re.lastIndex++;
+                let ext = re.exec(str);
+                if(!ext) return false;
+                ref.addPiece(ext[0]);
             }
         }
 
-        ref.len = re.lastIndex + offset;
-        ref.parsed = true;
-        ref.checkChain();
+        ref.length = re.lastIndex - match.index;
         return ref;
     }
 }
+
+Reference.regex = /([A-Za-z]+)((?:\.[A-Za-z]+)+)/g;
+
 
 
 class Drawable extends Dependency {
@@ -420,6 +476,11 @@ class Circle extends Drawable {
 
 Drawable.instances = {Point: Point, Circle: Circle};
 
+
+Part.prototype.getData = function() {
+    if(!this.scope) this.scope = new Scope();
+    return this.scope.getData();
+};
 
 Part.prototype.parseCommands = function() {
     let self = this;
