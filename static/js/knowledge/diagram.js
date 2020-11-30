@@ -772,6 +772,7 @@
             self.partEditing = part;
             self.$nameEdit.val(part.getName() || '');
             self.$descriptionEdit.val(part.getDescription() || '');
+            self.$commandsEdit.val(part.getCommands() || '');
             Page.clearDiagram(self.instanceOfPalette);
             part.each(['>', Concept.isA, '*'], function(node) {
                 node.updateGoData(self.instanceOfPalette, true);

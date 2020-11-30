@@ -556,6 +556,7 @@
             if(data instanceof Part) return this === data;
             if(data instanceof Concept) return this.concept === data;
             if(typeof data === 'string') {
+                data = data.replace(/_/g, ' ');
                 if(this.getName() === data) return true;
                 let concept = Concept.get(data), node = null;
                 if(concept) node = concept.getNode();

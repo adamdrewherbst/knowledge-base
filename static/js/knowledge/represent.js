@@ -2,9 +2,9 @@ class Dependency {
     constructor() {
         this.id = Dependency.nextId++;
         Dependency.record[this.id] = this;
-        this.resolved = true;
         this.dependsOn = {};
         this.dependsOnMe = {};
+        this.unresolved = {};
     }
 
     getId() {
@@ -14,35 +14,58 @@ class Dependency {
     dependOn(dep, include) {
         include = include || (include === undefined);
         if(this.dependsOn.hasOwnProperty(dep.getId()) == include) return;
-        if(include) this.dependsOn[dep.getId()] = { dep: dep, resolved: false };
+        if(include) this.dependsOn[dep.getId()] = dep;
         else delete this.dependsOn[dep.getId()];
+        this.resolve(dep, !include);
         dep.dependOnMe(this);
     }
 
     dependOnMe(dep, include) {
         include = include || (include === undefined);
         if(this.dependsOnMe.hasOwnProperty(dep.getId()) == include) return;
-        if(include) this.dependsOnMe[dep.getId()] = { dep: dep, resolved: false };
+        if(include) this.dependsOnMe[dep.getId()] = dep;
         else delete this.dependsOnMe[dep.getId()];
         dep.dependOn(this);
     }
 
-    resolve(dep) {
-        this.dependsOn[dep.getId()].resolved = true;
-        this.check(dep);
+    resolve(dep, resolved) {
+        if(dep) {
+            if(resolved === undefined) resolved = true;
+            if(resolved) delete this.unresolved[dep.getId()];
+            else this.unresolved[dep.getId()] = true;
+            this.process(dep);
+        }
+        let unresolved = Object.keys(this.unresolved);
+        if(unresolved.length == 0) {
+            this.execute();
+            for(let id in this.dependsOnMe) {
+                this.dependsOnMe[id].resolve(this);
+            }
+        }
     }
 
-    check(dep) {}
+    process(dep) {}
+
+    execute() {}
 }
 
 Dependency.nextId = 1;
 Dependency.record = {};
+Dependency.each = function(callback) {
+    for(let id in Dependency.record) {
+        let dep = Dependency.record[id];
+        callback.call(dep, dep);
+    }
+};
 
 
 class Field extends Dependency {
     constructor() {
         super();
         this.value = null;
+        this.updated = false;
+        this.lastAssignCommand = null;
+        this.lastEditCommand = null;
     }
 
     getValue() {
@@ -51,6 +74,22 @@ class Field extends Dependency {
 
     setValue(value) {
         this.value = value;
+    }
+
+    getLastAssignCommand() {
+        return this.lastAssignCommand;
+    }
+
+    setLastAssignCommand(command) {
+        this.lastAssignCommand = command;
+    }
+
+    getLastEditCommand() {
+        return this.lastEditCommand;
+    }
+
+    setLastEditCommand(command) {
+        this.lastEditCommand = command;
     }
 }
 
@@ -61,12 +100,14 @@ class Block {
         this.paths = paths || [];
         this.commands = commands || [];
         this.nextId = 1;
+        this.chains = [];
+        this.ids = [];
         this.maps = [];
         this.variables = {};
     }
 
     map() {
-        let self = this, re = /([<>])([A-Za-z]+)(?::([A-Za-z]+))?/g;
+        let self = this, re = /([<>])([A-Za-z_]+)(?::([A-Za-z_]+))?/g;
         self.paths.forEach(function(pathStr, pathInd) {
 
             //parse the path string into an array and give ID's to its parts
@@ -92,6 +133,13 @@ class Block {
                     }
                 }
             }
+            self.chains.push(chain);
+            self.ids.push(ids);
+        });
+
+        self.chains.forEach(function(chain, pathInd) {
+
+            let ids = self.ids[pathInd];
 
             //listen for the path on our part
             self.part.each(chain, function(path) {
@@ -161,12 +209,13 @@ class Scope extends Dependency {
     constructor(parent, variables, commands) {
         super();
         this.setParent(parent);
-        this.data = new Dependency();
+        this.variables = {};
         if(typeof variables === 'object')
             for(let name in variables) {
                 this.addVariable(name, variables[name]);
             }
-        this.commands = commands || [];
+        this.commandStrings = commands || [];
+        this.commands = [];
         this.children = [];
     }
 
@@ -179,6 +228,12 @@ class Scope extends Dependency {
         this.children.push(scope);
     }
 
+    eachChild(callback) {
+        this.children.forEach(function(child) {
+            callback.call(child, child);
+        });
+    }
+
     getData() {
         return this.variables;
     }
@@ -186,7 +241,12 @@ class Scope extends Dependency {
     addVariable(name, value) {
         if(value instanceof Part)
             value = value.getData();
+        else if(typeof value === 'function')
+            value = new value();
+        else if(value === undefined)
+            value = new Field();
         this.variables[name] = value;
+        return value;
     }
 
     getVariable(name) {
@@ -203,12 +263,29 @@ class Scope extends Dependency {
         return null;
     }
 
+    addCommands(commands) {
+        let self = this;
+        if(typeof commands === 'string') commands = [commands];
+        commands.forEach(function(str) {
+            if(str) self.commandStrings.push(str);
+        });
+    }
+
     compile() {
-        let self = this, prevCommand = null;
-        self.commands.forEach(function(commandStr) {
+        let self = this;
+        self.commandStrings.forEach(function(commandStr) {
             if(!commandStr) return;
             let command = new Command(self, commandStr);
             command.parse();
+            self.commands.push(command);
+            self.dependOn(command);
+        });
+    }
+
+    execute() {
+        let self = this;
+        self.commands.forEach(function(command) {
+            command.run();
         });
     }
 }
@@ -221,18 +298,30 @@ class Command extends Dependency {
         this.str = str;
         this.index = 0;
         this.operator = null;
+        this.isDeclaration = false;
         this.twoWay = false;
         this.arr = [];
         this.references = [];
         this.fields = [];
+        this.previous = [];
+        this.dependentCommands = [];
+        this.hasRun = false;
+        this.runIndex = null;
     }
 
     parse() {
         let declaration = this.str.match(Part.regex.declaration);
         if(declaration !== null) {
-            let type = Drawable.instances[declaration[1]], name = declaration[2];
-            this.scope.addVariable(name, type);
+            let type = Drawable.instances[declaration[1]], name = declaration[2],
+                variable = this.scope.addVariable(name, type);
+            this.isDeclaration = true;
+            this.addReference(variable)
             return;
+        }
+        let assignment = this.str.match(/^([A-Za-z]+)\s+=/);
+        if(assignment !== null) {
+            let name = assignment[1];
+            if(!this.scope.getVariable(name)) this.scope.addVariable(name);
         }
         let reToken = /[^\s]+/g, inString = false, match = null;
         while((match = reToken.exec(this.str)) !== null) {
@@ -241,7 +330,7 @@ class Command extends Dependency {
             else if(first === "'" || first === '"') inString = first;
             else {
                 let reference = Reference.parse(token, this.scope);
-                if(reference) this.addReference(reference, match.index);
+                if(reference) this.addReference(reference, match.index, token.length);
                 else if(!this.operator) this.setOperator(token);
             }
         }
@@ -256,13 +345,13 @@ class Command extends Dependency {
         }
     }
 
-    addReference(reference, index) {
+    addReference(reference, index, length) {
         if(!reference) return;
         if(index > this.index)
             this.arr.push(this.str.substring(this.index, index));
+        this.index = index + length;
         this.arr.push(this.references.length);
         this.references.push(reference);
-        this.index = index + reference.length;
         if(reference instanceof Reference) {
             reference.setCommand(this);
             this.dependOn(reference);
@@ -292,12 +381,13 @@ class Command extends Dependency {
             if(write) field.dependOn(this);
         }
         this.fields[index] = newFields;
+        this.previous[index] = {};
     }
 
     fillFields(obj, fields, path) {
         if(obj instanceof Field) fields[path] = obj;
         else if(typeof obj === 'object') {
-            for(let key in obj) this.fillFields(obj[key], index, path + '.' + key);
+            for(let key in obj) this.fillFields(obj[key], fields, path + '.' + key);
         }
     }
 
@@ -315,50 +405,77 @@ class Command extends Dependency {
         for(let i = 0; i < this.references.length; i++) {
             if(!this.twoWay && i == 0) continue;
             let reference = this.references[i],
-                resolved = !(reference instanceof Reference) || self.depends.on[reference.getId()].resolved;
+                resolved = !(reference instanceof Reference) || !self.unresolved[reference.getId()];
             if(this.twoWay && resolved) return true;
             if(!this.twoWay && !resolved) return false;
         }
         return !this.twoWay;
     }
 
-    check(dep) {
-        let unresolved = Object.keys(this.unresolved);
+    reads(refIndex) {
+        return refIndex > 0 || this.operator !== '=' || this.twoWay;
+    }
 
-        // first see if our scope hasn't even been run yet
-        if(unresolved.length == 1 && unresolved[0] = this.scope.getId()) {
-            this.scope.resolve(this);
-        }
-        else if(unresolved.length == 0) {
-            this.run(dep);
+    edits(refIndex) {
+        return refIndex == 0 || this.twoWay;
+    }
+
+    setPriorValues() {
+        for(let i = 0; i < this.fields.length; i++) {
+            for(let path in this.fields[i]) {
+                let field = this.fields[i][path];
+                if(!this.hasRun || field.updated) {
+                    this.previous[i][path] = field.getValue();
+                }
+                if(this.reads(i) && !this.hasRun) {
+                    let prior = field.getLastEditCommand();
+                    if(prior) prior.addDependentCommand(this);
+                }
+                if(this.edits(i)) {
+                    if(!this.hasRun) {
+                        field.setLastEditCommand(this);
+                        if(!this.reads(i)) field.setLastAssignCommand(this);
+                    }
+                    else field.setValue(this.previous[i][path]);
+                }
+            }
         }
     }
 
-    run(dep) {
-        let self = this, [index, path] = self.getPath(dep);
+    addDependentCommand(command) {
+        this.dependentCommands.push(command);
+    }
+
+    run() {
+        let self = this;
+        if(!self.hasRun) self.runIndex = Command.nextRunIndex++;
+        self.setPriorValues();
         for(let p in self.fields[0]) {
-            if(path !== null && p !== path) continue;
-            if(self.twoWay) {
+            if(self.isDeclaration) {
+            } else if(self.twoWay) {
                 for(let i = 0; i < 2; i++) {
-                    if(index !== null && i !== index) continue;
                     let edit = self.fields[(i+1)%2][p].getValue(),
                         read = self.fields[i][p].getValue();
                     edit.setValue(read.getValue());
                     edit.resolve(read);
                 }
             } else {
-                let edit = self.references[0][p], value = edit.getValue(), expr = 'value';
+                let edit = self.fields[0][p], value = edit.getValue(), expr = 'value';
                 for(let i = 1; i < self.arr.length; i++) {
                     let piece = self.arr[i];
-                    if(typeof piece === 'string') expr += ' ' + piece;
-                    else if(typeof piece === 'number') expr += ' ' + self.references[piece][p].getValue();
+                    if(typeof piece === 'string') expr += piece;
+                    else if(typeof piece === 'number') expr += self.previous[piece][p];
                 }
                 eval(expr);
                 edit.setValue(value);
+                if(!self.hasRun) edit.resolve(self);
             }
         }
+        self.hasRun = true;
     }
 }
+
+Command.nextRunIndex = 1;
 
 
 class Reference extends Dependency {
@@ -380,21 +497,32 @@ class Reference extends Dependency {
         this.command = command;
     }
 
-    check(dep) {
+    getField() {
+        if(this.obj instanceof Field)
+            return this.obj;
+        return null;
+    }
+
+    process(dep) {
         let self = this, i = 0;
+        if(dep instanceof Reference) {
+            let field = dep.getField();
+            if(field) self.dependOn(field);
+            else throw 'Nested reference is not to a field';
+            return;
+        }
         for(i = self.index; i < self.arr.length; i++) {
             let piece = self.arr[i];
             if(typeof piece === 'string')
                 self.obj = eval('self.obj.' + piece);
-            else if(piece instanceof Reference && self.resolved[piece.getId()])
+            else if(piece instanceof Field && !self.unresolved[piece.getId()])
                 self.obj = self.obj[piece.getValue()];
             else break;
         }
-        self.index = i;
-        if(self.command) {
+        if(self.command && i > self.index) {
             self.command.determineFields(self);
-            if(self.index === self.arr.length) self.command.resolve(self);
         }
+        self.index = i;
     }
 
     static parse(str, scope) {
@@ -404,8 +532,9 @@ class Reference extends Dependency {
         if(!match) return false;
 
         let field = scope.getField(match[0]);
-        if(!field) field = scope.getField('this.' + match[0]);
         if(!field) return false;
+
+        if(str[re.lastIndex] !== '[') return field;
 
         let ref = new Reference(field);
 
@@ -426,14 +555,12 @@ class Reference extends Dependency {
     }
 }
 
-Reference.regex = /([A-Za-z]+)((?:\.[A-Za-z]+)+)/g;
+Reference.regex = /(?:[A-Za-z]+)(?:(?:\.[A-Za-z]+)+)?/g;
 
 
 
 class Drawable {
-    constructor() {
-        super();
-    }
+    constructor() {}
     draw(context) {}
 }
 
@@ -471,17 +598,14 @@ Part.prototype.getData = function() {
 };
 
 Part.prototype.parseCommands = function() {
-    let self = this;
-    self.scope = new Scope();
-    self.blocks = [];
 
-    let commandStr = self.getCommands(), re = Part.regex.predicate, predicate = null, index = 0;
+    let self = this, commandStr = self.getCommands(), re = Part.regex.predicate, predicate = null, index = 0;
 
     while((predicate = re.exec(commandStr)) !== null) {
 
         if(predicate.index > index) {
             let commands = commandStr.substring(index, predicate.index).trim().split(/\s*\n\s*/);
-            self.scope.commands.push(...commands);
+            self.scope.addCommands(commands);
         }
 
         let paths = predicate[0].replace('{','').trim().split(/\s*&\s*/),
@@ -497,15 +621,18 @@ Part.prototype.parseCommands = function() {
 
     if(commandStr.length > index) {
         let commands = commandStr.substring(index).trim().split(/\s*\n\s*/);
-        self.scope.commands.push(...commands);
+        self.scope.addCommands(commands);
     }
 
     self.scope.compile();
+    self.scope.commands.forEach(function(command) {
+        command.resolve();
+    })
 };
 
 Part.buildRegex = function() {
     let declaration = new RegExp('\s*(' + Object.keys(Drawable.instances).join('|') + ') ([A-Za-z]+)'),
-        predicate = /\s*(([<>]?[A-Za-z]+(?::[A-Za-z]+)?)+(?:\s*&\s*)?)+\s*{/g;
+        predicate = /(?:(?:[<>][A-Za-z_]+(?::[A-Za-z_]+)?)+(?:\s*&\s*)?)+\s*{/g;
 
     Part.regex = {
         declaration: declaration,
@@ -514,7 +641,33 @@ Part.buildRegex = function() {
 };
 
 
+Part.prototype.represent = function() {
+    let self = this;
+    self.resetRepresent();
+    let parts = self.getIn();
+    $.each(parts, function(id, part) {
+        part.parseCommands();
+    });
+    $.each(parts, function(id, part) {
+        part.scope.eachChild(function(child) {
+            child.compile();
+        })
+    });
+    Dependency.each(function(dep) {
+        dep.resolve();
+    });
+};
 
+
+Part.prototype.resetRepresent = function() {
+    Dependency.record = {};
+    Dependency.nextId = 1;
+    Command.nextRunIndex = 1;
+    this.eachIn(function(part) {
+        part.scope = new Scope();
+        part.blocks = [];
+    })
+};
 
 
 
