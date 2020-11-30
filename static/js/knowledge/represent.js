@@ -20,16 +20,21 @@ class Dependency {
     dependOn(dep, include) {
         include = include || (include === undefined);
         if(this.dependsOn.hasOwnProperty(dep.getId()) == include) return;
-        if(include) this.dependsOn[dep.getId()] = dep;
+        if(include) {
+            this.dependsOn[dep.getId()] = dep;
+            this.resolved = false;
+        }
         else delete this.dependsOn[dep.getId()];
-        this.resolve(dep, !include);
         dep.dependOnMe(this);
     }
 
     dependOnMe(dep, include) {
         include = include || (include === undefined);
         if(this.dependsOnMe.hasOwnProperty(dep.getId()) == include) return;
-        if(include) this.dependsOnMe[dep.getId()] = dep;
+        if(include) {
+            this.dependsOnMe[dep.getId()] = dep;
+            this.resolved = false;
+        }
         else delete this.dependsOnMe[dep.getId()];
         dep.dependOn(this);
     }
@@ -50,7 +55,7 @@ class Dependency {
             for(let id in this.dependsOnMe) {
                 this.dependsOnMe[id].resolve(this);
             }
-        }
+        } else this.resolved = false;
     }
 
     process(dep) {}
