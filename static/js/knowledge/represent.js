@@ -72,6 +72,12 @@ Dependency.each = function(callback) {
     }
 };
 
+Dependency.clearUpdated = function() {
+    Dependency.each(function(dep) {
+        dep.updated = false;
+    });
+};
+
 Dependency.get = function(data) {
     if(typeof data === 'number') return Dependency.record[data];
     if(typeof data === 'string') {
@@ -95,7 +101,7 @@ class Field extends Dependency {
         this.scope = scope;
         this.value = value;
         this.updated = false;
-        this.lastAssignCommand = null;
+        this.lastInitCommand = null;
         this.lastEditCommand = null;
     }
 
@@ -111,12 +117,12 @@ class Field extends Dependency {
         this.value = value;
     }
 
-    getLastAssignCommand() {
-        return this.lastAssignCommand;
+    getLastInitCommand() {
+        return this.lastInitCommand;
     }
 
-    setLastAssignCommand(command) {
-        this.lastAssignCommand = command;
+    setLastInitCommand(command) {
+        this.lastInitCommand = command;
     }
 
     getLastEditCommand() {
@@ -317,7 +323,12 @@ class Scope extends Dependency {
     getField(path) {
         let prefix = 'this.variables';
         if(path[0] !== '.') prefix += '.';
-        let field = eval(prefix + path);
+        let field = null;
+        try {
+            field = eval(prefix + path);
+        } catch(error) {
+            console.error(error);
+        }
         if(field) return field;
         if(this.parent) return this.parent.getField(path);
         return null;
@@ -486,7 +497,7 @@ class Command extends Dependency {
     }
 
     reads(refIndex) {
-        return refIndex > 0 || this.operator !== '=' || this.twoWay;
+        return refIndex > 0 || this.twoWay || (!this.isDeclaration && this.operator !== '=');
     }
 
     edits(refIndex) {
@@ -507,7 +518,8 @@ class Command extends Dependency {
                 if(this.edits(i)) {
                     if(!this.hasRun) {
                         field.setLastEditCommand(this);
-                        if(!this.reads(i)) field.setLastAssignCommand(this);
+                        if(i == 0 && this.references.length == 1 && !this.reads(i))
+                            field.setLastInitCommand(this);
                     }
                     else field.setValue(this.previous[i][path]);
                 }
@@ -516,7 +528,8 @@ class Command extends Dependency {
     }
 
     addDependentCommand(command) {
-        this.dependentCommands.push(command);
+        if(this.dependentCommands.indexOf(command) < 0)
+            this.dependentCommands.push(command);
     }
 
     run() {
@@ -549,6 +562,7 @@ class Command extends Dependency {
                 }
                 eval(expr);
                 edit.setValue(value);
+                edit.updated = true;
                 if(!self.hasRun) edit.resolve(self);
             }
         }
@@ -557,6 +571,26 @@ class Command extends Dependency {
 }
 
 Command.nextRunIndex = 1;
+
+Command.update = function(updatedFields) {
+    let rerun = {};
+    updatedFields.forEach(function(field) {
+        field.updated = true;
+        let command = field.getLastInitCommand(),
+            getDependent = function(cmd) {
+                cmd.dependentCommands.forEach(function(dep) {
+                    rerun[dep.runIndex] = dep;
+                    getDependent(dep);
+                });
+            };
+        getDependent(command);
+    });
+    let indices = Object.keys(rerun).sort();
+    indices.forEach(function(index) {
+        rerun[index].run();
+    });
+    Dependency.clearUpdated();
+}
 
 
 class Reference extends Dependency {
@@ -643,15 +677,42 @@ Reference.regex = /(?:[A-Za-z]+)(?:(?:\.[A-Za-z]+)+)?/g;
 
 
 class Drawable {
-    constructor() {}
+    constructor(scope) {
+        this.scope = scope;
+        this.origin = new Point(scope, null);
+        this.drawOrigin = {};
+    }
+
+    fetchOrigin() {
+        for(let i = 0; i < 2; i++) {
+            let index = i == 0 ? 'x' : 'y',
+                value = this.origin[index].getValue();
+            if(value == null) {
+                let scopeOrigin = this.scope.getField('origin.' + index);
+                if(scopeOrigin) value = scopeOrigin.getValue();
+            }
+            if(value == null) value = 0;
+            this.drawOrigin[index] = value;
+        }
+    }
+
     draw(context) {}
+
+    display(context) {
+        context.save();
+        this.fetchOrigin();
+        context.moveTo(this.drawOrigin.x, this.drawOrigin.y);
+        this.draw(context);
+        context.restore();
+    }
 }
 
 class Point extends Drawable {
-    constructor(scope) {
-        super();
-        this.x = new Field(scope, 0);
-        this.y = new Field(scope, 0);
+    constructor(scope, value) {
+        super(scope);
+        if(value === undefined) value = 0;
+        this.x = new Field(scope, value);
+        this.y = new Field(scope, value);
     }
 
     draw(context) {
@@ -660,14 +721,27 @@ class Point extends Drawable {
 
 class Circle extends Drawable {
 
-    constructor(scope) {
-        super();
-        this.center = new Point(scope);
-        this.radius = new Field(scope, 0);
+    constructor(scope, radius) {
+        super(scope);
+        this.radius = new Field(scope, radius);
     }
 
     draw(context) {
-        context.drawCircle(this.get('center.x'), this.get('center.y'), this.get('radius'));
+        context.arc(0, 0, this.radius.getValue());
+    }
+}
+
+class Arrow extends Drawable {
+    constructor(scope) {
+        super(scope);
+        this.components = {
+            x: new Field(scope),
+            y: new Field(scope)
+        };
+    }
+
+    draw(context) {
+        context.lineTo(this.components.x.getValue(), this.components.y.getValue());
     }
 }
 
@@ -738,6 +812,7 @@ Part.prototype.represent = function() {
     Dependency.each(function(dep) {
         dep.resolve();
     });
+    Dependency.clearUpdated();
     self.printData();
 };
 
