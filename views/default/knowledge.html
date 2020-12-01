@@ -123,12 +123,24 @@
                             <button class="concept-level-up-button btn btn-primary" type="button">Up A Level</button>
                         </div>
                         <div class="controls-right">
-                            <button class="explorer-mode-button btn btn-primary" mode="graph" type="button">Graph</button>
+                            <button class="explorer-mode-button btn btn-primary" mode="visual" type="button">Visual</button>
                             <button class="explorer-close-button btn btn-primary" type="button">X</button>
                         </div>
                         <div class="clear"></div>
                     </div>
                     <div class="concept-palette gojs-diagram"></div>
+                </div>
+                <div class="visual-wrapper concept-mode" mode="visual">
+                    <div class="visual-controls explorer-controls">
+                        <div class="controls-right">
+                            <button class="explorer-mode-button btn btn-primary" mode="graph" type="button">Graph</button>
+                            <button class="explorer-close-button btn btn-primary" type="button">X</button>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="concept-visual">
+                        <canvas class="visual-canvas"></canvas>
+                    </div>
                 </div>
                 <div class="explorer-new-left explorer-new">
                     <button class="explorer-new-left-button explorer-new-button btn btn-primary" type="button">
@@ -228,17 +240,6 @@
             <div id="suggestion-wrapper">
             </div>
         </div>
-
-        {{# And here we display the entire relation as a picture when you click 'Visualize' }}
-
-        <div id="visualization">
-            <div id="visualization-controls">
-                <button id="visualize-relation" type="button" class="btn btn-primary">Visualize</button>
-            </div>
-            <canvas id="visualization-canvas">
-            </canvas>
-        </div>
-
     </body>
 
 
@@ -296,13 +297,6 @@
         $(document).ready(function() {
 
             Part.buildRegex();
-
-            // below the diagram is the HTML5 canvas that will be used to visualize the relation
-            // (the canvas is created in knowledge.html, and visualization happens in represent.js)
-            let canvas = document.getElementById('visualization-canvas');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            Page.canvas = canvas.getContext('2d');
 
             $('#save-button').click(function(e) {
                 console.log('saving');

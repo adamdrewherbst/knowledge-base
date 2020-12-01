@@ -63,6 +63,9 @@
         .concept-explorer[diagram-mode="palette"] {
             flex-grow: 1;
         }
+        .concept-explorer[diagram-mode="visual"] {
+            flex-grow: 4;
+        }
 
         .concept-mode {
             width: 100%;
@@ -90,6 +93,20 @@
             flex-grow: 1;
             display: block;
             border: 1px solid black;
+        }
+
+        .visual-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .concept-visual {
+            width: 100%;
+            flex-grow: 1;
+        }
+
+        .visual-canvas {
+            border: 3px solid green;
         }
 
         .explorer-controls {

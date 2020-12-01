@@ -135,6 +135,7 @@ class Field extends Dependency {
 }
 
 Field.eachField = function(obj, callback, path) {
+    if(obj instanceof Scope) return;
     if(path === undefined) path = '';
     if(obj instanceof Field) callback.call(obj, obj, path);
     else for(let key in obj) Field.eachField(obj[key], callback, path + '.' + key);
@@ -318,6 +319,17 @@ class Scope extends Dependency {
         if(variable) return variable;
         if(this.parent) return this.parent.getVariable(name);
         return null;
+    }
+
+    eachVariable(callback) {
+        for(let name in this.variables) {
+            if(name === 'this') continue;
+            let variable = this.variables[name];
+            callback.call(variable, variable, name);
+        }
+        this.children.forEach(function(child) {
+            child.eachVariable(callback);
+        });
     }
 
     getField(path) {
@@ -679,11 +691,11 @@ Reference.regex = /(?:[A-Za-z]+)(?:(?:\.[A-Za-z]+)+)?/g;
 class Drawable {
     constructor(scope) {
         this.scope = scope;
-        this.origin = new Point(scope, null);
-        this.drawOrigin = {};
+        this.origin = {x: new Field(scope), y: new Field(scope)};
     }
 
-    fetchOrigin() {
+    getDrawOrigin() {
+        let drawOrigin = {};
         for(let i = 0; i < 2; i++) {
             let index = i == 0 ? 'x' : 'y',
                 value = this.origin[index].getValue();
@@ -692,17 +704,22 @@ class Drawable {
                 if(scopeOrigin) value = scopeOrigin.getValue();
             }
             if(value == null) value = 0;
-            this.drawOrigin[index] = value;
+            drawOrigin[index] = value;
         }
+        return drawOrigin;
     }
 
     draw(context) {}
 
     display(context) {
         context.save();
-        this.fetchOrigin();
-        context.moveTo(this.drawOrigin.x, this.drawOrigin.y);
+        let drawOrigin = this.getDrawOrigin();
+        context.translate(drawOrigin.x, drawOrigin.y);
+        context.beginPath();
+        context.lineWidth = 5;
+        context.strokeStyle='#202090';
         this.draw(context);
+        context.stroke();
         context.restore();
     }
 }
@@ -716,6 +733,7 @@ class Point extends Drawable {
     }
 
     draw(context) {
+        context.arc(0, 0, 1, 0, 2*Math.PI);
     }
 }
 
@@ -727,7 +745,7 @@ class Circle extends Drawable {
     }
 
     draw(context) {
-        context.arc(0, 0, this.radius.getValue());
+        context.arc(0, 0, this.radius.getValue(), 0, 2*Math.PI);
     }
 }
 

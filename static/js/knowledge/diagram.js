@@ -41,9 +41,12 @@
             self.$wrapper.find('.concept-mode').each(function(i, wrapper) {
                 let $wrapper = $(wrapper), mode = $wrapper.attr('mode'), $diagram = $wrapper.find('.gojs-diagram');
                 $diagram.attr('id', 'concept-' + mode + '-' + self.id);
+                let diagram = null;
+                if(mode == 'palette') diagram = self.makePalette($diagram);
+                else if(mode == 'graph') diagram = self.makeGraph($diagram);
                 self.modes[mode] = {
                     wrapper: $wrapper,
-                    diagram: mode == 'palette' ? self.makePalette($diagram) : self.makeGraph($diagram)
+                    diagram: diagram
                 };
             });
 
@@ -147,6 +150,9 @@
                 self.partEditing.setCommands(self.$commandsEdit.val());
             });
 
+            self.canvas = self.$wrapper.find('.visual-canvas')[0];
+            self.context2d = self.canvas.getContext('2d');
+
             self.shownLinkTypes = {'primary': true, 'secondary': true};
 
             self.setMode('graph');
@@ -214,6 +220,15 @@
                 obj.wrapper.show();
                 this.mode = mode;
                 this.$wrapper.attr('diagram-mode', mode);
+
+                if(this.mode == 'visual') {
+                    let $parent = $(this.canvas.parentElement);
+                    this.canvas.width = $parent.width();
+                    this.canvas.height = $parent.height();
+                    this.context2d.resetTransform();
+                    this.context2d.translate(this.canvas.width/2, this.canvas.height/2);
+                    this.visualize();
+                }
             }
 
             this.update();
@@ -255,6 +270,19 @@
 
         Explorer.prototype.removeMapOption = function(id) {
             this.$wrapper.find('.show-map-select > option[value="' + id + '"]').remove();
+        };
+
+        Explorer.prototype.visualize = function() {
+            let self = this;
+            if(!self.node) return;
+            self.node.represent();
+            self.node.eachIn(function(part) {
+                part.scope.eachVariable(function(variable) {
+                    if(variable instanceof Drawable) {
+                        variable.display(self.context2d);
+                    }
+                });
+            });
         };
 
 
