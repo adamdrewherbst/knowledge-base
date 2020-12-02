@@ -150,8 +150,63 @@
                 self.partEditing.setCommands(self.$commandsEdit.val());
             });
 
-            self.canvas = self.$wrapper.find('.visual-canvas')[0];
+            self.$canvas = self.$wrapper.find('.visual-canvas');
+            self.canvas = self.$canvas[0];
             self.context2d = self.canvas.getContext('2d');
+
+            self.mouseX = null;
+            self.mouseY = null;
+            self.pressX = null;
+            self.pressY = null;
+            self.isDragging = false;
+            self.editDrawable = null;
+            self.editProperty = null;
+
+            self.$canvas.mousemove(function(e) {
+                self.getMouseCoords(e);
+                if(self.isDragging) {
+                    if(self.editDrawable) {
+                        self.editDrawable.edit(self.pressX, self.pressY,
+                            self.mouseX - self.pressX, self.mouseY - self.pressY);
+                        self.editDrawable.propagateEdit();
+                        self.visualize();
+                    }
+                } else {
+                    let distance = Infinity;
+                    self.drawable = null;
+                    self.eachDrawable(function(drawable, name) {
+                        let distances = drawable.getDistances(self.mouseX, self.mouseY);
+                        /*console.log('distances from ' + self.mouseX + ',' + self.mouseY
+                            + ' to ' + this.idString + '.' + name);
+                        console.info(distances);//*/
+                        for(let name in distances) {
+                            if(distances[name] < distance) {
+                                self.editDrawable = drawable;
+                                self.editProperty = name;
+                                distance = distances[name];
+                            }
+                        }
+                    });
+                    if(self.editDrawable) self.editDrawable.suggest(self.editProperty);
+                }
+            }).mousedown(function(e) {
+                self.pressX = self.mouseX;
+                self.pressY = self.mouseY;
+                self.isDragging = true;
+                if(self.editDrawable) {
+                    self.editDrawable.setEdit(self.editProperty);
+                    console.log('editing ' + self.editProperty);
+                    console.log('clicked ' + self.pressX + ',' + self.pressY);
+                    console.log(self.editDrawable.getDistances(self.pressX, self.pressY));
+                }
+            }).mouseup(function(e) {
+                self.pressX = null;
+                self.pressY = null;
+                self.isDragging = false;
+                if(self.editDrawable) {
+                    self.editDrawable.setEdit(null);
+                }
+            });
 
             self.shownLinkTypes = {'primary': true, 'secondary': true};
 
@@ -227,6 +282,7 @@
                     this.canvas.height = $parent.height();
                     this.context2d.resetTransform();
                     this.context2d.translate(this.canvas.width/2, this.canvas.height/2);
+                    if(this.node) this.node.represent();
                     this.visualize();
                 }
             }
@@ -275,14 +331,35 @@
         Explorer.prototype.visualize = function() {
             let self = this;
             if(!self.node) return;
-            self.node.represent();
+            self.context2d.save();
+            self.context2d.resetTransform();
+            self.context2d.clearRect(0, 0, self.canvas.width, self.canvas.height);
+            self.context2d.restore();
+            self.eachDrawable(function(drawable) {
+                drawable.display(self.context2d);
+            });
+        };
+
+        Explorer.prototype.eachDrawable = function(callback) {
+            let self = this;
+            if(!self.node) return;
             self.node.eachIn(function(part) {
-                part.scope.eachVariable(function(variable) {
+                part.scope.eachVariable(function(variable, name) {
                     if(variable instanceof Drawable) {
-                        variable.display(self.context2d);
+                        callback.call(this, variable, name);
                     }
                 });
             });
+        };
+
+        Explorer.prototype.getMouseCoords = function(event) {
+            let self = this;
+            let offset = self.$canvas.offset(),
+                inverseTransform = self.context2d.getTransform().inverse();
+                pixels = new DOMPoint(event.pageX - offset.left, y = event.pageY - offset.top),
+                point = pixels.matrixTransform(inverseTransform);
+            self.mouseX = point.x;
+            self.mouseY = point.y;
         };
 
 

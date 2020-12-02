@@ -309,7 +309,8 @@ class Scope extends Dependency {
             value = new Field(this);
         self.variables[name] = value;
         Field.eachField(value, function(field, path) {
-            field.idString = self.idString + '.' + name + path;
+            if(!field.idString)
+                field.idString = self.idString + '.' + name + path;
         });
         return value;
     }
@@ -325,7 +326,7 @@ class Scope extends Dependency {
         for(let name in this.variables) {
             if(name === 'this') continue;
             let variable = this.variables[name];
-            callback.call(variable, variable, name);
+            callback.call(this, variable, name);
         }
         this.children.forEach(function(child) {
             child.eachVariable(callback);
@@ -338,9 +339,7 @@ class Scope extends Dependency {
         let field = null;
         try {
             field = eval(prefix + path);
-        } catch(error) {
-            console.error(error);
-        }
+        } catch(error) {}
         if(field) return field;
         if(this.parent) return this.parent.getField(path);
         return null;
@@ -586,7 +585,7 @@ Command.nextRunIndex = 1;
 
 Command.update = function(updatedFields) {
     let rerun = {};
-    updatedFields.forEach(function(field) {
+    Field.eachField(updatedFields, function(field) {
         field.updated = true;
         let command = field.getLastInitCommand(),
             getDependent = function(cmd) {
@@ -692,10 +691,14 @@ class Drawable {
     constructor(scope) {
         this.scope = scope;
         this.origin = {x: new Field(scope), y: new Field(scope)};
+        this._drawOrigin = {};
+        this._editProperty = null;
+        this._editField = {};
+        this._editPrevious = {};
+        this._locked = {};
     }
 
-    getDrawOrigin() {
-        let drawOrigin = {};
+    findOrigin() {
         for(let i = 0; i < 2; i++) {
             let index = i == 0 ? 'x' : 'y',
                 value = this.origin[index].getValue();
@@ -704,23 +707,67 @@ class Drawable {
                 if(scopeOrigin) value = scopeOrigin.getValue();
             }
             if(value == null) value = 0;
-            drawOrigin[index] = value;
+            this.origin[index].setValue(value);
         }
-        return drawOrigin;
     }
 
     draw(context) {}
 
     display(context) {
         context.save();
-        let drawOrigin = this.getDrawOrigin();
-        context.translate(drawOrigin.x, drawOrigin.y);
+        this.findOrigin();
+        context.translate(this.origin.x.getValue(), this.origin.y.getValue());
         context.beginPath();
         context.lineWidth = 5;
         context.strokeStyle='#202090';
         this.draw(context);
+        context.closePath();
         context.stroke();
         context.restore();
+    }
+
+    getDistance(x, y, obj) {
+        let objX = obj ? parseFloat(obj.x.getValue()) : 0,
+            objY = obj ? parseFloat(obj.y.getValue()) : 0;
+        if(obj !== this.origin) {
+            objX += this.origin.x.getValue();
+            objY += this.origin.y.getValue();
+        }
+        return Math.hypot(x - objX, y - objY);
+    }
+
+    getDistances(x, y) {
+        let distances = {};
+        distances.origin = this.getDistance(x, y, this.origin);
+        return distances;
+    }
+
+    suggest(property) {}
+
+    setEdit(property) {
+        let self = this;
+        if(!property || !self.hasOwnProperty(property)) {
+            self._editProperty = null;
+            return;
+        }
+        self._editProperty = property;
+        self._editField = {};
+        self._editPrevious = {};
+        Field.eachField(self[property], function(field, path) {
+            let ind = path.replace(/^\./,'');
+            self._editField[ind] = field;
+            self._editPrevious[ind] = field.getValue();
+        });
+    }
+
+    edit(x, y, dx, dy) {
+        let self = this, xField = self._editField.x, yField = self._editField.y;
+        if(xField) xField.setValue(self._editPrevious.x + dx);
+        if(yField) yField.setValue(self._editPrevious.y + dy);
+    }
+
+    propagateEdit() {
+        Command.update(this._editField);
     }
 }
 
@@ -735,6 +782,12 @@ class Point extends Drawable {
     draw(context) {
         context.arc(0, 0, 1, 0, 2*Math.PI);
     }
+
+    getDistances(x, y) {
+        let distances = {};
+        distances.this = this.getDistance(x, y, this);
+        return distances;
+    }
 }
 
 class Circle extends Drawable {
@@ -746,6 +799,20 @@ class Circle extends Drawable {
 
     draw(context) {
         context.arc(0, 0, this.radius.getValue(), 0, 2*Math.PI);
+    }
+
+    getDistances(x, y) {
+        let distances = super.getDistances(x, y);
+        distances.radius = Math.abs(this.getDistance(x, y) - parseFloat(this.radius.getValue()));
+        return distances;
+    }
+
+    edit(x, y, dx, dy) {
+        super.edit(x, y, dx, dy);
+        if(this._editProperty == 'radius') {
+            let dr = this.getDistance(x+dx, y+dy) - this.getDistance(x, y);
+            this.radius.setValue(this._editPrevious[''] + dr);
+        }
     }
 }
 
@@ -761,9 +828,14 @@ class Arrow extends Drawable {
     draw(context) {
         context.lineTo(this.components.x.getValue(), this.components.y.getValue());
     }
+
+    getDistances(x, y) {
+        let distances = super.getDistances(x, y);
+        distances.components = this.getDistance(x, y, this.components);
+    }
 }
 
-Drawable.instances = {Point: Point, Circle: Circle};
+Drawable.instances = {Point: Point, Circle: Circle, Arrow: Arrow};
 
 
 Part.prototype.getData = function() {
