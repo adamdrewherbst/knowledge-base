@@ -159,52 +159,75 @@
             self.pressX = null;
             self.pressY = null;
             self.isDragging = false;
-            self.editDrawable = null;
-            self.editProperty = null;
+            self.dragDrawable = null;
+            self.dragProperty = null;
+            self.dragPart = null;
 
             self.$canvas.mousemove(function(e) {
                 self.getMouseCoords(e);
                 if(self.isDragging) {
-                    if(self.editDrawable) {
-                        self.editDrawable.edit(self.pressX, self.pressY,
+                    if(self.dragDrawable) {
+                        //console.log('editing ' + self.dragProperty + ' of ' + self.dragDrawable.getIdString());
+                        self.dragDrawable.edit(self.pressX, self.pressY,
                             self.mouseX - self.pressX, self.mouseY - self.pressY);
-                        self.editDrawable.propagateEdit();
+                        self.dragDrawable.propagateEdit();
+                        self.visualize();
+                        //console.log('new value is ' + self.dragDrawable[self.dragProperty].value);
+                    } else if(self.dragPart) {
+                        console.log('editing position of ' + self.dragPart.getId());
+                        self.dragPart.editPosition(self.pressX, self.pressY,
+                            self.mouseX - self.pressX, self.mouseY - self.pressY);
+                        let newPos = self.dragPart.getPosition();
+                        console.log('new value is ' + newPos.x + ',' + newPos.y);
                         self.visualize();
                     }
                 } else {
                     let distance = Infinity;
-                    self.drawable = null;
-                    self.eachDrawable(function(drawable, name) {
-                        let distances = drawable.getDistances(self.mouseX, self.mouseY);
-                        /*console.log('distances from ' + self.mouseX + ',' + self.mouseY
-                            + ' to ' + this.idString + '.' + name);
-                        console.info(distances);//*/
-                        for(let name in distances) {
-                            if(distances[name] < distance) {
-                                self.editDrawable = drawable;
-                                self.editProperty = name;
-                                distance = distances[name];
+                    self.dragDrawable = null;
+                    self.dragPart = null;
+                    self.eachPart(function(part) {
+                        let position = part.getPosition(),
+                            x = self.mouseX - position.x,
+                            y = self.mouseY - position.y;
+                        part.eachDrawable(function(drawable) {
+                            let distances = drawable.getDistances(x, y);
+                            /*console.log('distances from ' + self.mouseX + ',' + self.mouseY
+                                + ' to ' + drawable.getIdString() + '.' + name);
+                            console.info(distances);//*/
+                            for(let name in distances) {
+                                if(distances[name] < distance && distances[name] < 20) {
+                                    self.dragDrawable = drawable;
+                                    self.dragProperty = name;
+                                    distance = distances[name];
+                                }
                             }
-                        }
+                            if(drawable.contains(x, y)) {
+                                self.dragPart = part;
+                            }
+                        });
                     });
-                    if(self.editDrawable) self.editDrawable.suggest(self.editProperty);
+                    if(self.dragDrawable) self.dragDrawable.suggest(self.editProperty);
+                    else if(self.dragPart) self.dragPart.suggestPosition();
                 }
             }).mousedown(function(e) {
                 self.pressX = self.mouseX;
                 self.pressY = self.mouseY;
                 self.isDragging = true;
-                if(self.editDrawable) {
-                    self.editDrawable.setEdit(self.editProperty);
-                    console.log('editing ' + self.editProperty);
+                if(self.dragDrawable) {
+                    self.dragDrawable.setEdit(self.dragProperty);
+                    console.log('editing ' + self.dragProperty);
                     console.log('clicked ' + self.pressX + ',' + self.pressY);
-                    console.log(self.editDrawable.getDistances(self.pressX, self.pressY));
+                    console.log(self.dragDrawable.getDistances(self.pressX, self.pressY));
+                } else if(self.dragPart) {
+                    console.log('selected part ' + self.dragPart.getId());
+                    self.dragPart.setEditPosition();
                 }
             }).mouseup(function(e) {
                 self.pressX = null;
                 self.pressY = null;
                 self.isDragging = false;
-                if(self.editDrawable) {
-                    self.editDrawable.setEdit(null);
+                if(self.dragDrawable) {
+                    //self.dragDrawable.setEdit(null);
                 }
             });
 
@@ -335,18 +358,32 @@
             self.context2d.resetTransform();
             self.context2d.clearRect(0, 0, self.canvas.width, self.canvas.height);
             self.context2d.restore();
-            self.eachDrawable(function(drawable) {
-                drawable.display(self.context2d);
+            self.eachPart(function(part) {
+                let pos = part.getPosition();
+                self.context2d.save();
+                self.context2d.translate(pos.x, pos.y);
+                part.eachDrawable(function(drawable) {
+                    drawable.display(self.context2d);
+                });
+                self.context2d.restore();
+            });
+        };
+
+        Explorer.prototype.eachPart = function(callback) {
+            let self = this;
+            if(!self.node) return false;
+            return self.node.eachIn(function(part) {
+                return callback.call(part, part);
             });
         };
 
         Explorer.prototype.eachDrawable = function(callback) {
             let self = this;
-            if(!self.node) return;
-            self.node.eachIn(function(part) {
-                part.scope.eachVariable(function(variable, name) {
+            if(!self.node) return false;
+            return self.node.eachIn(function(part) {
+                return part.scope.eachVariable(function(variable, name) {
                     if(variable instanceof Drawable) {
-                        callback.call(this, variable, name);
+                        return callback.call(this, variable, name);
                     }
                 });
             });
