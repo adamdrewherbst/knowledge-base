@@ -1,7 +1,132 @@
-class Dependency {
+class Node {
     constructor() {
-        this.id = Dependency.nextId++;
+        this.part = null;
+        this.scope = null;
         this.idString = null;
+        this.parent = null;
+        this.children = {};
+        this.value = null;
+    }
+
+    getIdString() {
+        return this.idString;
+    }
+
+    setIdString(str) {
+        this.idString = str;
+        Node.record[this.idString] = this;
+    }
+
+    getValue() {
+        return this.value;
+    }
+
+    setValue(value) {
+        this.value = value;
+    }
+
+    getPart() {
+        return this.part;
+    }
+
+    getScope() {
+        return this.scope;
+    }
+
+    getParent() {
+        return this.parent;
+    }
+
+    setParent(parent, name) {
+        this.parent = parent;
+        if(parent) {
+            this.part = parent.getPart();
+            this.scope = parent.getScope();
+            this.setIdString(parent.getIdString() + '.' + name);
+        }
+    }
+
+    addChild(name, value) {
+        if(typeof name === 'object' || typeof name === 'function') {
+            value = name;
+            name = 0;
+            while(this.children.hasOwnProperty(name)) name++;
+        }
+        if(value instanceof Part)
+            value = value.getData();
+        else if(typeof value === 'function')
+            value = new value();
+        else if(value === undefined)
+            value = new Field();
+        this.children[name] = value;
+        value.setParent(this, name);
+        return value;
+    }
+
+    getChild(name) {
+        if(!name) return this;
+        return this.children[name];
+    }
+
+    eachChild(callback) {
+        for(let name in this.children) {
+            let child = this.children[name];
+            if(callback.call(child, child) === false) return false;
+        }
+        return true;
+    }
+
+    getNode(path) {
+        let arr = path.split('.'), node = this;
+        arr.forEach(function(name) {
+            node = node.getChild(name);
+        });
+        return node;
+    }
+
+    eachField(callback) {
+        if(this instanceof Field) {
+            return callback.call(this, this) !== false;
+        }
+        for(let name in this.children) {
+            let child = this.children[name];
+            if(child instanceof Field) {
+                if(callback.call(child, child) === false) return false;
+            } else if(child.eachField(callback) === false) return false;
+        }
+        return true;
+    }
+
+    setLocked(locked) {
+        this.eachField(function(field) {
+            field.locked = true;
+        });
+    }
+
+    eachDrawable(callback) {
+        for(let name in this.children) {
+            let child = this.children[name];
+            if(child instanceof Drawable) {
+                if(callback.call(child, child) === false) return false;
+            } else if(child.eachDrawable(callback) === false) return false;
+        }
+        return true;
+    }
+}
+
+Node.record = {};
+Node.get = function(idString) {
+    return Node.record[idString];
+}
+function n(idString) {
+    return Node.get(idString);
+}
+
+
+class Dependency extends Node {
+    constructor() {
+        super();
+        this.id = Dependency.nextId++;
         Dependency.record[this.id] = this;
         this.dependsOn = {};
         this.dependsOnMe = {};
@@ -11,10 +136,6 @@ class Dependency {
 
     getId() {
         return this.id;
-    }
-
-    toString() {
-        return this.idString;
     }
 
     dependOn(dep, include) {
@@ -96,26 +217,12 @@ function d(data) { return Dependency.get(data); }
 
 
 class Field extends Dependency {
-    constructor(scope, value) {
+    constructor() {
         super();
-        this.scope = scope;
-        this.value = value;
         this.updated = false;
         this.lastInitCommand = null;
         this.lastEditCommand = null;
         this.locked = false;
-    }
-
-    getPart() {
-        return this.scope.getPart();
-    }
-
-    getValue() {
-        return this.value;
-    }
-
-    setValue(value) {
-        this.value = value;
     }
 
     getLastInitCommand() {
@@ -134,15 +241,6 @@ class Field extends Dependency {
         this.lastEditCommand = command;
     }
 }
-
-Field.eachField = function(obj, callback, path, level) {
-    if(typeof obj !== 'object') return;
-    if(obj instanceof Scope) return;
-    if(path === undefined) path = '';
-    if(level === undefined) level = 0;
-    if(obj instanceof Field) callback.call(obj, obj, path);
-    else for(let key in obj) Field.eachField(obj[key], callback, path + '.' + key, level + 1);
-};
 
 
 class Block {
@@ -261,100 +359,46 @@ class Block {
 class Scope extends Dependency {
     constructor(parent, variables, commands) {
         super();
-        this.setParent(parent);
-        this.variables = {};
+        if(parent instanceof Part) {
+            this.part = parent;
+        } else {
+            this.setParent(parent);
+        }
+        this.addChild('variables', Node);
         if(typeof variables === 'object')
             for(let name in variables) {
                 this.addVariable(name, variables[name]);
             }
         this.commandStrings = commands || [];
-        this.commands = [];
-        this.children = [];
-    }
-
-    getPart() {
-        return this.part;
-    }
-
-    setParent(parent) {
-        if(parent instanceof Part) {
-            this.part = parent;
-            this.idString = '' + parent.getId();
-        } else {
-            this.parent = parent;
-            this.part = parent.part;
-            if(parent) parent.addChild(this);
-            this.idString = parent.idString + '.' + parent.children.length;
-        }
-    }
-
-    addChild(scope) {
-        this.children.push(scope);
-    }
-
-    eachChild(callback) {
-        this.children.forEach(function(child) {
-            callback.call(child, child);
-        });
+        this.addChild('commands', Node);
     }
 
     getData() {
-        return this.variables;
+        return this.getChild('variables');
+    }
+
+    getCommands() {
+        return this.getChild('commands');
     }
 
     addVariable(name, value) {
-        let self = this;
-        if(value instanceof Part)
-            value = value.getData();
-        else if(typeof value === 'function')
-            value = new value(this);
-        else if(value === undefined)
-            value = new Field(this);
-        self.variables[name] = value;
-        if(value instanceof Drawable) {
-            value.setIdString(self.idString + '.' + name);
-        }
-        Field.eachField(value, function(field, path) {
-            if(!field.idString)
-                field.idString = self.idString + '.' + name + path;
-        });
-        return value;
+        return this.getData().addChild(name, value);
     }
 
     getVariable(name) {
-        let variable = this.variables[name];
+        let variable = this.getData().getChild(name);
         if(variable) return variable;
         if(this.parent) return this.parent.getVariable(name);
         return null;
     }
 
-    eachVariable(callback) {
-        for(let name in this.variables) {
-            if(name === 'this') continue;
-            let variable = this.variables[name];
-            if(callback.call(this, variable, name) === false) return false;
-        }
-        this.children.forEach(function(child) {
-            child.eachVariable(callback);
-        });
-        return true;
-    }
-
     eachDrawable(callback) {
-        this.eachVariable(function(variable) {
-            if(variable instanceof Drawable)
-                callback.call(variable, variable);
-        });
+        return this.getData().eachDrawable(callback);
     }
 
     getField(path) {
-        let prefix = 'this.variables';
-        if(path[0] !== '.') prefix += '.';
-        let field = null;
-        try {
-            field = eval(prefix + path);
-        } catch(error) {}
-        if(field) return field;
+        let field = this.getData().getNode(path);
+        if(field instanceof Field) return field;
         if(this.parent) return this.parent.getField(path);
         return null;
     }
@@ -371,92 +415,36 @@ class Scope extends Dependency {
         let self = this;
         self.commandStrings.forEach(function(commandStr) {
             if(!commandStr) return;
-            let command = new Command(self, commandStr);
-            command.parse();
-            self.commands.push(command);
+            let command = new Command(commandStr);
+            self.getCommands().addChild(command);
             self.dependOn(command);
+            command.parse();
         });
     }
 
     execute() {
-        let self = this;
-        self.commands.forEach(function(command) {
+        let self = this, i = 0, command = null;
+        while((command = self.getCommands().getChild(i++)) instanceof Command) {
             command.run();
-        });
+        }
     }
 
     printFields() {
         let self = this;
-        Field.eachField(self.variables, function(field, path) {
+        self.getData().eachField(function(field) {
             if(field.scope === self)
-                console.log(field.idString + ' = ' + field.getValue());
+                console.log(field.getIdString() + ' = ' + field.getValue());
         });
-        self.children.forEach(function(child) {
+        self.eachChild(function(child) {
             child.printFields();
-        })
-    }
-
-    getPosition() {
-        let pos = this.variables.position;
-        if(typeof pos === 'object') {
-            let x = pos.x.getValue(), y = pos.y.getValue();
-            if(typeof x === 'number' && typeof y === 'number')
-                return {x: x, y: y};
-        }
-        return null;
-    }
-
-    eachDisplayable(callback) {
-        for(let name in this.variables) {
-            if(name === 'this') continue;
-            let variable = this.variables[name];
-            if(variable instanceof Drawable) callback.call(variable, variable);
-        }
-        this.children.forEach(function(child) {
-            callback.call(child, child);
         });
     }
 }
 
-Scope.display = function(obj, context) {
-    let position = obj.getPosition();
-    context.save();
-    context.translate(position.x, position.y);
-    if(obj instanceof Drawable) {
-        obj.display(context);
-    } else if(obj instanceof Scope) {
-        obj.eachDisplayable(function(displayable) {
-            Scope.display(displayable, context);
-        });
-    }
-    context.restore();
-};
-
-Scope.getMouseProperty = function(obj, x, y, ret) {
-    if(!ret.hasOwnProperty('distance')) ret.distance = Infinity;
-    let position = obj.getPosition();
-    x -= position.x;
-    y -= position.y;
-    let distance = Math.hypot(x, y);
-    if(distance < ret.distance) {
-        ret.distance = distance;
-        ret.property = 'position';
-        ret.owner = obj;
-    }
-    if(obj instanceof Drawable) {
-        obj.getMouseProperty(x, y, ret);
-    } else if(obj instanceof Scope) {
-        obj.eachDisplayable(function(displayable) {
-            Scope.getMouseProperty(displayable, x, y, ret);
-        });
-    }
-};
-
 
 class Command extends Dependency {
-    constructor(scope, str) {
+    constructor(str) {
         super();
-        this.scope = scope;
         this.str = str;
         this.index = 0;
         this.operator = null;
@@ -469,11 +457,6 @@ class Command extends Dependency {
         this.dependentCommands = [];
         this.hasRun = false;
         this.runIndex = null;
-        this.idString = scope.idString + '-' + (scope.commands.length+1);
-    }
-
-    toString() {
-        return this.idString + ': ' + this.str;
     }
 
     parse() {
@@ -657,7 +640,8 @@ Command.nextRunIndex = 1;
 
 Command.update = function(updatedFields) {
     let rerun = {};
-    Field.eachField(updatedFields, function(field) {
+    for(let name in updatedFields) {
+        let field = updatedFields[name];
         field.updated = true;
         let command = field.getLastInitCommand(),
             getDependent = function(cmd) {
@@ -667,7 +651,7 @@ Command.update = function(updatedFields) {
                 });
             };
         if(command) getDependent(command);
-    });
+    }
     let indices = Object.keys(rerun).sort();
     indices.forEach(function(index) {
         rerun[index].run();
@@ -759,26 +743,16 @@ Reference.regex = /(?:[A-Za-z]+)(?:(?:\.[A-Za-z]+)+)?/g;
 
 
 
-class Drawable {
-    constructor(scope) {
-        this.scope = scope;
+class Drawable extends Node {
+    constructor() {
         if(!(this instanceof Point)) {
-            this.position = new Point(scope, 0);
-            this.position._locked.x = true;
-            this.position._locked.y = true;
+            this.addChild('position', Point).setLocked(true);
         }
-        this._editProperty = null;
-        this._editField = {};
-        this._editPrevious = {};
-        this._locked = {};
-        this._idString = null;
-    }
-
-    setIdString(str) {
-        this._idString = str;
-    }
-    getIdString() {
-        return this._idString;
+        this.editProperty = null;
+        this.editField = {};
+        this.editPrevious = {};
+        this.locked = {};
+        this.idString = null;
     }
 
     draw(context) {}
@@ -823,37 +797,36 @@ class Drawable {
     setEdit(property) {
         let self = this;
         if(property !== 'this' && (!property || !self.hasOwnProperty(property))) {
-            self._editProperty = null;
+            self.editProperty = null;
             return;
         }
-        self._editProperty = property;
-        self._editField = {};
-        self._editPrevious = {};
+        self.editProperty = property;
+        self.editField = {};
+        self.editPrevious = {};
         let obj = property === 'this' ? this : self[property];
         Field.eachField(obj, function(field, path) {
             let ind = path.replace(/^\./,'');
-            self._editField[ind] = field;
-            self._editPrevious[ind] = field.getValue();
+            self.editField[ind] = field;
+            self.editPrevious[ind] = field.getValue();
         });
     }
 
     edit(x, y, dx, dy) {
-        let self = this, xField = self._editField.x, yField = self._editField.y;
-        if(xField) xField.setValue(self._editPrevious.x + dx);
-        if(yField) yField.setValue(self._editPrevious.y + dy);
+        let self = this, xField = self.editField.x, yField = self.editField.y;
+        if(xField) xField.setValue(self.editPrevious.x + dx);
+        if(yField) yField.setValue(self.editPrevious.y + dy);
     }
 
     propagateEdit() {
-        Command.update(this._editField);
+        Command.update(this.editField);
     }
 }
 
 class Point extends Drawable {
     constructor(scope, value) {
         super(scope);
-        if(value === undefined) value = 0;
-        this.x = new Field(scope, value);
-        this.y = new Field(scope, value);
+        this.addChild('x', Field);
+        this.addChild('y', Field);
     }
 
     draw(context) {
@@ -862,7 +835,7 @@ class Point extends Drawable {
 
     getDistances(x, y) {
         let distances = {};
-        if(!this._locked.x && !this._locked.y) {
+        if(!this.locked.x && !this.locked.y) {
             distances.this = this.getDistance(x, y, this);
         }
         return distances;
@@ -871,59 +844,57 @@ class Point extends Drawable {
 
 class Circle extends Drawable {
 
-    constructor(scope, radius) {
-        super(scope);
-        this.radius = new Field(scope, radius);
+    constructor() {
+        super();
+        this.addChild('radius', Field);
     }
 
     draw(context) {
-        context.arc(0, 0, this.radius.getValue(), 0, 2*Math.PI);
+        context.arc(0, 0, this.getValue('radius'), 0, 2*Math.PI);
     }
 
     getDistances(x, y) {
         let distances = super.getDistances(x, y);
         if(!this.radius.locked) {
-            distances.radius = Math.abs(this.getDistance(x, y) - parseFloat(this.radius.getValue()));
+            distances.radius = Math.abs(this.getDistance(x, y) - parseFloat(this.getValue('radius')));
         }
         return distances;
     }
 
     contains(x, y) {
-        return this.getDistance(x, y) < this.radius.getValue();
+        return this.getDistance(x, y) < this.getValue('radius');
     }
 
     edit(x, y, dx, dy) {
         super.edit(x, y, dx, dy);
-        if(this._editProperty == 'radius') {
+        if(this.editProperty == 'radius') {
             let dr = this.getDistance(x+dx, y+dy) - this.getDistance(x, y);
-            this.radius.setValue(this._editPrevious[''] + dr);
-            console.log('changed radius by ' + dr + ' to ' + this.radius.value);
+            this.setValue('radius', this.editPrevious[''] + dr);
+            console.log('changed radius by ' + dr + ' to ' + this.getValue('radius'));
         }
     }
 }
 
 class Arrow extends Drawable {
-    constructor(scope) {
-        super(scope);
-        this.components = {
-            x: new Field(scope),
-            y: new Field(scope)
-        };
+    constructor() {
+        super();
+        this.addChild('x', Field);
+        this.addChild('y', Field);
     }
 
     draw(context) {
-        context.lineTo(this.components.x.getValue(), this.components.y.getValue());
+        context.lineTo(this.getValue('x'), this.getValue('y'));
     }
 
     contains(x, y) {
-        let sum = this.getDistance(x, y) + this.getDistance(x, y, this.components),
-            length = Math.hypot(this.components.x.getValue(), this.components.y.getValue());
+        let sum = this.getDistance(x, y) + this.getDistance(x, y, this),
+            length = Math.hypot(this.getValue('x'), this.getValue('y'));
         return sum < 1.1 * length;
     }
 
     getDistances(x, y) {
         let distances = super.getDistances(x, y);
-        distances.components = this.getDistance(x, y, this.components);
+        distances.this = this.getDistance(x, y);
         return distances;
     }
 }

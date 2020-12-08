@@ -158,6 +158,8 @@
             self.mouseY = null;
             self.pressX = null;
             self.pressY = null;
+            self.mouseCoords = null;
+            self.pressCoords = null;
             self.isDragging = false;
             self.dragDrawable = null;
             self.dragProperty = null;
@@ -210,10 +212,8 @@
                     else if(self.dragPart) self.dragPart.suggestPosition();
                 }
             }).mousedown(function(e) {
-                self.pressX = self.mouseX;
-                self.pressY = self.mouseY;
-                self.isDragging = true;
                 if(self.dragDrawable) {
+                    self.dragPart = self.dragDrawable.getPart();
                     self.dragDrawable.setEdit(self.dragProperty);
                     console.log('editing ' + self.dragProperty);
                     console.log('clicked ' + self.pressX + ',' + self.pressY);
@@ -222,6 +222,10 @@
                     console.log('selected part ' + self.dragPart.getId());
                     self.dragPart.setEditPosition();
                 }
+                self.getMouseCoords(e);
+                self.pressX = self.mouseX;
+                self.pressY = self.mouseY;
+                self.isDragging = true;
             }).mouseup(function(e) {
                 self.pressX = null;
                 self.pressY = null;
@@ -397,6 +401,11 @@
                 point = pixels.matrixTransform(inverseTransform);
             self.mouseX = point.x;
             self.mouseY = point.y;
+            if(self.isDragging) {
+                let partPos = self.dragPart.getPosition();
+                self.mouseX -= partPos.x;
+                self.mouseY -= partPos.y;
+            }
         };
 
 
