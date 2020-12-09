@@ -2,6 +2,7 @@ class Node {
     constructor() {
         this.part = null;
         this.scope = null;
+        this.name = null;
         this.idString = null;
         this.parent = null;
         this.children = {};
@@ -14,17 +15,22 @@ class Node {
     setIdString(str) {
         this.idString = str;
         Node.record[this.idString] = this;
-        this.eachChild(function(child, name) {
-            child.setIdString(str + '.' + name);
-        });
     }
 
     getPart() {
         return this.part;
     }
 
+    setPart(part) {
+        this.part = part;
+    }
+
     getScope() {
         return this.scope;
+    }
+
+    setScope(scope) {
+        this.scope = scope;
     }
 
     getParent() {
@@ -33,11 +39,16 @@ class Node {
 
     setParent(parent, name) {
         this.parent = parent;
+        this.name = name;
         if(parent) {
-            this.part = parent.getPart();
+            this.setPart(parent.getPart());
             if(!(this instanceof Scope))
-                this.scope = parent.getScope();
+                this.setScope(parent.getScope());
             this.setIdString(parent.getIdString() + '.' + name);
+            let self = this;
+            this.eachChild(function(child, name) {
+                child.setParent(self, name);
+            });
         }
     }
 
@@ -102,38 +113,32 @@ class Node {
         if(node instanceof Field) node.setValue(value);
     }
 
-    eachField(callback, path) {
-        path = path || '';
-        if(this instanceof Field) {
-            return callback.call(this, this, path) !== false;
-        }
-        for(let name in this.children) {
-            let child = this.children[name], newPath = path + '.' + name;
-            if(child instanceof Field) {
-                if(callback.call(child, child, newPath) === false) return false;
-            } else if(child.eachField(callback, newPath) === false) return false;
-        }
-        return true;
-    }
-
     setLocked(locked) {
         this.eachField(function(field) {
             field.setLocked(true);
         });
     }
 
-    eachDrawable(callback, path) {
+    each(callback, path, type) {
         path = path || '';
-        if(this instanceof Drawable) {
+        if(!type || this instanceof type)
             return callback.call(this, this, path) !== false;
-        }
         for(let name in this.children) {
             let child = this.children[name], newPath = path + '.' + name;
-            if(child instanceof Drawable) {
+            if(child.getParent() !== this) continue;
+            if(!type || child instanceof type) {
                 if(callback.call(child, child, newPath) === false) return false;
-            } else if(child.eachDrawable(callback, newPath) === false) return false;
+            } else if(child.each(callback, newPath, type) === false) return false;
         }
         return true;
+    }
+
+    eachField(callback, path) {
+        return this.each(callback, path, Field);
+    }
+
+    eachDrawable(callback, path) {
+        return this.each(callback, path, Drawable);
     }
 }
 
@@ -200,6 +205,10 @@ class Dependency extends Node {
                 this.dependsOnMe[id].resolve(this);
             }
         } else this.resolved = false;
+    }
+
+    hasResolved() {
+        return this.resolved;
     }
 
     process(dep) {}
@@ -429,6 +438,10 @@ class Scope extends Dependency {
         return this.parent ? this.parent.scope : null;
     }
 
+    getIndex() {
+        return this.name;
+    }
+
     getData() {
         return this.getChild('var');
     }
@@ -458,7 +471,10 @@ class Scope extends Dependency {
     }
 
     eachDrawable(callback) {
-        return this.getData().eachDrawable(callback);
+        if(this.getData().eachDrawable(callback) === false) return false;
+        return this.eachSubScope(function(sub) {
+            return sub.eachDrawable(callback);
+        });
     }
 
     addCommands(commands) {
@@ -489,10 +505,18 @@ class Scope extends Dependency {
         let self = this;
         self.commandStrings.forEach(function(commandStr) {
             if(!commandStr) return;
+            let firstOnly = commandStr.match(/^1:\s*/);
+            if(firstOnly) {
+                if(self.getIndex() > 0) return;
+                commandStr = commandStr.substring(firstOnly[0].length);
+            }
             let command = new Command(commandStr);
-            self.getCommands().addChild(command);
-            self.dependOn(command);
+            if(!command) return;
+            let scope = firstOnly ? self.getParentScope() : self;
+            scope.getCommands().addChild(command);
+            scope.dependOn(command);
             command.parse();
+            if(scope.hasResolved()) command.resolve();
         });
     }
 
@@ -601,7 +625,7 @@ class Command extends Dependency {
         }
         for(let key in newFields) {
             let field = newFields[key];
-            if(field.getPart() === this) continue;
+            if(field.getPart() === this.getPart()) continue;
             let read = this.twoWay || (index > 0),
                 write = this.twoWay || (index == 0);
             if(read) this.dependOn(field);
@@ -609,16 +633,6 @@ class Command extends Dependency {
         }
         this.fields[index] = newFields;
         this.previous[index] = {};
-    }
-
-    getPath(field) {
-        if(!field) return [null, null];
-        for(let index in this.fields) {
-            for(let path in this.fields[index]) {
-                if(this.fields[index][path] === field) return [index, path];
-            }
-        }
-        return [null, null];
     }
 
     allReferencesResolved() {
@@ -654,11 +668,10 @@ class Command extends Dependency {
                 if(this.edits(i)) {
                     if(!this.hasRun) {
                         field.setLastEditCommand(this);
-                        if(!this.reads(i)) {
-                            if(i == 0 && this.references.length == 1)
-                                field.setLastInitCommand(this);
-                            else field.locked = true;
-                        }
+                        if(this.references.length > 1)
+                            field.setLocked(true);
+                        else if(!this.reads(i))
+                            field.setLastInitCommand(this);
                     }
                     else field.setValue(this.previous[i][path]);
                 }
@@ -822,14 +835,17 @@ class Drawable extends Node {
             this.addChild('position', Point).setLocked(true);
         }
         this.editProperty = null;
+        this.hidden = false;
     }
 
     draw(context) {}
 
     display(context) {
+        if(this.hidden) return;
         context.save();
-        if(this.position) {
-            context.translate(this.position.x.getValue(), this.position.y.getValue());
+        let pos = this.getChild('position');
+        if(pos) {
+            context.translate(pos.getValue('x'), pos.getValue('y'));
         }
         context.lineWidth = 5;
         context.strokeStyle='#202090';
@@ -841,17 +857,17 @@ class Drawable extends Node {
     }
 
     getDistance(x, y, property) {
-        let xField = null, yField = null;
+        let node = null, xField = null, yField = null;
         if(property) {
-            let node = this.getChild(property);
+            node = property instanceof Node ? property : this.getChild(property);
             xField = node.getChild('x');
             yField = node.getChild('y');
-            if(!xField || !yField || xField.isLocked() || yField.isLocked()) return NaN;
+            if(!xField || !yField) return NaN;
         }
         let propertyX = xField ? parseFloat(xField.getValue()) : 0,
             propertyY = yField ? parseFloat(yField.getValue()) : 0;
         let position = this.getChild('position');
-        if(position && property !== 'position') {
+        if(position && node !== position) {
             propertyX += position.getValue('x');
             propertyY += position.getValue('y');
         }
@@ -875,8 +891,9 @@ class Drawable extends Node {
             this.editProperty = null;
             return;
         }
-        this.editProperty = this.getChild(property);
-        this.editProperty.eachField(function(field) {
+        if(property == 'this') this.editProperty = this;
+        else this.editProperty = this.getChild(property);
+        if(this.editProperty) this.editProperty.eachField(function(field) {
             field.setPreviousValue();
         });
     }
@@ -949,23 +966,28 @@ class Circle extends Drawable {
 class Arrow extends Drawable {
     constructor() {
         super();
-        this.addChild('x', Field);
-        this.addChild('y', Field);
+        let components = this.addChild('components', Node);
+        components.addChild('x', Field);
+        components.addChild('y', Field);
     }
 
     draw(context) {
-        context.lineTo(this.getValue('x'), this.getValue('y'));
+        context.moveTo(0, 0);
+        context.lineTo(this.getValue('components.x'), this.getValue('components.y'));
     }
 
     contains(x, y) {
-        let sum = this.getDistance(x, y) + this.getDistance(x, y, this),
-            length = Math.hypot(this.getValue('x'), this.getValue('y'));
+        let sum = this.getDistance(x, y) + this.getDistance(x, y, 'components'),
+            length = Math.hypot(this.getValue('components.x'), this.getValue('components.y'));
         return sum < 1.1 * length;
     }
 
     getDistances(x, y) {
         let distances = super.getDistances(x, y);
-        distances.this = this.getDistance(x, y);
+        let components = this.getChild('components');
+        if(!components.getChild('x').isLocked() && !components.getChild('y').isLocked()) {
+            distances.components = this.getDistance(x, y, 'components');
+        }
         return distances;
     }
 }
@@ -979,7 +1001,7 @@ Part.prototype.getData = function() {
 
 Part.prototype.parseCommands = function() {
 
-    let self = this, commandStr = self.getCommands(), re = Part.regex.predicate, predicate = null, index = 0;
+    let self = this, commandStr = self.getAllCommands(), re = Part.regex.predicate, predicate = null, index = 0;
     re.lastIndex = 0;
 
     while((predicate = re.exec(commandStr)) !== null) {
@@ -1058,6 +1080,19 @@ Part.prototype.printData = function() {
     });
 };
 
+Part.prototype.display = function(context) {
+    let self = this;
+    if(self.hidden) return;
+    let pos = self.getPosition();
+    context.save();
+    context.translate(pos.x, pos.y);
+    self.eachDrawable(function(drawable) {
+        console.log('part ' + self.id + ' drawing ' + drawable.idString + (drawable.hidden ? ' (hidden)' : ''));
+        drawable.display(context);
+    });
+    context.restore();
+};
+
 Part.prototype.eachDrawable = function(callback) {
     return this.scope.eachDrawable(callback);
 };
@@ -1068,6 +1103,14 @@ Part.prototype.getPosition = function() {
         x: pos.getValue('x'),
         y: pos.getValue('y')
     };
+};
+
+Part.prototype.getPreviousPosition = function() {
+    let pos = this.scope.getVariable('position');
+    return {
+        x: pos.getChild('x').getPreviousValue(),
+        y: pos.getChild('y').getPreviousValue()
+    }
 };
 
 Part.prototype.setEditPosition = function() {

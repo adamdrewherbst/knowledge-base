@@ -546,6 +546,23 @@
             return this.concept.getCommands();
         };
 
+        Part.prototype.getAllCommands = function() {
+            let commands = '';
+            this.eachIsA(function(part) {
+                let partCommands = part.getConcept().getCommands();
+                if(commands && commands[commands.length-1] !== '\n')
+                    commands += '\n';
+                commands += partCommands;
+            }, {
+                recursive: true,
+                topDown: true
+            });
+            if(commands && commands[commands.length-1] !== '\n')
+                commands += '\n';
+            commands += this.concept.getCommands();
+            return commands;
+        };
+
         Part.prototype.setCommands = function(commands) {
             this.concept.setCommands(commands);
         };
@@ -880,14 +897,21 @@
             return this.eachLink('outgoing', callback);
         };
 
-        Part.prototype.eachIsA = function(callback, recursive, checked) {
-            let self = this;
+        Part.prototype.eachIsA = function(callback, opts, checked) {
+            let self = this, recursive = false, topDown = false;
+            if(typeof opts === 'boolean') recursive = opts;
+            else if(opts && typeof opts === 'object') {
+                recursive = opts.recursive;
+                topDown = opts.topDown;
+            }
             if(recursive && !checked) checked = {};
             return self.each(['>', Concept.isA, '*'], function(node) {
-                callback.call(node, node, node.getId());
+                if(!topDown) callback.call(node, node, node.getId());
                 if(recursive && !checked[node.getId()] &&
                     node.eachIsA(callback, true, checked) === false) return false;
+                if(topDown) callback.call(node, node, node.getId());
             });
+            return true;
         };
 
         Part.prototype.printLinks = function() {

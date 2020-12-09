@@ -210,6 +210,7 @@
                     else if(self.dragPart) self.dragPart.suggestPosition();
                 }
             }).mousedown(function(e) {
+                self.isDragging = true;
                 if(self.dragDrawable) {
                     self.dragPart = self.dragDrawable.getPart();
                     self.dragDrawable.setEdit(self.dragProperty);
@@ -223,7 +224,6 @@
                 self.getMouseCoords(e);
                 self.pressX = self.mouseX;
                 self.pressY = self.mouseY;
-                self.isDragging = true;
             }).mouseup(function(e) {
                 self.pressX = null;
                 self.pressY = null;
@@ -361,13 +361,7 @@
             self.context2d.clearRect(0, 0, self.canvas.width, self.canvas.height);
             self.context2d.restore();
             self.eachPart(function(part) {
-                let pos = part.getPosition();
-                self.context2d.save();
-                self.context2d.translate(pos.x, pos.y);
-                part.eachDrawable(function(drawable) {
-                    drawable.display(self.context2d);
-                });
-                self.context2d.restore();
+                part.display(self.context2d);
             });
         };
 
@@ -397,8 +391,8 @@
                 point = pixels.matrixTransform(inverseTransform);
             self.mouseX = point.x;
             self.mouseY = point.y;
-            if(self.isDragging) {
-                let partPos = self.dragPart.getPosition();
+            if(self.isDragging && self.dragPart) {
+                let partPos = self.dragPart.getPreviousPosition();
                 self.mouseX -= partPos.x;
                 self.mouseY -= partPos.y;
             }
