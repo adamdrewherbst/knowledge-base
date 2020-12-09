@@ -158,8 +158,6 @@
             self.mouseY = null;
             self.pressX = null;
             self.pressY = null;
-            self.mouseCoords = null;
-            self.pressCoords = null;
             self.isDragging = false;
             self.dragDrawable = null;
             self.dragProperty = null;
@@ -385,10 +383,8 @@
             let self = this;
             if(!self.node) return false;
             return self.node.eachIn(function(part) {
-                return part.scope.eachVariable(function(variable, name) {
-                    if(variable instanceof Drawable) {
-                        return callback.call(this, variable, name);
-                    }
+                return part.scope.eachDrawable(function(drawable) {
+                    return callback.call(this, drawable);
                 });
             });
         };
