@@ -1,173 +1,249 @@
 PURPOSE
 
-This is a website that is an aid for students learning physics.  It could 
-potentially be used for other subjects as well.  I am publishing it under the 
-GNU General Public License version 3.  I am asking anyone interested to help me 
-with this site, as I believe it can be valuable but it could really use strong 
-coders to keep it going.
-
+This is a website that is an aid for students learning physics.  It could
+potentially be used for other subjects as well.  It is under the
+GNU General Public License version 3.
 
 CONCEPT
 
-This site makes use of a directed labelled knowledge graph, where each vertex and 
-each edge contains a concept.  No two vertices contain the same concept, ie. each 
+This site makes use of a directed labelled knowledge graph, where each vertex and
+each edge contains a concept.  No two vertices contain the same concept, ie. each
 vertex defines a new concept.  However, multiple edges can share the same concept.
 
 Often, the vertex concepts will correspond to nouns - eg. body, mass, velocity,
 surface, sum, product, integral, interval, etc.  Many edge concepts will correspond to
 prepositions - thus, an edge with its two vertices will correspond to phrases such as:
 
-  mass OF body
-  interval FROM quantity
-  interval TO quantity
-  force ON body
-  force OF body
-  sum OF quantity
+      mass OF body
+      interval FROM quantity
+      interval TO quantity
+      force ON body
+      force OF body
+      sum OF quantity
 
 The concept in a vertex can correspond to a general concept, like those mentioned above,
-or a specific instantation of a more general concept.  In the latter case, the vertex
+*or* a specific instance of a more general concept.  In the latter case, the vertex
 will have an edge with the concept 'IS A' pointing to the general concept it instantiates.
 For example:
 
-  force IS A vector
-  vector IS A quantity
-  'my force' IS A force
+      force IS A vector
+      vector IS A quantity
+      'my force' IS A force
 
 Here 'my force' represents a specific force mentioned in a specific problem.
 
 Each concept has an ID, description, synonyms, etc., so multiple concepts can have the same
 name and we can still distinguish one from another.
 
-In addition to the special 'IS A' concept which organizes concepts hierarchically, there is 
+In addition to the special 'IS A' concept which organizes concepts in terms of inheritance, there is
 an 'IN' concept which organizes them into categories.  For example:
 
-  force IN physics
-  vector IN mathematics
-  geometry IN mathematics
+      force IN Newtonian physics
+      Newtonian physics IN physics
+      vector IN mathematics
+      geometry IN mathematics
 
 When a student inputs a problem description, they choose one or more categories to place it
 in.  A vertex is created for the problem, and it is categorized appropriately.
 
-  'problem 17' IN thermodynamics
+        'problem 17' IN thermodynamics
 
 The concepts the student adds to the problem description are categorized
 within the problem's vertex:
 
-  'my force' IN 'problem 17'
-  'my body' IN 'problem 17'
+      'my force' IN 'problem 17'
+      'my force' IS A force
+      'my body' IN 'problem 17'
+      'my body' IS A body
+
+Aside from the IN edges that group them into the same description, and the 'IS A' edges that
+state what concepts they instantiate, the vertices in either a law or problem description have
+edges between them to indicate the relations between them.  For example,
+
+      'my force' OF 'my body'
+      'my force' ON 'other body'
+      'my velocity' OF 'my body'
+      'my velocity' AT 'time 1'
+      'other velocity' OF 'other body'
+      'other velocity' AT 'time 2'
 
 Each general law, such as the law of conservation of energy, is also given its own vertex,
 and each concept within its description is 'IN' it.
 
 A general law also has one or more predicates - each predicate also receives a vertex, eg.
-'predicate 1' IS A predicate, and the subgraph of the law that corresponds to the predicate 
-is all marked as 'IN' the predicate.
 
-Aside from the IN edges that group them into the same description, and the 'IS A' edges that
-state what concepts they instantiate, the vertices in either a law or problem description have 
-edges between them to indicate the relations between them.  For example,
+        'predicate 1' OF 'Newton's 2nd Law'
+        'predicate 1' IS A predicate
 
-  'my force' OF 'my body'
-  'my force' ON 'other body'
-  'my velocity' OF 'my body'
-  'my velocity' AT 'time 1'
-  'other velocity' OF 'other body'
-  'other velocity' AT 'time 2'
+where 'predicate' and 'OF' are built-in meta-concepts.
 
-Hence, just as classes and instances are represented by the same type of entity, a 'concept', a general
-law and a specific case are each represented by a simple directed graph.
+The subgraph of the law that corresponds to the predicate is all marked as 'IN' the predicate.
+But there is a key difference: the predicate does not consist of vertices, but rather *the edges between them*.
+Remember, each vertex defines a unique concept; it is only the edges that share common concepts, so these are
+what can be used to test whether the law applies to the problem.
+
+Consequently, we have to allow edges to terminate on other edges, as well as vertices, so that we can have edges
+marking each predicate edge as being 'IN' the predicate.  In practice we do this by storing both vertices and edges
+under the general heading of 'parts'; a part can optionally have a 'start' and/or 'end', making it an edge, and these
+fields can refer to any other part, whether edge or vertex.
+
+Hence, just as classes and instances are represented by the same type of entity (a 'concept'), a general
+law and a specific case are each represented by a simple directed graph.  If we use the 'IN' edges to properly
+categorize each new concept or relation, the entire knowledge graph will remain a single connected entity.
 
 After a student builds a problem description, we need to find any general laws that can be applied to
-it.  This means, firstly, finding a predicate that contains instances of the same concepts that are
-instantiated in the problem.  Given the structure of our graph, this is easy.  We just start with any vertex 
-of the problem, follow any of its 'IS A' links to a general concept, then follow any other 'IS A' link 
-backward to another instance, and see if that vertex has an 'IN' link to a vertex which 'IS A' predicate.
-In other words, starting from the chosen problem vertex V, we look for this path:
+it.  This means, first, finding a predicate that 'matches' the problem.  Since any predicate is itself a graph,
+and the problem is a graph, a 'match' is really an isomorphism -- between the predicate, and any subgraph of the problem.
 
-  V > IS A > * < IS A > IN > predicate:P
+A key point here is that a predicate will include edges that extend to concepts *outside* its law.  Typically,
+most of these will be 'IS A' links: for example, any law of physics that applies to a body is predicated first and foremost
+on the existence of the body, hence the law contains a vertex which 'IS A body', and that 'IS A' link is part of the predicate.
+Such 'external links' need not be 'IS A', though presumably most are.
 
-where * is the wildcard and left and right karets indicate edge direction.  The vertex in parentheses is
-the predicate of interest.  To see if P matches our problem, we take the subgraph P describes:
+Any problem that matches that predicate will therefore have a matching link *to the same external vertex*.  In this way
+it becomes easy to check for matching predicates; we simply start from each of the problem's 'external vertices',
+and try to build two matching subgraphs, one link at a time, extending one of them into any predicate that links to the same
+external vertex, and the other into the problem graph.  We do this recursively so as to catch all possible ways the predicate
+can be applied to the given problem.
 
-  * > IN > P
-
-and we look for any isomorphism between that subgraph and our problem graph.  While this is a hard
+In graph theory, this is known as the "subgraph isomorphism problem".  While this is a hard
 problem in general, most of the laws and problems students are dealing with will have relatively small graphs,
-and hence the algorithm can run in reasonable time.
+and hence the algorithm can run in quite reasonable time.
 
-After a student builds a problem description, using the 'IS A' concept to state what each part of
-the problem is ('my body' IS A body, 'my force' IS A force, etc), and other edges to describe the
-relations between those parts ('my force' OF 'body 1', 'my force' ON 'body 2', 'velocity 1' OF 'body 1',
-'velocity 1' AT 'time 1'), we then look for any general law that can be applied to the problem.
-that exist within the categories the problem belongs to.  We take their predicate subgraphs, and
-see if there is an isomorphism from the predicate to the problem.  If so, we apply the law, by taking
+If we find such an isomorphism from a given predicate, we can apply the associated law, by taking
 all the structure of the law outside that predicate, and appending it to the problem graph, making
-sure we don't append vertices that are already there.
+sure we don't append parts that are already there.  (To avoid this, we simply extend the matching algorithm,
+allowing it to match edges outside the predicate, but not requiring them -- we only require that, for a vertex
+outside the predicate to be included in the match, *all* of its edges to predicate vertices must be
+matched.  Then, we only append structure that has not already been matched.)
 
-We can do this iteratively in order to solve a problem.  Of course, the computer couln't do this alone,
+We can do this iteratively in order to solve a problem.  Of course, the computer couldn't feasibly do this alone,
 because the number of ways all possible laws could be applied would lead to combinatorial explosion.
-But that's fine, because we want the student to learn, not just watch.  Instead, the computer can suggest laws
-that could be applied at each step, and the student chooses which to apply.  This way they start
-to develop a feel for the most efficient ways to solve various problems, and they also start to 
-recognize the predicate patterns on their own because they are displayed explicitly on the screen.
+But that is why this approach is perfectly suited as a learning aid: we want the student to explore the possible ways
+of solving the problem, while the computer merely keeps track of the conceptual relationships, displays them in a
+familiar way, and uses them to suggest possibilities.
 
+REPRESENTATION
 
-
-Although the graph representation is the core and should always remain accessible, we can build
-additional interfaces that make building and solving a problem more intuitive.  This is vital, as
+Although the graph is the core and should always remain accessible, we can build
+additional interfaces that make building and solving a problem much more intuitive.  This is vital, as
 a student should not have to learn complex graph syntax while they're trying to learn the subject
-at hand.  Instead, each concept record can store rules in a simple programming language, used to 
-visualize it as a picture or symbol, using primitive shapes and symbols and relationships that the 
-computer understands.  This would provide a more intuitive drag-and-drop experience.
+at hand.  Instead, each concept record can store rules in a simple programming language, used to
+visualize it as a picture or symbol, using built-in primitive shapes and symbols.
+This would provide a more intuitive drag-and-drop experience.
 
-For example, the 'body' concept might contain a visualization program like this:
+A sample visualization program could look like this:
 
-    this.origin = position.of>this.wrt>origin>of>WCS
     Circle circle
-    circle.center = this.origin
+    circle.position.x = 250
+    circle.position.y = 100
     circle.radius = 50
 
-Here the Circle type, with its center and radius members, would be built into the website and hence
-automatically parsed and displayed.
-    The right side of the first line is a graph query that retrieves
-the 'value' field of the vertex which 'IS A position', and has an 'of' edge to this vertex and a 'wrt' (with respect to)
-edge to a vertex which 'IS A origin' and has an 'of' edge to a vertex which 'IS A WCS' (world coordinate system).
-    'WCS (world coordinate system)' is a concept that would be instantiated by default in any user-created graph so
-as to allow it to be visualized.  Whenever the user drags and drops a visual element, the vertex it represents is
-implicitly given angles and distances relative to the WCS via relationships like:
+Here the Circle type, with its "position" and "radius" members, is a built-in visual primitive that can be parsed and displayed
+(in fact, any visual primitive has a 'position' member).
 
-    this>component>wrt>x_direction>of>WCS
+In general, though, the way that a particular vertex is visualized will depend not only on its concept, but its connectivity to
+other parts in the graph.  In other words, the visualization program itself might have to identify predicates within the graph,
+and change how the vertex is drawn based on those predicates.  Since any such predicate should connect to the vertex in question, we can
+use a path-based syntax to identify them.
 
+For example, the 'body' concept might have this rule:
 
-    Arrow arrow
-    arrow.start = position.of>this.wrt>world_coordinate_system
-    arrow.delta = component.of>this.wrt>
+    <of<*:x {
+      x.position = this.position
+    }
 
-The Arrow type with its start and delta members are built into the website so the computer can parse
-and display them.  The expressions after the equal signs are graph queries - so we are retrieving the
-value stored in the 'position' vertex which has an 'of' edge pointing to this vertex, and a 'wrt' edge
-pointing to a vertex having an instance of the 'world_coordinate_system' concept.    
+The first line is the predicate, which in this case is a single path.  Each path begins at the current part.  In this case we
+look for a neighboring 'OF' edge that points to us, and whose other endpoint can be anything, since we have the wildcard '*' in place
+of a concept name.  We label that endpoint 'x', and set its position to our own.  This ensures that any property of a body will be
+drawn at the same pixel as the body itself.
 
-(Here world_coordinate_system is a concept that would be included in a problem graph by
-default, and when building the picture, the user would implicitly be setting angles and
-distances with respect to ('wrt') the world_coordinate_system)
+The assignments to graph vertices should probably be two-way by default.  That is, dragging either the 'body' vertex or its property
+'x' on the screen would cause the other vertex to update its position.
 
-These visual elements would be interactive, so for example, the user could grab the tip of the arrow
-and drag it to a new pixel.  The binding is two-way - that is, since the arrow has been bound to the 
+Similar rules would resolve the values of vertices.  For example, the 'product' concept would say:
 
+    value = 1
+    >of>*:x {
+      value *= x
+    }
 
-Note that the above program depends on the value of the 'position' and 'coordinates' vertices, hence these 
-would have to be resolved first.  There would be additional rules for resolving values.  So the 'position'
-concept might have these rules:
+In other words, any product is 1 if nothing is being multiplied.  For each operand, which the product will point to via an 'OF'
+edge, the product's value is multiplied by the operand value.  The operand isn't necessarily an instance of anything in particular,
+so we simply match it with the wildcard '*'.  Note that the graph shorthand retrieves the 'value' of the referenced
+vertex by default, so we don't have to include that.
 
-    this.value[d.name] = component.of>this.wrt>(direction d)
+In this way, each 'representation command' in one graph part that references another part, creates a dependency between them.  Whenever
+we need to visualize the problem, write it symbolically (eg. as equations), or calculate the values of its members, we iterate through
+the graph, resolving any commands that have no waiting dependencies, and as we resolve them, their values propagate to the commands that
+were waiting on them, cascading on until all possible commands have been run.  Thus we resolve the graph into more familiar representations.
 
-Meanwhile the 'x_direction' concept, which 'IS A>direction', would say:
-
-    this.name = 'x'
-
-Rules would be inherited by concepts that instantiate this one via an 'IS A' edge, and they
-could add to it or override any part of it.  For example, the 'force' concept, which 'IS A>vector',
-might say:
+All value/representation rules of a given concept would be inherited by concepts that instantiate it via an 'IS A' edge, and these
+'child concepts' could add to it or override any part of it.  For example, the 'force' concept, which 'IS A vector', might say
 
     arrow.color = '#fb6'
+
+thus modifying the 'arrow' field that was defined in 'vector' to specify that forces will be represented by arrows of a specific color.
+
+The representation language is fleshed out as we consider more involved examples.  Consider the addition of vectors: each
+vector is visualized as an arrow, while their sum is drawn by placing the arrows head-to-tail in sequence, and the resultant is drawn
+from the starting point to the ending point of our path.  We can capture this in the 'sum' concept as follows:
+
+    >of>vector:v {
+      1: Arrow resultant
+      Arrow arrow
+      arrow.position = resultant.components
+      arrow.components = v.arrow.components
+      resultant.components += arrow.components
+    }
+
+Note that the predicate path '>of>vector:v', like any other predicate, is applied to all matching instances.  Thus it is effectively a loop
+over all vector operands of the sum.  The '1:' prefix on the first command denotes that 'resultant' is only initialized for the first instance,
+ie. once we know we have a sum of vectors.  (It is therefore assigned to the scope above the predicate, ie. the root scope of its vertex, so it can
+be accessed by all iterations of the loop.)  After that, for each new operand, we create a vector, set its start point to the current
+endpoint of the resultant, and its 'components' (a built-in field of the Arrow primitive) to those of the operand itself.
+
+This program sequentially builds the visual model of a vector sum.  On the other hand, as the instances of the predicate have no true order,
+we might worry that the order of parts (arrows) in the visual could suddenly be changed on refresh.  Furthermore, if every mouse
+event (eg. dragging the endpoint of an arrow) triggers a refresh, we would prefer not to re-execute the whole visualization each time.  To avoid
+both of these issues, we have each command store the commands that sequentially used or edited its output value.  These are identified during the initial
+visualization, ie. they represent the de facto sequence, which is not inherent in the graph.  When a field is modified by user input, we
+only need to re-run the commands that directly depend on it, and their dependent sequences in turn.
+
+Note also that a command in general runs implicitly on sub-fields.  For example, in the line 'arrow.position = resultant.components', both 'position'
+and 'components' actually have 'x' and 'y' sub-fields, so it is equivalent to the pair 'arrow.position.x = resultant.components.x; arrow.position.y = result.components.y'.
+If one of the operand fields has no sub-fields, it is treated as a constant over all these sub-commands.
+
+A predicate can be more than a single path; we just decompose it into paths so it can be expressed as text.  The components of a multi-path predicate can be
+concatenated with the '&' sign.  For example, a 'coordinate system' can determine where 'points' in its domain are drawn.  Take the Cartesian coordinate system,
+which has the following rule (here 'wrt' is short for 'with respect to').
+
+    <of<x_axis<wrt<coordinate:x>of>point:p
+    & <of<y_axis<wrt<coordinate:y>of>p {
+      p.position.x = x
+      p.position.y = y
+    }
+
+This says 'coordinate x of point p with respect to my x-axis, and coordinate y of p with respect to my y-axis'.  Notice that the variable *p* is re-used
+in the second path of the predicate, implying that the two paths terminate on the same 'point' vertex.  Other coordinate systems would have the same kind
+of rule, only with different axis names and coordinate-to-screen transformations.
+
+There may be additional features of the representation language, to be worked out as the project is developed.  One question is the priority of commands,
+when multiple commands from different parts would edit the same field.  For example, 'body' has the rule noted above to ensure its properties are drawn
+on top of it,
+
+    <of<*:x {
+      x.position = this.position
+    }
+
+but some properties that are nominally 'OF' a body should not be drawn with that body as their origin.  For example, a 'position' (the physics concept, not the
+built-in property of drawables) is 'OF' a body and 'WITH RESPECT TO' a 'coordinate system', and it is the latter that should determine the origin of the
+displayed arrow.  So 'position' has this rule:
+
+    >wrt>coordinate_system:c {
+      this.position = c.position
+    }
+
+The question is, since rules from different parts are executed in arbitrary order, how do we ensure the priority of the second command?  Probably the most natural
+rule is that a command which edits a field of its own part should take precedence over commands from other parts.  But there may be exceptions, and we might have
+to implement importance keywords akin to CSS, thus giving the content writers the necessary flexibility.

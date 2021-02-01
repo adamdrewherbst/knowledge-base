@@ -1,195 +1,194 @@
-<span class="section-title">Riemannian Concepts</span>
+<span class="section-title">Conceptos Riemannianos</span>
 
-There are just a few more concepts from Riemannian geometry that will be used qualitatively in what follows.  They are all ultimately derived from the
-metric, as this determines the entire manifold, so there are sophisticated equations to describe them, but this paper won't pretend to be heavily
-mathematical, so they are described below in conceptual terms.  These descriptions are not necessarily the most direct mathematical approaches to these
-concepts but I find them easier to understand.
+Hay solo algunos conceptos más de la geometría de Riemann que se utilizarán cualitativamente en lo que sigue. Todos ellos se derivan en última instancia de la
+métrica, ya que esto determina toda la variedad, por lo que hay ecuaciones sofisticadas para describirlos, pero este artículo no pretende ser demasiado
+matemático, por lo que se describen a continuación en términos conceptuales. Estas descripciones no son necesariamente los enfoques matemáticos más directos para estos
+conceptos pero los encuentro más fáciles de entender.
 
 <p>
-<span class="subsection">Tangent Vectors</span>
+<span class = "subsection"> Vectores tangentes </span>
 
-In a real 2D surface, we saw how tangent vectors such as \(\frac{\partial \vec r}{\partial x}\) were visibly tangent to the surface.  But if the surface was curved, the only
-tangent vectors that could directly be used to describe paths and areas were infinitesimal ones, \(d\vec r\).  The same idea generalizes to intrinsic
-manifolds, except instead of having \(\vec r\) vectors, all we have are the coordinates.  So if we have a path parametrized by \(t\), we can say it has an
-abstract tangent vector \((\frac{\partial x}{\partial t}, \frac{\partial y}{\partial t})\), and we can use the metric to take the generalized dot product of two such vectors,
-which is given the new name "inner product" for manifolds.  But again, we can't calculate a true property of the manifold without scaling these vector quantities by \(dt\)'s and integrating.
+En una superficie 2D real, vimos cómo los vectores tangentes como \(\frac{\partial\vec r}{\partial x}\) eran visiblemente tangentes a la superficie. Pero si la superficie era curva, la única
+Los vectores tangentes que podrían usarse directamente para describir caminos y áreas eran infinitesimales, \(d\vec r\). La misma idea se generaliza a intrínsecos
+variedades, excepto que en lugar de tener vectores \(\vec r\), todo lo que tenemos son las coordenadas. Entonces, si tenemos una ruta parametrizada por \(t\), podemos decir que tiene una
+vector tangente abstracto \((\frac{\partial x}{\partial t}, \frac{\partial y}{\partial t})\), y podemos usar la métrica para tomar el producto escalar generalizado de vectores,
+que recibe el nuevo nombre de "producto interno" para los colectores. Pero, nuevamente, no podemos calcular una propiedad verdadera de la variedad sin escalar estas cantidades vectoriales por \(dt\) e integrarlas.
 <p>
-In particular, we can define a "unit vector" as a tangent vector whose metric is equal to \(\pm 1\).
+En particular, podemos definir un "vector unitario" como un vector tangente cuya métrica es igual a \(\pm 1\).
 
-<span class="subsection">Orthogonality</span>
+<span class = "subsection"> Ortogonalidad </span>
 
-Remember that the metric for surfaces is just a shorthand for the dot product, and two vectors are perpendicular when their dot product is zero.
-So even when we generalize it to allow hyperbolic spacetime, we can still say vectors with zero metric are orthogonal.
+Recuerde que la métrica para superficies es solo una abreviatura del producto escalar, y dos vectores son perpendiculares cuando su producto escalar es cero.
+Entonces, incluso cuando lo generalizamos para permitir el espacio-tiempo hiperbólico, todavía podemos decir que los vectores con métrica cero son ortogonales.
 
 $$g(\vec u, \vec v) = 0 \rightarrow \vec u, \, \vec v \quad orthogonal$$
 
-According to the relativistic model of space and time measurements described in the last section, this turns out to have the consequence that the path an observer perceives as
-space (simultaneous) is orthogonal to that observer's trajectory (time axis).
+De acuerdo con el modelo relativista de medidas de espacio y tiempo descrito en la última sección, esto resulta tener la consecuencia de que la trayectoria que un observador percibe como
+el espacio (simultáneo) es ortogonal a la trayectoria de ese observador (eje del tiempo).
 <p>
-Orthogonal path elements at a point can be multiplied to give a generalized area, which may be a spatial area or a spacetime area.  From this we can
-build up to 3D volumes and 4D hypervolumes.  There are much more efficient formulas in terms of the metric, but this is the idea.
+Los elementos de la trayectoria ortogonal en un punto se pueden multiplicar para dar un área generalizada, que puede ser un área espacial o un área de espacio-tiempo. De esto podemos
+construir hasta volúmenes 3D e hipervolúmenes 4D. Hay fórmulas mucho más eficientes en términos de métrica, pero esta es la idea.
 
-<span class="subsection">Geodesics</span>
+<span class = "subsection"> Geodesia </span>
 
-A geodesic is the extremal -- shortest or longest -- path between two points.  It is a local extremum, in the sense that it is extremal only with
-respect to infinitesimal variations of the path.
+Una geodésica es la ruta extrema (más corta o más larga) entre dos puntos. Es un extremo local, en el sentido de que es extremo sólo con
+respecto a variaciones infinitesimales del camino.
 
 <div class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/geodesic.jpg')}}"></image>
 <div class="figure-caption">
-    A geodesic (blue curve) is extremal relative to all possible infinitesimal variations of it (yellow curves) that have the same endpoints.
+    Una geodésica (curva azul) es extrema en relación con todas las posibles variaciones infinitesimales de la misma (curvas amarillas) que tienen los mismos puntos finales.
 </div>
 </div>
 
-As long as the manifold is smooth, ie. the metric is smooth with respect to the coordinates, then the geodesics will be described by smooth coordinate
-paths as well.
+Siempre que el colector sea liso, es decir, la métrica es suave con respecto a las coordenadas, entonces las geodésicas se describirán mediante coordenadas suaves
+caminos también.
 <p>
-A segment \(S\) of a geodesic \(G\) is also a geodesic in its own right.  If \(S\)'s interval weren't extremal, we could vary the path so as to make it extremal, and
-in doing so we would be varying \(G\)'s interval in the same way -- meaning \(G\) wasn't really extremal in the first place.  So for \(G\) to be a geodesic,
-\(S\) must as well.
+Un segmento \(S\) de una geodésica \(G\) también es una geodésica por derecho propio. Si el intervalo de \(S\) no fuera extremo, podríamos variar el camino para hacerlo extremo, y
+al hacerlo, estaríamos variando el intervalo de \(G\) de la misma manera, lo que significa que \(G\) no era realmente extremo en primer lugar. Entonces, para que \(G\) sea una geodésica,
+\(S\) también debe hacerlo.
 
 <div class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/geodesic_segment.jpg')}}"></image>
 <div class="figure-caption">
-    Since the red segment's length is part of the blue segment's length, it must be extremal itself in order for the whole path to be.
+    Dado que la longitud del segmento rojo es parte de la longitud del segmento azul, debe ser extrema para que todo el camino sea.
 </div>
 </div>
 
-Something that might not be as obvious is that, almost always, a geodesic can be completely determined by specifying a point and a direction at that point.
-This is the generalization of Euclid's axiom that a point and direction define a straight line.  But one exception to this for manifolds is a "neck-pinch singularity",
-like a cylinder that is squeezed down to a single point somewhere in the middle:
+Algo que quizás no sea tan obvio es que, casi siempre, una geodésica se puede determinar completamente especificando un punto y una dirección en ese punto.
+Esta es la generalización del axioma de Euclides de que un punto y una dirección definen una línea recta. Pero una excepción a esto para las variedades es una "singularidad que aprieta el cuello",
+como un cilindro que se aprieta hasta un solo punto en algún lugar en el medio:
 
 <div class="figure">
 <image width=50% src="{{=URL('static','spacetime/images/motivation/neck_pinch.jpg')}}"></image>
 <div class="figure-caption">
-    At the singularity where these geodesics meet, they all momentarily have the same direction, so we cannot say that a point and direction uniquely determine a single geodesic.
+    En la singularidad donde se encuentran estas geodésicas, todas tienen momentáneamente la misma dirección, por lo que no podemos decir que un punto y una dirección determinen de manera única una sola geodésica.
 </div>
 </div>
 
-This type of singularity is the structure that will be suggested here as the model of a particle.
+Este tipo de singularidad es la estructura que se sugiere aquí como modelo de partícula.
 
-<span class="subsection">Levi-Civita Connection</span>
+<span class = "subsection"> Conexión Levi-Civita </span>
 
-This is the generalization of the notion of parallel lines.  Start with a point \(p\) and direction, ie. a unit tangent vector \(\vec u\), thus giving us a geodesic \(G\).  Move an infinitesimal amount in any
-direction to point \(q\).  What vector \(\vec u\) at \(q\) is parallel to \(\vec v\)?
+Ésta es la generalización de la noción de líneas paralelas. Comience con un punto \(p\) y una dirección, es decir, un vector unitario tangente \(\vec u\), lo que nos da una \(G\) geodésica. Mueva una cantidad infinitesimal en cualquier
+dirección al punto \(q\).  ¿Qué vector \(\vec u\) en \(q\) es paralelo a \(\vec v\)?
 <p>
-In Euclidean space, two parallel lines always maintain the same distance between them; put another way, all derivatives of the distance between them are zero.
+En el espacio euclidiano, dos líneas paralelas siempre mantienen la misma distancia entre ellas; dicho de otra manera, todas las derivadas de la distancia entre ellos son cero.
 <p>
-We can't guarantee that in curved space, because straight lines can accelerate relative to each other, but here's what we can do.  Given a geodesic \(H\) at \(q\), we can measure its distance from \(p\), along a geodesic orthogonal to \(G\).
-Then we can measure the derivatives of that distance with respect to distance along \(H\).
+No podemos garantizar eso en un espacio curvo, porque las líneas rectas pueden acelerarse entre sí, pero esto es lo que podemos hacer. Dada una \(H\) geodésica en \(q\), podemos medir su distancia desde \(p\), a lo largo de una ortogonal geodésica a \(G\).
+Entonces podemos medir las derivadas de esa distancia con respecto a la distancia a lo largo de \(H\).
 <p>
-Just as in Euclidean space, there will be a whole plane of geodesics at \(q\) whose first derivative is zero (the "plane parallel to \(G\)").  From among those, we
-choose the geodesic whose <i>second</i> derivative is minimum.  This is the geodesic that "hugs most tightly to \(G\)", hence locally parallel to it.
+Al igual que en el espacio euclidiano, habrá un plano completo de geodésicas en \(q\) cuya primera derivada es cero (el "plano paralelo a \(G\)"). De entre ellos, nosotros
+elija la geodésica cuya <i> segunda </i> derivada sea mínima. Esta es la geodésica que "abraza más fuertemente a \(G\)", por lo tanto localmente paralela a ella.
 
 <div class="figure">
 <image width=80% src="{{=URL('static','spacetime/images/motivation/levi_civita.jpg')}}"></image>
 <div class="figure-caption">
-    Left: Of all geodesics through \(q\), we first select those whose first derivative of distance from \(G\) is zero -- those that lie in the blue plane.
-    Right: Of these, we pick the one whose second derivative is minimum.  Distance is measured along perpendiculars to \(G\).
+    Izquierda: De todas las geodésicas que pasan por \(q\), primero seleccionamos aquellas cuya primera derivada de la distancia desde \(G\) es cero, las que se encuentran en el plano azul.
+    Derecha: De estos, elegimos aquel cuya segunda derivada es mínima. La distancia se mide a lo largo de las perpendiculares hasta \(G\).
 </div>
 </div>
 
-We can repeat this process for each infinitesimal piece of any finite path \(S\).  But thanks to curvature, the result will generally depend not only on the endpoints, but
-on the path itself.  Thus we say that <i>\(\vec v\) is the parallel transport of \(\vec u\) from \(p\) to \(q\) along \(S\)</i>.
+Podemos repetir este proceso para cada pieza infinitesimal de cualquier camino finito \(S\). Pero gracias a la curvatura, el resultado generalmente dependerá no solo de los puntos finales, sino
+en el camino mismo. Así decimos que <i> \(\vec v\) es el transporte paralelo de \(\vec u\) desde \(p\) a \(q\) a lo largo de \(S\) </i>.
 <p>
-There are other "connections" that transport vectors at one point to those at another.  But the Levi-Civita connection is considered the most natural one, because it preserves
-these aspects of the concept of parallel lines.
+Hay otras "conexiones" que transportan vectores en un punto a los de otro. Pero la conexión Levi-Civita se considera la más natural, porque conserva
+estos aspectos del concepto de líneas paralelas.
 
-<span class="subsection">Ricci, Scalar, and Einstein Curvature</span>
+<span class = "subsection"> Curvatura de Ricci, escalar y de Einstein </span>
 
-Remember that geodesics accelerate towards or away from each other on curved surfaces.  We can describe this more precisely for a given surface by quantifying how much it happens
-in the infinitesimal neighborhood of a given point in a certain direction.
+Recuerde que las geodésicas se acercan o se alejan unas de otras en superficies curvas. Podemos describir esto con mayor precisión para una superficie dada cuantificando cuánto sucede
+en la vecindad infinitesimal de un punto dado en una cierta dirección.
 <p>
-First we take a "cone" of geodesics from point \(p\), within a small angular range of a central geodesic \(G\), whose direction is \(\vec u\).
+Primero tomamos un "cono" de geodésicas del punto \(p\), dentro de un pequeño rango angular de una geodésica central \(G\), cuya dirección es \(\vec u\).
 
 <div class="figure">
 <image width=50% src="{{=URL('static','spacetime/images/motivation/ricci_curvature.jpg')}}"></image>
 <div class="figure-caption">
-    Ricci curvature measures how the expansion of the cone with length of \(G\) accelerates, in the limit as the cone dimensions shrink to zero.  Here the surface is 2D, so the volume is really an area.
+    La curvatura de Ricci mide cómo se acelera la expansión del cono con una longitud de \(G\), en el límite cuando las dimensiones del cono se reducen a cero. Aquí la superficie es 2D, por lo que el volumen es realmente un área.
 </div>
 </div>
 
-In Euclidean space, we know how the volume \(V\) of the cone would vary with the length, \(\tau\), of \(G\).  The effect of the curvature is to alter this variation.  So we take the
-ratio of the cone's volume at each \(\tau\) to the corresponding Euclidean volume at \(\tau\).  Then we take the acceleration (second derivative) of that ratio over \(\tau\).
-And to get the value for a single direction, we take the limit as the angle (or equivalently volume) shrinks to zero.
+En el espacio euclidiano, sabemos cómo el volumen \(V\) del cono variaría con la longitud, \(\tau\), de \(G\). El efecto de la curvatura es alterar esta variación. Entonces tomamos el
+relación entre el volumen del cono en cada \(\tau\) y el volumen euclidiano correspondiente en \(\tau\). Luego tomamos la aceleración (segunda derivada) de esa razón sobre \(\tau\).
+Y para obtener el valor de una sola dirección, tomamos el límite cuando el ángulo (o el volumen equivalente) se reduce a cero.
 
 $$Ric(\vec u, \vec u) \quad \propto \quad \lim_{V \to 0} (-\frac{\partial^2}{\partial \tau^2} \, \frac{V}{V_{euclidean}})$$
 
-The minus sign is a convention: we call curvature positive when geodesics converge, ie. the cone contracts, and negative when they diverge.
+El signo menos es una convención: llamamos a la curvatura positiva cuando las geodésicas convergen, es decir, el cono se contrae, y negativo cuando divergen.
 <p>
-The same thing works in spacetime: if \(G\) is timelike, just replace length with time.  Also, the cone is specified not only by relative angle but relative speed as well.
+Lo mismo funciona en el espacio-tiempo: si \(G\) es similar al tiempo, simplemente reemplace la longitud con el tiempo. Además, el cono se especifica no solo por el ángulo relativo sino también por la velocidad relativa.
 <p>
-This kind of curvature is probably the most intuitive, though there is a more general quantity called Riemann curvature from which the Ricci curvature can be derived.
+Este tipo de curvatura es probablemente el más intuitivo, aunque existe una cantidad más general llamada curvatura de Riemann de la que se puede derivar la curvatura de Ricci.
 <p>
-Interestingly, Ricci curvature at a point is a quadratic form, just like the metric, which is why \(\vec u\) is plugged in twice in the above equation.
+Curiosamente, la curvatura de Ricci en un punto es una forma cuadrática, al igual que la métrica, por lo que \(\vec u\) se inserta dos veces en la ecuación anterior.
 
 $$Ric(\vec u, \vec v) = \begin{pmatrix} u_x & u_y \end{pmatrix} \begin{pmatrix} R_{xx} & R_{xy} \\ R_{xy} & R_{yy} \end{pmatrix} \begin{pmatrix} u_x \\ u_y \end{pmatrix}$$
 
-Basically, this just expresses the notion that the manifold, in analogy with a surface, is "locally linear" -- so any quantity based on an infinitesimal part of it should be
-linear in the coordinates.  And since the Ricci curvature is a second derivative, it is second-order in the coordinates.  But the geometric meaning of the Ricci value of two different vectors is not really clear.
+Básicamente, esto solo expresa la noción de que la variedad, en analogía con una superficie, es "localmente lineal", por lo que cualquier cantidad basada en una parte infinitesimal de ella debe ser
+lineal en las coordenadas. Y dado que la curvatura de Ricci es una segunda derivada, es de segundo orden en las coordenadas. Pero el significado geométrico del valor de Ricci de dos vectores diferentes no está realmente claro.
 <p>
-Being a symmetric matrix has the consequence that the Ricci tensor has four orthogonal unit "eigenvectors", one for each dimension of spacetime; each one has an "eigenvalue",
-which is the curvature along the eigenvector direction.  The eigenvectors have the locally extremal curvatures with respect to direction.
+Al ser una matriz simétrica, el tensor de Ricci tiene cuatro "vectores propios" de unidades ortogonales, una para cada dimensión del espacio-tiempo; cada uno tiene un "valor propio",
+que es la curvatura a lo largo de la dirección del vector propio. Los vectores propios tienen las curvaturas extremas localmente con respecto a la dirección.
 
 <div class="figure">
 <image width=50% src="{{=URL('static','spacetime/images/motivation/ricci_eigenvectors.jpg')}}"></image>
 <div class="figure-caption">
-    A schematic of the 3 spatial eigenvectors of the Ricci tensor at each point in the manifold.  They are always orthogonal, but may have different
-    eigenvalues (represented here by drawing them with different lengths, though by convention we always refer to the <i>unit</i> eigenvectors).
-    In spacetime there is an additional timelike eigenvector.
-</div>
+    Un esquema de los 3 autovectores espaciales del tensor de Ricci en cada punto de la variedad. Siempre son ortogonales, pero pueden tener diferentes
+    autovalores (representados aquí dibujándolos con diferentes longitudes, aunque por convención siempre nos referimos a los autovectores <i> unidad </i>).
+    En el espacio-tiempo hay un vector propio similar al tiempo adicional.</div>
 </div>
 
-The metric also has this property, but because the metric simply measures interval, it turns out that <i>all</i> unit vectors are its eigenvectors,
-with eigenvalue of \(\pm 1\) depending on whether they are spacelike or timelike.
+La métrica también tiene esta propiedad, pero debido a que la métrica simplemente mide el intervalo, resulta que <i> todos </i> los vectores unitarios son sus autovectores,
+con valor propio de \(\pm 1\) dependiendo de si son espaciales o temporales.
 
 <div class="figure">
 <image width=35% src="{{=URL('static','spacetime/images/motivation/isotropic_tensor_spacetime.jpg')}}"></image>
 <image width=35% src="{{=URL('static','spacetime/images/motivation/isotropic_tensor_spatial.jpg')}}"></image>
 <div class="figure-caption">
-    By definition, the metric has the same value along all unit vectors of spacetime, except the sign of spacelike and timelike directions are opposite,
-    indicated by the color switch.
+    Por definición, la métrica tiene el mismo valor a lo largo de todos los vectores unitarios del espacio-tiempo, excepto que el signo de las direcciones espaciales y temporales son opuestos,
+    indicado por el cambio de color.
 </div>
 </div>
 
-Whereas, since the Ricci tensor measures, not interval, but rate of curvature <i>with respect to</i> interval, it can vary with direction, giving it four well-defined eigenvectors with distinct eigenvalues.
+Considerando que, dado que el tensor de Ricci mide, no el intervalo, sino la tasa de curvatura <i> con respecto al </i> intervalo, puede variar con la dirección, lo que le da cuatro autovectores bien definidos con autovalores distintos.
 <p>
-But note that, if the Ricci tensor is "degenerate" such that there is no variation with direction, it will still have a
-sign flip between spacelike and timelike directions, just like the metric, as in the picture above.  This happens when the Ricci tensor
-is just a multiple of the metric tensor.  And this is the kind of curvature we associate with
-"dark energy": the spacelike curvature is isotropically positive, and the timelike curvature isotropically negative.  So timelike geodesics accelerate
-away from each other, meaning the expansion of the universe is accelerating.  And because spacelike geodesics converge, as they
-do on a sphere, space may form a closed surface; hence it is said that the universe may be closed.
+Pero tenga en cuenta que, si el tensor de Ricci está "degenerado" de manera que no hay variación con la dirección, todavía tendrá un
+cambio de signo entre direcciones espaciales y temporales, al igual que la métrica, como en la imagen de arriba. Esto sucede cuando el tensor de Ricci
+es solo un múltiplo del tensor métrico. Y este es el tipo de curvatura con la que asociamos
+"energía oscura": la curvatura espacial es isotrópicamente positiva y la curvatura temporal es isotrópicamente negativa. Así que las geodésicas temporales se aceleran
+unos de otros, lo que significa que la expansión del universo se está acelerando. Y debido a que las geodésicas espaciales convergen,
+hacer en una esfera, el espacio puede formar una superficie cerrada; por eso se dice que el universo puede estar cerrado.
 <p>
-When the Ricci curvature is "isotropic" like this, we can specify it by a single scalar, so we call that the "scalar curvature", \(R\).
+Cuando la curvatura de Ricci es "isotrópica" como esta, podemos especificarla mediante un solo escalar, por lo que la llamamos "curvatura escalar", \(R\).
 <p>
-When Ricci curvature varies by direction, we can only come up with a representative scalar by averaging over all spacetime directions.  Specifically, we
-average the eigenvalues over the four eigenvectors.  But when we take this average, we still respect the sign flip between space and time.  That is,
-when we use the eigenvectors as our coordinate axes,
+Cuando la curvatura de Ricci varía según la dirección, solo podemos obtener un escalar representativo promediando todas las direcciones del espacio-tiempo. Específicamente, nosotros
+promediar los autovalores sobre los cuatro autovectores. Pero cuando tomamos este promedio, todavía respetamos el cambio de signo entre el espacio y el tiempo. Es decir,
+cuando usamos los vectores propios como nuestros ejes de coordenadas,
 
 $$R = -R_{tt} + R_{xx} + R_{yy} + R_{zz}$$.
 
-When Einstein was trying to figure out how matter induces curvature, he knew conservation of energy and momentum still had to be respected, meaning the
-associated curvature had to persist over time.  Because spacetime now had a unified geometry, it turned out this was equivalent to the statement that the
-"spacetime divergence" of the curvature -- the flux of its components through an infinitesimal spacetime hypersurface -- had to be zero.  And Einstein managed
-to find a kind of curvature form that had this property <i>identically</i> in <i>any</i> Riemannian manifold, now called the Einstein tensor:
+Cuando Einstein estaba tratando de descubrir cómo la materia induce la curvatura, sabía que la conservación de la energía y el impulso aún tenían que ser respetados, es decir, la
+la curvatura asociada tenía que persistir en el tiempo. Debido a que el espacio-tiempo ahora tenía una geometría unificada, resultó que esto era equivalente a la afirmación de que el
+La "divergencia espaciotemporal" de la curvatura - el flujo de sus componentes a través de una hipersuperficie espaciotemporal infinitesimal - tenía que ser cero. Y Einstein logró
+para encontrar un tipo de forma de curvatura que tuviera esta propiedad <i> idénticamente </i> en <i> cualquier </i> variedad de Riemann, ahora llamada tensor de Einstein:
 
 $$G_{\mu\nu} = R_{\mu\nu} - \frac12 \, R \, g_{\mu\nu}$$
 
-That is, it is a combination of the Ricci tensor, the scalar curvature, and the metric tensor.  The Greek subscripts stand for any axis of spacetime.
+Es decir, es una combinación del tensor de Ricci, la curvatura escalar y el tensor métrico. Los subíndices griegos representan cualquier eje del espacio-tiempo.
 <p>
-The Einstein curvature is not as intuitive as the Ricci, but it does have an interesting interpretation.  Basically, the Ricci tensor (actually any symmetric tensor) can be expressed
-as the sum of an "isotropic" curvature, like dark energy, and a curvature whose associated scalar is zero, though its directional components may not be.  Then, the
-Einstein curvature turns out to be the Ricci curvature with the sign of its isotropic part flipped.
+La curvatura de Einstein no es tan intuitiva como la de Ricci, pero tiene una interpretación interesante. Básicamente, el tensor de Ricci (en realidad, cualquier tensor simétrico) se puede expresar
+como la suma de una curvatura "isotrópica", como la energía oscura, y una curvatura cuyo escalar asociado es cero, aunque sus componentes direccionales pueden no serlo. Entonces la
+curvatura de Einstein resulta ser la curvatura de Ricci con el signo de su parte isotrópica invertida.
 
-<span class="subsection">Sectional Curvature</span>
+<span class = "subsection"> Curvatura seccional </span>
 
-Sectional curvature is 2D curvature.  On a 2D surface, we can still calculate the directional Ricci curvatures at a point, replacing volume with area.  But it
-turns out that they will be the same in all directions.  So all we need is the scalar curvature, also called the Gaussian curvature.
+La curvatura seccional es una curvatura 2D. En una superficie 2D, aún podemos calcular las curvaturas direccionales de Ricci en un punto, reemplazando el volumen con el área. Pero
+resulta que serán iguales en todas las direcciones. Entonces, todo lo que necesitamos es la curvatura escalar, también llamada curvatura gaussiana.
 <p>
-In 3D or higher, we can pick a point \(p\) and two of its tangent vectors \(\vec u\) and \(\vec v\).  Then we can make all linear combinations of those tangent vectors, forming a "plane".
-And we can consider the geodesics along all vectors in the plane.  This is called a section.  It forms a 2D Riemannian manifold, so again, we only
-need the scalar curvature to describe it.  That is called the sectional curvature at \(p\) in the \(uv\)-plane.
+En 3D o superior, podemos elegir un punto \(p\) y dos de sus vectores tangentes \(\vec u\) y \(\vec v\). Entonces podemos hacer todas las combinaciones lineales de esos vectores tangentes, formando un "plano".
+Y podemos considerar las geodésicas a lo largo de todos los vectores del plano. Esto se llama sección. Forma una variedad Riemanniana 2D, por lo que, de nuevo, solo
+Necesito la curvatura escalar para describirlo. Eso se llama curvatura seccional en \(p\) en el plano \(uv\).
 
 
 

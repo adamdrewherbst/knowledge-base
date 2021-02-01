@@ -13,10 +13,8 @@
 PURPOSE
 <p>
 This is a website that is an aid for students learning physics.  It could
-potentially be used for other subjects as well.  I am publishing it under the
-GNU General Public License version 3.  I am asking anyone interested to help me
-with this site, as I believe it can be valuable but it could really use strong
-coders to keep it going.
+potentially be used for other subjects as well.  It is under the
+GNU General Public License version 3.
 <p><p>
 CONCEPT
 <p>
@@ -38,7 +36,7 @@ prepositions - thus, an edge with its two vertices will correspond to phrases su
     </div>
 <p>
 The concept in a vertex can correspond to a general concept, like those mentioned above,
-or a specific instantation of a more general concept.  In the latter case, the vertex
+<i>or</i> a specific instance of a more general concept.  In the latter case, the vertex
 will have an edge with the concept 'IS A' pointing to the general concept it instantiates.
 For example:
 <p>
@@ -112,7 +110,7 @@ what can be used to test whether the law applies to the problem.
 <p>
 Consequently, we have to allow edges to terminate on other edges, as well as vertices, so that we can have edges
 marking each predicate edge as being 'IN' the predicate.  In practice we do this by storing both vertices and edges
-under the general heading of 'parts'; a part can optionally have a 'start' and 'end', making it an edge, and these
+under the general heading of 'parts'; a part can optionally have a 'start' and/or 'end', making it an edge, and these
 fields can refer to any other part, whether edge or vertex.
 <p>
 Hence, just as classes and instances are represented by the same type of entity (a 'concept'), a general
@@ -120,7 +118,7 @@ law and a specific case are each represented by a simple directed graph.  If we 
 categorize each new concept or relation, the entire knowledge graph will remain a single connected entity.
 <p>
 After a student builds a problem description, we need to find any general laws that can be applied to
-it.  This means, firstly, finding a predicate that 'matches' the problem.  Since any predicate is itself a graph,
+it.  This means, first, finding a predicate that 'matches' the problem.  Since any predicate is itself a graph,
 and the problem is a graph, a 'match' is really an isomorphism -- between the predicate, and any subgraph of the problem.
 <p>
 A key point here is that a predicate will include edges that extend to concepts <i>outside</i> its law.  Typically,
@@ -136,7 +134,7 @@ can be applied to the given problem.
 <p>
 In graph theory, this is known as the "subgraph isomorphism problem".  While this is a hard
 problem in general, most of the laws and problems students are dealing with will have relatively small graphs,
-and hence the algorithm can run in reasonable time.
+and hence the algorithm can run in quite reasonable time.
 <p>
 If we find such an isomorphism from a given predicate, we can apply the associated law, by taking
 all the structure of the law outside that predicate, and appending it to the problem graph, making
@@ -147,10 +145,9 @@ matched.  Then, we only append structure that has not already been matched.)
 <p>
 We can do this iteratively in order to solve a problem.  Of course, the computer couldn't feasibly do this alone,
 because the number of ways all possible laws could be applied would lead to combinatorial explosion.
-But that's fine, because we want the student to learn, not just watch.  Instead, the computer can suggest laws
-that could be applied at each step, and the student chooses which to apply.  This way they can make mistakes,
-and they can start to develop a feel for the most efficient ways to solve various problems.  They also start to
-recognize the predicate patterns on their own because they are displayed explicitly on the screen.
+But that is why this approach is perfectly suited as a learning aid: we want the student to explore the possible ways
+of solving the problem, while the computer merely keeps track of the conceptual relationships, displays them in a
+familiar way, and uses them to suggest possibilities.
 <p>
 REPRESENTATION
 <p>
@@ -161,29 +158,34 @@ at hand.  Instead, each concept record can store rules in a simple programming l
 visualize it as a picture or symbol, using built-in primitive shapes and symbols.
 This would provide a more intuitive drag-and-drop experience.
 <p>
-For example, the 'body' concept might contain a visualization program like this:
+A sample visualization program could look like this:
 <p>
     <div class="indented">
     Circle circle<br>
-    circle.center.x = coordinate.OF>position>OF>this.WRT>x_axis>OF>wcs<br>
-    circle.center.y = coordinate.OF>position>OF>this.WRT>y_axis>OF>wcs<br>
+    circle.position.x = 250<br>
+    circle.position.y = 100<br>
     circle.radius = 50
     </div>
 <p>
-Here the Circle type, with its center and radius members, is a built-in visual primitive that can be parsed and displayed.
-Meanwhile, the right-hand sides of the 'center' assignment statements are a shorthand to identify graph parts.  In this case
-we are retrieving a vertex which 'IS A coordinate' and has the two edge-vertex sequences separated by periods, where the right
-caret indicates the direction of the edges. ('WRT' is short for 'with respect to'.)  In particular, we are retrieving the <i>value</i>
-stored in that vertex; every vertex can have a value stored in it.
+Here the Circle type, with its "position" and "radius" members, is a built-in visual primitive that can be parsed and displayed
+(in fact, any visual primitive has a 'position' member).
 <p>
-'wcs (world coordinate system)' is a concept that would be instantiated by default in any user-created graph so
-as to allow it to be visualized -- depending, perhaps, on what 'visualization package' the user chose for their problem.
-It is effectively an interface between the graph and the visualization module.  It would include a minimal structure:
+In general, though, the way that a particular vertex is visualized will depend not only on its concept, but its connectivity to
+other parts in the graph.  In other words, the visualization program itself might have to identify predicates within the graph,
+and change how it is drawn based on those predicates.  Since any such predicate should connect to the vertex in question, we can
+use a path-based syntax to identify them.
+<p>
+For example, the 'body' concept might have this rule:
 <p>
     <div class="indented">
-        x_axis OF wcs<br>
-        y_axis OF wcs
+    &lt;of&lt;*:x {<br>
+    &emsp;x.position = position<br>
+    }
     </div>
+<p>
+The first line is the predicate, which in this case is a single path.  Each path begins at the current part.  In this case we
+look for a neighboring 'OF' edge that points to us, and whose other endpoint can be anything.  We label that endpoint 'x', and
+set its position to our own.  This ensures that any property of a body will be drawn at the same pixel as the body itself.
 <p>
 The assignments to graph vertices are two-way.  That is, not only would the circle update itself according to the body's world
 position, but if the user drags it to a new location, the 'coordinate' vertices would have their values updated accordingly.
@@ -192,7 +194,9 @@ There would be additional rules for resolving the values of vertices.  For examp
 <p>
     <div class="indented">
     value = 1<br>
-    value *= *.OF&lt;this
+    &gt;of&gt;*:x {<br>
+    &emsp;value *= x<br>
+    }
     </div>
 <p>
 In other words, any product is 1 if nothing is being multiplied.  For each operand, which the product will point to via an 'OF'
@@ -203,7 +207,7 @@ vertex by default, so we don't have to include that.
 In this way, each 'representation command' in one graph part that references another part, creates a dependency between them.  Whenever
 we need to visualize the problem, write it symbolically (eg. as equations), or calculate the values of its members, we iterate through
 the graph, resolving any commands that have no waiting dependencies, and as we resolve them, their values propagate to the commands that
-were waiting on them.  Thus we resolve the graph into more familiar representations.
+were waiting on them, cascading on until all possible commands have been run.  Thus we resolve the graph into more familiar representations.
 <p>
 All value/representation rules of a given concept would be inherited by concepts that instantiate it via an 'IS A' edge, and these
 'child concepts' could add to it or override any part of it.  For example, the 'force' concept, which 'IS A vector', might say
@@ -213,6 +217,79 @@ All value/representation rules of a given concept would be inherited by concepts
     </div>
 <p>
 thus modifying the 'arrow' field that was defined in 'vector' to specify that forces will be represented by arrows of a specific color.
+<p>
+The representation language is fleshed out as we consider more involved examples.  Consider the addition of vectors: each
+vector is visualized as an arrow, while their sum is drawn by placing the arrows head-to-tail in sequence, and the resultant is drawn
+from the starting point to the ending point of our path.  We can capture this in the 'sum' concept as follows:
+
+<div class="indented">
+    &gt;of&gt;vector:v {<br>
+    &emsp;1: Arrow resultant<br>
+    &emsp;Arrow arrow<br>
+    &emsp;arrow.position = resultant.components<br>
+    &emsp;arrow.components = v.arrow.components<br>
+    &emsp;resultant.components += arrow.components<br>
+    }
+</div>
+
+<p>
+Note that the predicate path '&gt;of&gt;vector:v', like any other predicate, is applied to all matching instances.  Thus it is effectively a loop
+over all vector operands of the sum.  The '1:' prefix on the first command denotes that 'resultant' is only initialized for the first instance,
+ie. once we know we have a sum of vectors.  After that, for each new operand, we create a vector, set its start point to the current
+endpoint of the resultant, and its 'components' (a built-in field of the Arrow primitive) to those of the operand itself.
+<p>
+This program sequentially builds the visual model of a vector sum.  On the other hand, as the instances of the predicate have no true order,
+we might worry that the order of parts (arrows) in the visual could suddenly be changed on refresh.  Furthermore, if every mouse
+event (eg. dragging the endpoint of an arrow) triggers a refresh, we would prefer not to re-execute the whole visualization each time.  To avoid
+both of these issues, we have each command store the commands that sequentially used or edited its output value.  These are identified during the initial
+visualization, ie. they represent the de facto sequence, which is not inherent in the graph.  When a field is modified by user input, we
+only need to re-run the commands that directly depend on it and their dependent sequences.
+<p>
+Note also that a command in general runs implicitly on sub-fields.  For example, in the line 'arrow.position = resultant.components', both 'position'
+and 'components' actually have 'x' and 'y' sub-fields, so it is equivalent to the pair 'arrow.position.x = resultant.components.x; arrow.position.y = result.components.y'.
+If one of the operand fields has no sub-fields, it is treated as a constant over all these sub-commands.
+<p>
+A predicate can be more than a single path; we just decompose it into paths so it can be expressed as text.  The components of a multi-path predicate can be
+concatenated with the '&' sign.  For example, a 'coordinate system' can determine where 'points' in its domain are drawn.  Take the Cartesian coordinate system,
+which has the following rule (here 'wrt' is short for 'with respect to').
+
+<div class="indented">
+    &lt;of&lt;x_axis&lt;wrt&lt;coordinate:x&gt;of&gt;point:p <br>
+    & &lt;of&lt;y_axis&lt;wrt&lt;coordinate:y&gt;of&gt;p {<br>
+    &emsp;p.position.x = x<br>
+    &emsp;p.position.y = y<br>
+    }
+</div>
+
+<p>
+Notice that the variable <i>p</i> is re-used in the second path of the predicate, implying that the two paths terminate on the same 'point' vertex.  Other
+coordinate systems would have the same rule, only with different axis names and coordinate-to-screen transformations.
+<p>
+There may be additional features of the representation language, to be worked out as the project is developed.  One question is the priority of commands,
+when multiple commands from different parts would edit the same field.  For example, 'body' might contain a default command that ensures all of its properties
+are drawn on top of it:
+
+<div class="indented">
+    &lt;of&lt;*:x {<br>
+    &emsp;x.position = this.position<br>
+    }
+</div>
+
+<p>
+But some properties that are nominally 'OF' a body should not be drawn with that body as their origin.  For example, a 'position' (the physics concept, not the
+built-in property of drawables) is 'OF' a body and 'WITH RESPECT TO' a 'coordinate system', and it is the latter that should determine the origin of the
+displayed arrow.  So 'position' has this rule:
+
+<div class="indented">
+    &gt;with_respect_to&gt;coordinate_system:c {<br>
+    &emsp;this.position = c.position<br>
+    }
+</div>
+
+<p>
+The question is, since rules from different parts are executed in arbitrary order, how do we ensure the priority of the second command?  Probably the most natural
+rule is that a command which edits a field of its own part should take precedence over commands from other parts.  But there may be exceptions, and we might have
+to implement importance keywords akin to CSS, thus giving the content writers the necessary flexibility.
             </div>
         </div>
     </body>

@@ -9,10 +9,33 @@
 
             {{ include 'header.html' }}
 
+            {{
+            def sectionTitle(filename):
+                return getSectionTitle(filename, sections['sections'])
+
+            def getSectionTitle(filename, group):
+                for section in group:
+                    if section['file'] == filename:
+                        return cleanSectionTitle(section['title'])
+                    title = getSectionTitle(filename, section['sections'])
+                    if title is not None:
+                        return cleanSectionTitle(title)
+                    pass
+                return None
+
+            def cleanSectionTitle(title):
+                if title[-2:] == '!!' or title[-2:] == '??':
+                    title = title[:-2]
+                    pass
+                return title
+            }}
+
             {{ def sectionNav(): }}
                 <div class="nav-prev nav-item">
-                {{ if prevSection: }}
-                    <a href="{{ =URL('spacetime', 'index', vars={'section': prevSection['file'], 'language': language})}}"><< {{= prevSection['title']}}</a>
+                {{ if prevSection:
+                    title = cleanSectionTitle(prevSection['title'])
+                }}
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': prevSection['file'], 'language': language})}}"><< {{=title}}</a>
                 {{ pass }}
                 </div>
                 <div class="nav-toc nav-item">
@@ -21,8 +44,10 @@
                 {{ pass }}
                 </div>
                 <div class="nav-next nav-item">
-                {{ if nextSection: }}
-                    <a href="{{ =URL('spacetime', 'index', vars={'section': nextSection['file'], 'language': language})}}">{{= nextSection['title']}} >></a>
+                {{ if nextSection:
+                    title = cleanSectionTitle(nextSection['title'])
+                }}
+                    <a href="{{ =URL('spacetime', 'index', vars={'section': nextSection['file'], 'language': language})}}">{{= title}} >></a>
                 {{ pass }}
                 </div>
             {{ return }}
@@ -33,11 +58,8 @@
 
             <div id="content-wrapper">
 
-                {{ def cite(refName, paren=False): }}<span class="citation">
-                    {{if paren:}} ( {{pass}}
-                    <a href="{{=references[refName]['URL']}}">{{=references[refName]['inline']}}</a>
-                    {{if paren:}} ) {{pass}}
-                </span>{{ return }}
+                {{def cite(refName, paren=False):}}<span class="citation">{{if paren:}}({{pass}}<a href="{{=references[refName]['URL']}}">{{=references[refName]['inline']}}</a>{{if paren:}}){{pass}}</span>{{return}}
+                {{def section(filename):}}<span class="citation"><a href="{{=URL('spacetime','index',vars={'section':filename,'language':language})}}">{{=sectionTitle(filename)}}</a></span>{{return}}
 
                 {{ include sectionFile }}
             </div>

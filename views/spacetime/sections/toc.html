@@ -3,8 +3,20 @@
 {{ def display(section):
     if 'title' in section and section['title']: }}
     <li>
-        {{ if 'file' in section and section['file']: }}
-        <a href="{{=URL('spacetime', 'index', vars={'section': section['file'], 'language': language})}}">{{=section['title']}}</a>
+        {{ if 'file' in section and section['file']:
+            itemClass = 'toc-normal'
+            title = section['title']
+            if title[-2:] == '!!':
+                itemClass = 'toc-highlight'
+                title = title[:-2]
+            elif title[-2:] == '??':
+                itemClass = 'toc-ignore'
+                title = title[:-2]
+            else:
+                itemClass = 'toc-normal'
+            pass
+        }}
+        <a class="{{=itemClass}}" href="{{=URL('spacetime', 'index', vars={'section': section['file'], 'language': language})}}">{{=title}}</a>
         {{ else: }}
         {{=section['title']}}
         {{ pass }}

@@ -3,16 +3,14 @@ abstract,Abstract
 introduction,Introduction
 ,Background and Motivation
 +riemannian_basics,Riemannian Basics
-+quadratic_metric,Relativity
++relativity,Relativity
 +riemannian_concepts,Riemannian Concepts
 ,Charge
-+belt_model,Belt Model
-+space_model,Space Model (Electron)
-+electric_field,Electric Field
-+curvature_waves,Curvature Waves
-+baryons,Baryons
-+mesons_quark_generations,Mesons and Quark Generations
-+lepton_generations,Lepton Generations
++belt_model,Belt Model!!
++space_model,Space Model (Electron)!!
++electric_field,Electric Field!!
++curvature_waves,Curvature Waves!!
++baryons,Baryons!!
 ,Spin
 +internal_spin,Internal Spin
 +external_spin,External Spin
@@ -21,10 +19,9 @@ introduction,Introduction
 ,Mass
 +planck_relation,The Planck-Einstein Relation
 +geodesic_motion,Geodesic Motion
-+baryon_mass,Baryon Mass
-+higgs_field,The Higgs Field and Dark Energy
++higgs_field,The Higgs Field and Dark Energy!!
 +higgs_boson,The Higgs Boson
 +dark_matter,Dark Matter
-+generational_mass_trend,Generational Mass Trend
-+neutrino_oscillations,Neutrino Oscillations
++baryon_mass,Baryon Mass
++generations,Generations
 conclusion,Conclusion

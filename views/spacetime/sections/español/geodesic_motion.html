@@ -1,73 +1,64 @@
-<span class="section-title">Geodesic Motion</span>
+<span class = "section-title"> Movimiento geodésico </span>
 
-At the same time, according to the Einstein field equation, matter is associated with the Einstein tensor, which is the Ricci tensor with its “metric component” flipped.  That is, we can decompose a symmetric second-rank tensor into a multiple of the metric,
+Al mismo tiempo, de acuerdo con la ecuación de campo de Einstein, la materia está asociada con el tensor de Einstein, que es el tensor de Ricci con su "componente métrico" invertido. Es decir, podemos descomponer un tensor simétrico de segundo rango en un múltiplo de la métrica,
 
 \begin{equation*}
 	R_{\mu\nu,metric} = \frac{g^{\sigma\rho}R_{\sigma\rho}}{g^{\alpha\beta}g_{\alpha\beta}}g_{\mu\nu} = \frac14 R g_{\mu\nu}
 \end{equation*}
 
-and a tensor whose metric trace is zero (“orthogonal to the metric”), in analogy with the decomposition of vectors,
+y un tensor cuya traza métrica es cero ("ortogonal a la métrica"), en analogía con la descomposición de vectores,
 
 \begin{equation*}
 	\vec a_b = \frac{\vec a \cdot \vec b}{\vec b \cdot \vec b} \  \vec b
 \end{equation*}
 
-and the Einstein tensor is
+y el tensor de Einstein es
 
 \begin{equation*}
 	G_{\mu\nu} = R_{\mu\nu} - 2R_{\mu\nu,metric} = R_{\mu\nu} - \frac12 R g_{\mu\nu}
 \end{equation*}
 
-Einstein suspected that this tensor is the one determined by matter, because its divergence happens to be identically zero in any manifold, so that it naturally enforces the conservation of momentum and energy {{cite('einstein_matter',True)}}.
+Einstein sospechaba que este tensor es el determinado por la materia, porque su divergencia resulta ser idénticamente cero en cualquier variedad, por lo que naturalmente obliga a la conservación del momento y la energía {{cite('einstein_matter', True)}}.
 <p>
-
-	That has the result that, locally, mass density is the sum of the Ricci eigenvalues.  But it is less straightforward to define the mass of a finite distribution.  However, this model is apparently a stationary spacetime or close to it, so that we can use Komar’s mass integral, which is a kind of volume integral of the Ricci curvature {{cite('komar_mass',True)}}.
+Eso tiene el resultado de que, localmente, la densidad de masa es la suma de los valores propios de Ricci. Pero es menos sencillo definir la masa de una distribución finita. Sin embargo, este modelo es aparentemente un espacio-tiempo estacionario o cercano a él, de modo que podemos usar la integral de masa de Komar, que es una especie de integral de volumen de la curvatura de Ricci {{cite ('komar_mass', True)}}.
 <p>
-
-	First of all, that has an interesting consequence.  Since mass and frequency are proportional, mass and period are inversely so, such that the product of mass and period is a constant (Planck’s constant).  But since the spacetime is stationary, the product of mass and period is the same as the integral of mass over one period, which by the Komar formula is essentially the curvature integrated over the spacetime hypervolume in one period.  That is, Planck’s constant can also be interpreted as the total curvature in one period.
+En primer lugar, eso tiene una consecuencia interesante. Dado que la masa y la frecuencia son proporcionales, la masa y el período lo son inversamente, de modo que el producto de la masa y el período es una constante (constante de Planck). Pero como el espacio-tiempo es estacionario, el producto de masa y período es el mismo que la integral de masa durante un período, que según la fórmula de Komar es esencialmente la curvatura integrada sobre el hipervolumen del espacio-tiempo en un período. Es decir, la constante de Planck también se puede interpretar como la curvatura total en un período.
 <p>
-
-	A natural question is whether the spin period is proportional to the periods of timelike geodesics over the loop.  Now, the time curvature varies as the inverse square of the geodesic period.  But we have seen in "<a href="{{=URL('spacetime','index',vars={'section':'planck_relation'})}}">The Planck-Einstein Relation</a>" that the effective radius of the waveform is proportional to the spin period, so that the spatial volume should scale as its cube.  If the two periods were proportional, the hypervolume of a period would thus scale as their fourth power, so that, the form of the spacetime being similar, the total curvature in a period would not be constant, and the Planck-Einstein relation would not hold.
+Una pregunta natural es si el período de giro es proporcional a los períodos de geodésicas temporales sobre el circuito. Ahora, la curvatura del tiempo varía como el cuadrado inverso del período geodésico. Pero hemos visto en "{{section('planck_relation')}}" que el radio efectivo de la forma de onda es proporcional al período de giro, de modo que el volumen espacial debe escalar como su cubo. Si los dos períodos fueran proporcionales, el hipervolumen de un período se escalaría como su cuarta potencia, de modo que, siendo similar la forma del espacio-tiempo, la curvatura total en un período no sería constante y la relación de Planck-Einstein no sería constante sostener.
 
 \begin{align*}
-R_{tt} \propto \frac{1}{T_{geodesic}^2} \\
+R_{tt} \propto \frac{1}{T_{geodesica}^2} \\
 r_{eff} \propto T_{spin} \\
 V \propto r_{eff}^3 \propto T_{spin}^3 \\
-hypervolume \propto VT_{spin} \propto T_{spin}^4 \\
-total\ curvature \propto hypervolume\ \cdot\ curvature \propto \frac{T_{spin}^4}{T_{geodesic}^2} \\
-total\ curvature\ is\ constant\ \rightarrow\ \frac{T_{spin}^4}{T_{geodesic}^2} = constant
+hipervolumen \propto VT_{spin} \propto T_{spin}^4 \\
+curvatura\ total \propto hipervolumen\ \cdot\ curvatura \propto \frac{T_{spin}^4}{T_{geodesica}^2} \\
+curvatura\ total\ es\ constante\ \rightarrow\ \frac{T_{spin}^4}{T_{geodesica}^2} = constante
 \end{align*}
 
-	So apparently the geodesic and spin periods are not proportional, meaning that the mass in the waveform is not following timelike geodesics.  This suggests that the law of gravitational motion is not obeyed within the particle’s waveform, that is, on the smallest of scales.  But for general relativity to hold, the particle as a whole should appear to follow a geodesic.
+Entonces, aparentemente, los períodos geodésico y de giro no son proporcionales, lo que significa que la masa en la forma de onda no sigue geodésicas temporales. Esto sugiere que la ley del movimiento gravitacional no se obedece dentro de la forma de onda de la partícula, es decir, en la más pequeña de las escalas. Pero para que la relatividad general se mantenga, la partícula como un todo debería parecer seguir una geodésica.
 <p>
-
-	In particular, since energy and momentum are already conserved by virtue of the non-divergence of the Einstein tensor, geodesic motion in gravitational fields is the <span class="italic">only</span> additional condition required to ensure that general relativity is satisfied on macroscopic scales.
+En particular, dado que la energía y el momento ya se conservan en virtud de la no divergencia del tensor de Einstein, el movimiento geodésico en los campos gravitacionales es la <span class = "italic"> única </span> condición adicional requerida para asegurar que la relatividad general se satisface en escalas macroscópicas.
 <p>
-
-	More precisely, if we consider a family of geodesics that are (a) momentarily comoving with the particle, and (b) far enough from the singularity that they are not appreciably affected by it, the particle worldline should remain comoving with them, even though, in the midst of its own turbulent region of spacetime, that worldline may not constitute a geodesic.  (This assumes that this comoving geodesic family remains coherent, that is, its members remain more or less comoving with each other, which is to say the local curvature surrounding the particle is much smaller than its own curvature — which should hold in typical gravitational fields.)  The general idea is shown below:
+Más precisamente, si consideramos una familia de geodésicas que (a) están momentáneamente comovidas con la partícula, y (b) lo suficientemente lejos de la singularidad como para que no se vean afectadas de manera apreciable por ella, la línea del mundo de la partícula debería permanecer comoviéndose con ellas, aunque , en medio de su propia región turbulenta del espacio-tiempo, esa línea de mundo puede no constituir una geodésica. (Esto supone que esta familia geodésica comoviva permanece coherente, es decir, sus miembros permanecen más o menos comovándose entre sí, es decir, la curvatura local que rodea a la partícula es mucho más pequeña que su propia curvatura, que debería mantenerse en los campos gravitacionales típicos.) La idea general se muestra a continuación:
 <p>
-
 
 <div id="fig:geodesic_motion" class="figure">
 <image width=60% src="{{=URL('static','spacetime/images/Geodesic_Motion.jpg')}}"></image>
 <div class="figure-caption">
-    Schematic illustration of the notion that the worldline (dashed red curve) must remain comoving with the asymptotic family of momentarily comoving geodesics (purple curves), in adherence with general relativity, even though the mass of the waveform (green squiggle) may not follow its own local timelike geodesics.
+    Ilustración esquemática de la noción de que la línea del mundo (curva roja punteada) debe permanecer como conviniendo con la familia asintótica de geodésicas como concomitantes momentáneamente (curvas púrpuras), en cumplimiento con la relatividad general, aunque la masa de la forma de onda (garabato verde) puede no seguir su propias geodésicas locales similares al tiempo.
 </div>
 </div>
 
-But geodesic propagation of a soliton is a condition that we might expect to be naturally enforced by the wave equation.  After all, plane waves and wave packets in linear systems propagate at constant velocity.  And remember that the wave equation only has its familiar form
+Pero la propagación geodésica de un solitón es una condición que podríamos esperar que la ecuación de onda imponga de forma natural. Después de todo, las ondas planas y los paquetes de ondas en sistemas lineales se propagan a velocidad constante. Y recuerda que la ecuación de onda solo tiene su forma familiar
 
 \begin{equation*}
 	(-\frac{1}{c^2} \frac{\partial^2}{\partial t^2} + \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2} + \frac{\partial^2}{\partial z^2}) R_{\rho\sigma\mu\nu} = 0
 \end{equation*}
 
-in geodesic normal coordinates.
+en coordenadas geodésicas normales.
 <p>
-
-	Suppose that the waveform did deviate from its comoving geodesic neighborhood.  The deviation would have to occur along a particular spatial direction.  Yet the loop model has only one distinguished direction: the loop axis.  But then, towards which side of the axis would it veer?  The only difference is due to spin, which appears right-handed in one direction and left-handed in the other.  But the wave equation apparently makes no distinction between the two senses of rotation.
+Suponga que la forma de onda se desvió de su vecindario geodésico comoving. La desviación debería ocurrir a lo largo de una dirección espacial particular. Sin embargo, el modelo de bucle tiene solo una dirección diferenciada: el eje del bucle. Pero entonces, ¿hacia qué lado del eje se desviaría? La única diferencia se debe al giro, que parece ser diestro en un sentido y zurdo en el otro. Pero la ecuación de onda aparentemente no hace distinción entre los dos sentidos de rotación.
 <p>
-
-	Put another way: the average spatial variation of the waveform is symmetric across any given plane.  So by the normal form of the wave equation written above, the average time variation should be as well.  But if the waveform veers to one side of that plane, the variation of curvature along comoving geodesics on the two sides will be opposite - the curvature will grow on one side and shrink on the other.  And since the derivatives in the normal form of the equation are themselves measured along geodesics, that violates the symmetry of the equation.
+Dicho de otra manera: la variación espacial promedio de la forma de onda es simétrica en cualquier plano dado. Entonces, según la forma normal de la ecuación de onda escrita anteriormente, la variación de tiempo promedio también debería serlo. Pero si la forma de onda se desvía hacia un lado de ese plano, la variación de la curvatura a lo largo de las geodésicas comanditarias en los dos lados será opuesta: la curvatura crecerá en un lado y se reducirá en el otro. Y dado que las derivadas en la forma normal de la ecuación se miden a lo largo de las geodésicas, eso viola la simetría de la ecuación.
 <p>
-
-	So it appears likely that the law of gravity will be naturally obeyed by these solitonic particles.
+Por tanto, parece probable que estas partículas solitónicas obedezcan naturalmente la ley de la gravedad.

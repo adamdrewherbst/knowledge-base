@@ -38,6 +38,8 @@ def index():
     prevSection = None
     nextSection = None
     for line in toc:
+        if line[-2:] == '??':
+            continue
         arr = line.lstrip('+').split(',')
         if arr[0] == 'toc':
             tableOfContentsTitle = arr[1]

@@ -49,6 +49,18 @@
     padding: 20px 50px;
 }
 
+.toc-normal {
+}
+
+.toc-highlight {
+    background-color: #ffa;
+}
+
+.toc-ignore {
+    color: #600;
+    text-decoration: line-through;
+}
+
 .dedication {
     text-align: center;
     font-style: italic;

@@ -11,8 +11,9 @@ introduction,Introducción
 +electric_field,El Campo Eléctrico
 +curvature_waves,Ondas de Curvatura
 +baryons,Los Bariones
-+mesons_quark_generations,Mesones y Generaciones de Quarks
-+lepton_generations,Generaciones de Leptones
++generations,Generaciones
++mesons_quark_generations,Mesones y Generaciones de Quarks??
++lepton_generations,Generaciones de Leptones??
 ,El Giro Cuántico
 +internal_spin,El Giro Interno
 +external_spin,El Giro Externo
@@ -25,6 +26,6 @@ introduction,Introducción
 +higgs_field,El Campo Higgs y la Energía Oscura
 +higgs_boson,El Bosón de Higgs
 +dark_matter,La Materia Oscura
-+generational_mass_trend,La Tendencia Masiva de las Generaciones
-+neutrino_oscillations,Oscilaciones de Neutrinos
++generational_mass_trend,La Tendencia Masiva de las Generaciones??
++neutrino_oscillations,Oscilaciones de Neutrinos??
 conclusion,Conclusión

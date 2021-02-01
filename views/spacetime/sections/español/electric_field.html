@@ -1,12 +1,10 @@
-<span class="section-title">The Electric Field</span>
+<span class = "section-title"> El campo eléctrico </span>
 
-How does the electric field relate to the curvature?  Here, it is helpful to consider two electrons in close proximity.  How do their curvature fields combine in the region between them?  The difficulty is that these fields are not defined with respect to some immutable “base space”, such that we can simply add their corresponding tensor components at each point.  The manifold is at once the field and the space.
+¿Cómo se relaciona el campo eléctrico con la curvatura? Aquí, es útil considerar dos electrones muy próximos. ¿Cómo se combinan sus campos de curvatura en la región entre ellos? La dificultad es que estos campos no están definidos con respecto a algún “espacio base” inmutable, de modo que simplemente podemos agregar sus correspondientes componentes tensoriales en cada punto. Lo múltiple es a la vez campo y espacio.
 <p>
-
-	But the intuition behind the curvature field was that space must twist, in a real sense, in order to compensate topologically for the formation of the loop.  The curvature field is the mathematical expression of that twist, but we should still be justified in talking in terms of the twisting of space itself.  So, if one electron applies a twist to a given region of space, and another electron applies a twist of the same handedness to the same region, how can the effect be other than a sum of the two twists?  Such that the local twist rates of the two electrons will add.
+Pero la intuición detrás del campo de curvatura fue que el espacio debe torcerse, en un sentido real, para compensar topológicamente la formación del bucle. El campo de curvatura es la expresión matemática de ese giro, pero aún así debería estar justificado hablar en términos de la torsión del espacio mismo. Entonces, si un electrón aplica una torsión a una región determinada del espacio, y otro electrón aplica una torsión de la misma mano a la misma región, ¿cómo puede el efecto ser diferente a la suma de las dos torsiones? De tal manera que se sumarán las tasas de torsión locales de los dos electrones.
 <p>
-
-	For simplicity, suppose the two electrons are oriented symmetrically, that is, with their loop axes aligned to the displacement between them.  Now, if the twist rate of each electron is a radially decaying function, then the sum of the two rates will have a minimum at the point halfway between them - but it will not be zero.  Yet we know the electric field halfway between two equal charges is zero.  This suggests that the electric field is proportional not to the twist rate, but to its derivative, which <span class="italic">is</span> zero at that point:
+Para simplificar, suponga que los dos electrones están orientados simétricamente, es decir, con sus ejes de bucle alineados con el desplazamiento entre ellos. Ahora, si la tasa de torsión de cada electrón es una función que decae radialmente, entonces la suma de las dos tasas tendrá un mínimo en el punto medio entre ellos, pero no será cero. Sin embargo, sabemos que el campo eléctrico a medio camino entre dos cargas iguales es cero. Esto sugiere que el campo eléctrico es proporcional no a la tasa de torsión, sino a su derivada, que <i>es</i> cero en ese punto:
 <p>
 
 
@@ -14,30 +12,30 @@ How does the electric field relate to the curvature?  Here, it is helpful to con
 <image width=42% src="{{=URL('static','spacetime/images/twist_rate_like_charges.png')}}"></image>
 <image width=42% src="{{=URL('static','spacetime/images/twist_rate_opposite_charges.png')}}"></image>
 <div class="figure-caption">
-    Net twist rate in the region between two like charges (left) and opposite charges (right).  The derivative corresponds to the electric field, such that, at the midpoint, it is zero for like charges and nonzero for opposite, as expected.
+    Tasa de torsión neta en la región entre dos cargas similares (izquierda) y cargas opuestas (derecha). La derivada corresponde al campo eléctrico, de modo que, en el punto medio, es cero para cargas iguales y distinto de cero para las opuestas, como se esperaba.
 </div>
 </div>
 
-This also makes sense because the twist rate itself is not directional anyway.  It is either right- or left-handed regardless of which way you look along the helical axis.  Whereas the derivative can tell us in which direction the twist rate becomes more or less right-handed.
+Esto también tiene sentido porque la velocidad de giro en sí no es direccional de todos modos. Puede ser diestro o zurdo, independientemente de hacia dónde mire a lo largo del eje helicoidal. Mientras que la derivada nos puede decir en qué dirección la tasa de torsión se vuelve más o menos derecha.
 <p>
-
-	Likewise, the twist rates between two opposite charges will subtract.  This time, the twist rate will be zero halfway between them, but its derivative will not, such that the electric field is nonzero, as expected.
+Asimismo, se restarán las tasas de torsión entre dos cargas opuestas. Esta vez, la tasa de torsión será cero a mitad de camino entre ellos, pero su derivada no lo será, de modo que el campo eléctrico sea distinto de cero, como se esperaba.
 <p>
-
-	This appears to support the superposition principle of electric fields: if the twist rates add, so do their derivatives.  The situation is more complicated when their directions differ, but at least we would expect them to pick an intermediate direction, and for the resulting rate to vary with their own, which corresponds conceptually to vector addition.
-
-This raises an interesting possibility.  If the electric field is the derivative of the twist rate, and the electric field of a point charge varies as the inverse square of the radius, the twist rate itself will vary as the inverse of the radius.  And if the helical curvature, as in Euclidean space, is the square of the twist rate, it will then vary as the inverse square of the radius, just like the electric field.
+Esto parece apoyar el principio de superposición de campos eléctricos: si las tasas de torsión se suman, también lo hacen sus derivadas. La situación es más complicada cuando sus direcciones difieren, pero al menos esperaríamos que elijan una dirección intermedia y que la tasa resultante varíe con la suya propia, que corresponde conceptualmente a la suma de vectores.
+<p>
+Esto plantea una posibilidad interesante. Si el campo eléctrico es la derivada de la tasa de torsión y el campo eléctrico de una carga puntual varía como el inverso del cuadrado del radio, la tasa de torsión en sí misma variará como la inversa del radio. Y si la curvatura helicoidal, como en el espacio euclidiano, es el cuadrado de la tasa de torsión, entonces variará como el cuadrado inverso del radio, al igual que el campo eléctrico.
 
 \begin{align}
     E \propto \frac{1}{r^2} \\
-    E \propto \frac{d}{dr} (twist\ rate) \\
-    \rightarrow twist\ rate \propto \frac{1}{r} \\
-    curvature \propto (twist\ rate)^2 \\
-    \rightarrow curvature \propto \frac{1}{r^2} \propto E
+    E \propto \frac{d}{dr} (taza\ de\ torsion) \\
+    \rightarrow taza\ de\ torsion \propto \frac{1}{r} \\
+    curvatura \propto (taza\ de\ torsion)^2 \\
+    \rightarrow curvatura \propto \frac{1}{r^2} \propto E
 \end{align}
 
-And if space is flat on average, the positive tangential curvature should equal the negative radial curvature, such that it will also have an inverse square profile.  Of course, one surface whose positive curvature varies as the inverse square of its radius is a sphere, or really any closed 2D surface.  (Actually this is only strictly true in Euclidean space; here, it is an approximation that should hold as long as we are not too close to the neck-pinch singularity, since surface-area to radius ratio behaves very differently near the singularity.)  So it is possible that the tangential geodesic sections form closed surfaces, just like the ones inside the loop.  If for some as-yet-unknown reason this were a fundamental characteristic of the electron space, then Gauss’ law of electric flux would effectively result from the Gauss-Bonnet theorem, which says that the total curvature on such a surface is independent of its shape and size.
+Y si el espacio es plano en promedio, la curvatura tangencial positiva debe ser igual a la curvatura radial negativa, de modo que también tendrá un perfil cuadrado inverso. Por supuesto, una superficie cuya curvatura positiva varía con el cuadrado inverso de su radio es una esfera, o realmente cualquier superficie 2D cerrada. (En realidad, esto solo es estrictamente cierto en el espacio euclidiano; aquí, es una aproximación que debería mantenerse siempre y cuando no estemos demasiado cerca de la singularidad del pellizco del cuello, ya que la relación área de superficie a radio se comporta de manera muy diferente cerca de la singularidad). Por tanto, es posible que las secciones geodésicas tangenciales formen superficies cerradas, como las que están dentro del bucle. Si por alguna razón aún desconocida esta fuera una característica fundamental del espacio de electrones, entonces la ley de flujo eléctrico de Gauss resultaría efectivamente del teorema de Gauss-Bonnet, que dice que la curvatura total en tal superficie es independiente de su forma y tamaño.
 <p>
+Sin embargo, podría ser imposible lograr esto en una variedad uniforme. Esto se debe a que una sección geodésica cerrada fuera del bucle cruzaría todas las geodésicas radiales, mientras que las que están dentro del bucle solo cruzan efectivamente las geodésicas desde un medio espacio, a medida que pasan al otro medio espacio. Entonces la curvatura externa sería más débil que la interna, ya que no es suficiente cerrar un solo medio espacio; y como resultado, habría una especie de torcedura en la curvatura a través de la singularidad. Por otra parte, la curvatura se acerca al infinito en la singularidad de todos modos, por lo que esto podría no estar demasiado fuera de lugar. O, si las secciones externas no se cierran, su tendencia radial podría seguir dictada, en aras de la continuidad, por el hecho de que las secciones internas sí cierran; de modo que todavía tendrían un perfil cuadrado inverso.
 
-	However, it might be impossible to achieve this in a smooth manifold.  That’s because a closed geodesic section outside the loop would cross all radial geodesics, whereas the ones inside the loop are effectively only crossing the geodesics from one half-space, as they transition to the other half-space.  So the external curvature would be weaker than the internal, since it is not sufficient to close a single half-space; and as a result, there would be a kind of kink in the curvature across the singularity.  Then again, the curvature approaches infinity at the singularity anyway, so this might not be too out of place.  Or, if the external sections do not close, their radial trend might still be dictated, in the interest of continuity, by the fact that the internal sections do close; such that they would still have an inverse square profile.
+
+
 

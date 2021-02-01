@@ -1,6 +1,6 @@
-<span class="section-title">A Space Model</span>
+<span class = "section-title"> Un modelo espacial </span>
 
-Could the same phenomenon occur in a 3D manifold?  At one particular point \(x\), we can choose a plane through \(x\), thus dividing space into two half-spaces.  Then we demand that every geodesic passing through \(x\) from one half-space traverses a loop before entering the other half-space.  The geodesics maintain their connectivity inside the loop.
+¿Podría ocurrir el mismo fenómeno en una variedad 3D? En un punto particular \(x\), podemos elegir un plano que pase por \(x\), dividiendo así el espacio en dos medios espacios. Luego exigimos que cada geodésico que pase por \(x\) desde un medio espacio atraviese un bucle antes de entrar al otro medio espacio. Las geodésicas mantienen su conectividad dentro del circuito.
 <p>
 
 
@@ -8,103 +8,88 @@ Could the same phenomenon occur in a 3D manifold?  At one particular point \(x\)
 <image width=50% src="{{=URL('static','spacetime/images/Half_Spaces.jpg')}}"></image>
 <image width=40% src="{{=URL('static','spacetime/images/Half_Spaces_With_Loop.jpg')}}"></image>
 <div class="figure-caption">
-    Left: Euclidean space, where all geodesics from one half-space of a point (red) pass directly to its other half-space (green) as they cross it.  Right: looped space - all geodesics from one half-space traverse a loop (blue) before entering the other half-space.
+    Izquierda: espacio euclidiano, donde todas las geodésicas de un medio espacio de un punto (rojo) pasan directamente a su otro medio espacio (verde) cuando lo cruzan. Derecha: espacio en bucle: todas las geodésicas de un medio espacio atraviesan un bucle (azul) antes de entrar en el otro medio espacio.
 </div>
 </div>
 
-In the picture above, the loop appears to overlap the space around it, but in reality it is completely separate; it only intersects the rest of the manifold at the point \(x\).  That is clearer in the two-dimensional cross-sections drawn below.
+En la imagen de arriba, el bucle parece superponerse al espacio que lo rodea, pero en realidad está completamente separado; solo se cruza con el resto de la variedad en el punto \(x\). Eso es más claro en las secciones transversales bidimensionales dibujadas a continuación.
 <p>
-
-	We can refer to the loop by its dividing plane, which separates the two half-spaces, or we can refer to the “loop axis”, the line (geodesic) orthogonal to this plane.
+Podemos referirnos al bucle por su plano de división, que separa los dos medios espacios, o podemos referirnos al “eje del bucle”, la línea (geodésica) ortogonal a este plano.
 <p>
-
-	If the loop has finite volume, its 2D cross-section will be like a disk (the peach-colored disk in the right-hand drawing above), where the boundary of the disk is formed from those geodesics that lie in the dividing plane.  But that would be geodesically incomplete.  So we have the geodesic cross sections form closed surfaces, by giving them sufficient positive curvature.
+Si el bucle tiene un volumen finito, su sección transversal 2D será como un disco (el disco de color melocotón en el dibujo de la derecha de arriba), donde el límite del disco se forma a partir de las geodésicas que se encuentran en el plano divisorio. Pero eso sería geodésicamente incompleto. Entonces tenemos las secciones transversales geodésicas que forman superficies cerradas, dándoles suficiente curvatura positiva.
 <p>
-
-	In order for that to happen, the radial geodesics must become momentarily parallel at \(x\).  We can see this by considering a planar section of the manifold:
+Para que eso suceda, las geodésicas radiales deben volverse momentáneamente paralelas en \(x\). Podemos ver esto considerando una sección plana de la variedad:
 
 <div id="fig:loop_cross_section" class="figure">
 <image width=45% src="{{=URL('static','spacetime/images/Geodesically_Incomplete_Loop.jpg')}}"></image>
 <image width=45% src="{{=URL('static','spacetime/images/Geodesically_Complete_Loop.jpg')}}"></image>
 <div class="figure-caption">
-    A 2D cross section of looped space.  The cross section of the loop (dashed black lines) would be an incomplete line segment (left) [a disk in three dimensions], but if there is sufficient positive curvature, it will close, keeping the manifold complete (right) [in 3D these cross-sections would look like spheres].  This requires a “neck pinch” singularity, where geodesics become parallel.
+    Una sección transversal 2D de espacio en bucle. La sección transversal del bucle (líneas negras discontinuas) sería un segmento de línea incompleto (izquierda) [un disco en tres dimensiones], pero si hay suficiente curvatura positiva, se cerrará, manteniendo el colector completo (derecha) [en 3D estas secciones transversales se verían como esferas]. Esto requiere una singularidad de "pellizco de cuello", donde las geodésicas se vuelven paralelas.
 </div>
 </div>
 
-This also has the consequence that the geodesics lying in the dividing plane coincide as they pass through the loop, because the boundary of the disk mentioned above has been contracted to a single point.
+Esto también tiene la consecuencia de que las geodésicas que se encuentran en el plano de división coinciden al pasar por el bucle, porque el límite del disco mencionado anteriormente se ha contraído en un solo punto.
 <p>
-
-	The point \(x\) is then a species of “neck pinch singularity”.  The radial curvature is negative, and its magnitude approaches infinity at the singularity.  Singularities of this general class have been studied, for example in {{cite('ricci_neckpinch_2012')}} and {{cite('ricci_neckpinch_2014')}}.
-
+El punto \(x\) es entonces una especie de “singularidad de pellizco de cuello”. La curvatura radial es negativa y su magnitud se aproxima al infinito en la singularidad. Se han estudiado las singularidades de esta clase general, por ejemplo en {{cite('ricci_neckpinch_2012')}} y {{cite('ricci_neckpinch_2014')}}.
 <p>
-
-How does the twist manifest?  In the belt, it essentially results from the topology of the belt being preserved, and something analogous should hold in 3D.  In particular, it should be an intrinsic feature, and we should not have to impose any arbitrary structures, such as a connection with torsion, in order to see it.
+¿Cómo se manifiesta el giro? En el cinturón, es esencialmente el resultado de que se conserva la topología del cinturón, y algo análogo debería mantenerse en 3D. En particular, debería ser una característica intrínseca, y no deberíamos tener que imponer ninguna estructura arbitraria, como una conexión con torsión, para poder verla.
 <p>
-
-	So if we use the natural Levi-Cevita connection, what could twist relative to it?  Not the geodesics, because the Levi-Cevita connection is essentially defined in terms of these.
+Entonces, si usamos la conexión natural Levi-Cevita, ¿qué podría torcerse en relación con ella? No las geodésicas, porque la conexión Levi-Cevita se define esencialmente en términos de estas.
 <p>
-
-	The next sensible candidate is the curvature.  Consider the Ricci tensor: it is a second-rank symmetric tensor, and as such it has an orthonormal basis of eigenvectors at every point.  So as we move along a path, the direction of a given eigenvector may turn relative to its parallel transport, and that constitutes a twisting field.  A right-handed twist corresponds to one sign of charge, left-handed to the other.
+El siguiente candidato sensato es la curvatura. Considere el tensor de Ricci: es un tensor simétrico de segundo rango y, como tal, tiene una base ortonormal de vectores propios en cada punto. Entonces, a medida que nos movemos a lo largo de una trayectoria, la dirección de un vector propio dado puede girar en relación con su transporte paralelo, y eso constituye un campo de torsión. Un giro a la derecha corresponde a un signo de carga, a la izquierda al otro.
 <p>
 
 
 <div id="fig:ricci_twist" class="figure">
 <image src="{{=URL('static','spacetime/images/Twisting_Tangential_Ricci_Field.jpg')}}"></image>
 <div class="figure-caption">
-    If the curvature in tangential planes is anisotropic, it can twist along the radial direction with respect to the Levi-Civita connection.  The purple and yellow arrows are taken to be two eigenvector fields of the Ricci tensor, and their lengths the eigenvalues.  The small green arrows represent a vector being transported by the connection.  The red dot is the singularity.  This drawing represents the space outside the loop, but a similar twist would occur along radial geodesics as they traverse the inside of the loop.
+     Si la curvatura en planos tangenciales es anisotrópica, puede girar a lo largo de la dirección radial con respecto a la conexión Levi-Civita. Las flechas violeta y amarilla se toman como dos campos de vectores propios del tensor de Ricci, y sus longitudes los valores propios. Las pequeñas flechas verdes representan un vector transportado por la conexión. El punto rojo es la singularidad. Este dibujo representa el espacio fuera del bucle, pero se produciría un giro similar a lo largo de las geodésicas radiales a medida que atraviesan el interior del bucle.
 </div>
 </div>
 
-Note that this can only happen if the curvature in the plane orthogonal to the path is anisotropic, i.e. the Ricci tensor has distinct eigenvalues.  Otherwise it would be meaningless to say whether it twists or not.
+Tenga en cuenta que esto solo puede suceder si la curvatura en el plano ortogonal a la trayectoria es anisotrópica, es decir, el tensor de Ricci tiene valores propios distintos. De lo contrario, no tendría sentido decir si se retuerce o no.
 <p>
-
-	The 3D loop described above is a radial phenomenon, in that every radial geodesic traverses the loop.  So it would make sense that the anisotropic Ricci field would twist about these radial lines, giving a radial electric field, just as we expect for a point particle.  And the twisting field, just like the radial curvature itself, will be strongest near the singularity where the distortion is concentrated, decaying with radial distance. This is portrayed in the picture above.
+El bucle 3D descrito anteriormente es un fenómeno radial, ya que cada geodésico radial atraviesa el bucle. Por lo tanto, tendría sentido que el campo de Ricci anisotrópico girara alrededor de estas líneas radiales, dando un campo eléctrico radial, tal como esperamos para una partícula puntual. Y el campo de torsión, al igual que la curvatura radial misma, será más fuerte cerca de la singularidad donde se concentra la distorsión, decayendo con la distancia radial. Esto se muestra en la imagen de arriba.
 <p>
-
-	That means the curvature components that are twisting are themselves tangential to spheres centered on the singularity.  And this implies the field cannot be spherically symmetric, because a smooth vector field on a sphere cannot be everywhere nonzero, by the <a href="https://en.wikipedia.org/wiki/Hairy_ball_theorem">Hairy Ball Theorem</a>.  But that is okay, because the electron, due to its gyromagnetic behavior, is not spherically symmetric anyway.  This suggests that an ideal Coulomb field, even in principle, can only exist as a macroscopic time average when many of these microscopic fields are combined with random orientations.
+Eso significa que los componentes de la curvatura que se retuercen son en sí mismos tangenciales a las esferas centradas en la singularidad. Y esto implica que el campo no puede ser esféricamente simétrico, porque un campo vectorial uniforme en una esfera no puede ser distinto de cero en todas partes, según el <a href="https://en.wikipedia.org/wiki/Hairy_ball_theorem"> Teorema de la bola peluda </a>. Pero eso está bien, porque el electrón, debido a su comportamiento giromagnético, no es esféricamente simétrico de todos modos. Esto sugiere que un campo de Coulomb ideal, incluso en principio, solo puede existir como un promedio de tiempo macroscópico cuando muchos de estos campos microscópicos se combinan con orientaciones aleatorias.
 <p>
-
-	If we suppose that the curvature is strongest along the axis of the loop, then the tangential Ricci eigenvector field on spheres centered at the singularity could look like this:
+Si suponemos que la curvatura es más fuerte a lo largo del eje del bucle, entonces el campo tangencial del vector propio de Ricci en esferas centradas en la singularidad podría verse así:
 <p>
 
 
 <div id="fig:ricci_sphere" class="figure">
 <image width=60% src="{{=URL('static','spacetime/images/Ricci_Eigenvectors_on_Spheres.jpg')}}"></image>
 <div class="figure-caption">
-    A possible view of two spheres centered on the singularity, as seen when looking along the loop axis.  The red arrows are one of the eigenvector fields, with their size indicating eigenvalue (curvature).  The curvature is strongest on the loop axis, and drops to zero as we reach the dividing plane (equator of the sphere).  As we move inward radially (from the left sphere to the right one), the eigenvector field twists.
+    Una posible vista de dos esferas centradas en la singularidad, como se ve al mirar a lo largo del eje del bucle. Las flechas rojas son uno de los campos de vector propio, y su tamaño indica el valor propio (curvatura). La curvatura es más fuerte en el eje del bucle y cae a cero cuando llegamos al plano divisor (ecuador de la esfera). A medida que nos movemos radialmente hacia adentro (de la esfera izquierda a la derecha), el campo de vector propio gira.
 </div>
 </div>
 
-Does the curvature have to be of a particular form in order to exhibit this twist?  The best example we have of a “twisting” manifold is the helicoid.  It has negative Gaussian curvature at all points, which is proportional to the square of its axial twist rate.  On the other hand, the twist of the helicoid is not intrinsic; it is induced by embedding the surface isometrically in Euclidean 3-space.
+¿La curvatura tiene que ser de una forma particular para exhibir este giro? El mejor ejemplo que tenemos de un colector "retorcido" es el helicoide. Tiene una curvatura gaussiana negativa en todos los puntos, que es proporcional al cuadrado de su tasa de torsión axial. Por otro lado, el giro del helicoide no es intrínseco; se induce incrustando la superficie isométricamente en el espacio 3 euclidiano.
 <p>
-
-	As an alternative to eigenvalues, we can describe the Ricci tensor by the sectional curvatures in the planes formed by its eigenvectors; the eigenvalues are averages of these sectional curvatures.  If one eigenvector is radial, then one section is tangential, and the other two include the radial direction.  Now, in the spirit of Riemann ({{cite('riemann_hypotheses')}}), we might suppose that space, at least outside the loop, is nearly flat on the whole, meaning that these sectional curvatures more or less cancel each other out.  Such that one has positive curvature, one negative, and the third may be either (or zero).  And because space is flat on average, maybe these sections behave almost like 2D surfaces embedded in Euclidean 3-space.  In particular, the one with negative curvature twists like a helicoid relative to the connection.
+Como alternativa a los autovalores, podemos describir el tensor de Ricci por las curvaturas seccionales en los planos formados por sus autovectores; los valores propios son promedios de estas curvaturas seccionales. Si un vector propio es radial, entonces una sección es tangencial y los otros dos incluyen la dirección radial. Ahora, en el espíritu de Riemann ({{cite ('riemann_hypotheses')}}), podríamos suponer que el espacio, al menos fuera del bucle, es casi plano en su conjunto, lo que significa que estas curvaturas seccionales más o menos se cancelan entre sí. afuera. De tal manera que uno tiene una curvatura positiva, uno negativo y el tercero puede ser (o cero). Y debido a que el espacio es plano en promedio, tal vez estas secciones se comporten casi como superficies 2D incrustadas en el espacio tridimensional euclidiano. En particular, el que tiene curvatura negativa se retuerce como un helicoide en relación con la conexión.
 <p>
-
-	In that case, the negative section must be one of the radial ones, so that we have the desired twist along the radial direction.  If it behaves like an embedded surface, its curvature will vary as the square of its twist rate.
+En ese caso, la sección negativa debe ser una de las radiales, para que tengamos el giro deseado en la dirección radial. Si se comporta como una superficie incrustada, su curvatura variará como el cuadrado de su tasa de torsión.
 <p>
-
-	And we have already assigned positive curvature to the cross sections inside the loop, so as to make them closed, and thus keep the manifold complete.  By continuation, we can make the tangential sections outside the loop positive as well.  For our purposes we need not consider the other radial section, as long as its curvature is distinct from the first one, so as to produce the required anisotropy.
+Y ya hemos asignado curvatura positiva a las secciones transversales dentro del bucle, para cerrarlas y así mantener completo el colector. Continuando, podemos hacer que las secciones tangenciales fuera del bucle también sean positivas. Para nuestros propósitos, no necesitamos considerar la otra sección radial, siempre que su curvatura sea distinta de la primera, para producir la anisotropía requerida.
 
 <div id="fig:external_sections" class="figure">
 <image width=60% src="{{=URL('static','spacetime/images/electron_external_sections.jpg')}}"></image>
 <div class="figure-caption">
-    2D sections formed by extending spatial geodesics from a point (green dot) outside the singularity (red dot).  One of the radial sections (yellow surface) should have negative curvature, allowing it to twist, while the tangential section (blue surface)
-    should have positive curvature, since the tangential sections transition to become the cross sections of the loop, which must close.  The radial twist is relative to the Levi-Civita connection.
+    Secciones 2D formadas al extender geodésicas espaciales desde un punto (punto verde) fuera de la singularidad (punto rojo). Una de las secciones radiales (superficie amarilla) debe tener una curvatura negativa que le permita girar, mientras que la sección tangencial (superficie azul)
+    debe tener una curvatura positiva, ya que las secciones tangenciales pasan a convertirse en las secciones transversales del bucle, que debe cerrarse. El giro radial es relativo a la conexión Levi-Civita.
 </div>
 </div>
 
 <p>
 
-<span class="side-note">Topological Invariance</span>
+<span class = "side-note"> Invarianza topológica </span>
 
-Of course, we cannot simply prescribe a Ricci tensor field and declare that such a manifold exists.  In fact, given a second-rank symmetric tensor field over a coordinate system, it not necessarily a tractable problem to prove that it <span class="italic">is</span> the Ricci curvature of a valid manifold.  That issue is addressed in depth by DeTurck ({{cite('deturck_ricci')}}, {{cite('deturck_ricci_local')}}).
+Por supuesto, no podemos simplemente prescribir un campo tensorial de Ricci y declarar que existe tal variedad. De hecho, dado un campo tensorial simétrico de segundo rango sobre un sistema de coordenadas, no es necesariamente un problema manejable demostrar que <i>es</i> la curvatura de Ricci de una variedad válida. DeTurck ({{cite('deturck_ricci')}}, {{cite('deturck_ricci_local')}} aborda ese problema en profundidad.
 <p>
-
-	But it's likely that wouldn't be the most efficient approach in this context anyway.  In this case, we are imagining that the twisting Ricci field is <span class="italic">induced</span> by the formation of a loop in a space that was initially homogeneous.  (We say <span class="italic">homogeneous</span> rather than <span class="italic">flat</span>, because space in our universe is not asymptotically flat, as evidenced by "dark energy", and this fact could be topologically important for the formation of the loop; this will be touched on again in "<a href="{{=URL('spacetime','index',vars={'section':'higgs_field'})}}">Higgs Field</a>").  This paper will not attempt to identify the process by which the loop is formed.  But the key to this whole theory is that the process must be one that preserves the topological invariants of spacetime, and that the twist is of just the right magnitude to achieve this.
+Pero es probable que ese no sea el enfoque más eficiente en este contexto de todos modos. En este caso, estamos imaginando que el campo de Ricci retorcido es <i>inducido</i> por la formación de un bucle en un espacio que inicialmente era homogéneo. (Decimos <i>homogéneo</i> en lugar de <i>plano</i>, porque el espacio en nuestro universo no es asintóticamente plano, como lo demuestra la "energía oscura", y este hecho podría ser topológicamente importante para la formación del bucle; esto se tocará nuevamente en "{{section('higgs_field')}}"). Este documento no intentará identificar el proceso mediante el cual se forma el bucle. Pero la clave de toda esta teoría es que el proceso debe preservar las invariantes topológicas del espacio-tiempo, y que el giro es de la magnitud justa para lograrlo.
 <p>
-
-	Perhaps the most notable topological theorem on manifolds is the <a href="https://en.wikipedia.org/wiki/Chern–Gauss–Bonnet_theorem">Chern-Gauss-Bonnet theorem</a>.  This states that the volume integral of a particular function of the curvature is equal to the Euler-Poincare characteristic of the manifold.  Yet it apparently does not apply in a meaningful way to odd-dimensional manifolds.  It does hold, however, in four-dimensional Lorentzian spacetime.  So if we could find the asymptotically homogeneous spacetime corresponding to an isolated charged particle, we could check that it obeys Chern's theorem, with the Euler characteristic being that of the homogeneous background spacetime itself.  And if the particle spacetime is stationary, it should be sufficient to take the integral over a three-dimensional spatial cross-section.  (But the function integrated would include the timelike curvature, which is why it is still a four-dimensional result.)
+Quizás el teorema topológico más notable sobre variedades es el <a href="https://en.wikipedia.org/wiki/Chern–Gauss–Bonnet_theorem"> teorema de Chern-Gauss-Bonnet </a>. Esto establece que la integral de volumen de una función particular de la curvatura es igual a la característica de Euler-Poincare de la variedad. Sin embargo, aparentemente no se aplica de manera significativa a las variedades de dimensiones impares. Sin embargo, se mantiene en el espacio-tiempo lorentziano de cuatro dimensiones. Entonces, si pudiéramos encontrar el espaciotiempo asintóticamente homogéneo correspondiente a una partícula cargada aislada, podríamos comprobar que obedece al teorema de Chern, siendo la característica de Euler la del propio espaciotiempo homogéneo de fondo. Y si el espacio-tiempo de la partícula es estacionario, debería ser suficiente tomar la integral sobre una sección transversal espacial tridimensional. (Pero la función integrada incluiría la curvatura temporal, por lo que sigue siendo un resultado de cuatro dimensiones).
 <p>
+Aún así, parece que este método solo pudo verificar una solución existente. La pregunta abierta, entonces, y el primer desafío en la construcción de una teoría cuantitativa a partir de estas ideas, es si la analogía del cinturón se traslada a esta singular variedad de bucles y exactamente cómo.
 
-	Still, it seems this method could only verify an existing solution.  The open question, then, and the first challenge in constructing a quantitative theory from these ideas, is whether and exactly how the analogy of the belt carries over to this singular looped manifold.
+

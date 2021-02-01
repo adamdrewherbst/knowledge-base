@@ -1,6 +1,6 @@
-<span class="section-title">Riemannian Geometry: Basics</span>
+<span class="section-title">La Geometría de Riemannian: Conceptos Básicos</span>
 
-Consider a curve \(C\) in the plane:
+Considere una curva \(C\) en el plano:
 
 <div id="fig:1d_continuum" class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum.jpg')}}"></image>
@@ -8,7 +8,7 @@ Consider a curve \(C\) in the plane:
 </div>
 </div>
 
-We can think of each point of \(C\) as a vector \(\vec r\) from some origin \(O\).  Then we can label its points by some coordinate, \(x\).
+Podemos pensar en cada punto de \(C\) como un vector \(\vec r\) de algún origen \(O\). Entonces podemos etiquetar sus puntos por alguna coordenada, \(x\).
 
 <div id="fig:1d_continuum" class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum_coordinate.jpg')}}"></image>
@@ -16,9 +16,9 @@ We can think of each point of \(C\) as a vector \(\vec r\) from some origin \(O\
 </div>
 </div>
 
-Notice how the scale of the coordinate doesn't have to correspond to true distance along \(C\).
+Observe cómo la escala de la coordenada no tiene que corresponder a la distancia real a lo largo de \(C\).
 <p>
-A tangent vector at each point is \(\frac{d\vec r}{dx}\).  Its length varies according to the coordinate scale.
+Un vector tangente en cada punto es \(\frac{d\vec r}{dx}\). Su longitud varía según la escala de coordenadas.
 
 <div id="fig:1d_continuum" class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum_tangent_vector.jpg')}}"></image>
@@ -26,13 +26,13 @@ A tangent vector at each point is \(\frac{d\vec r}{dx}\).  Its length varies acc
 </div>
 </div>
 
-But what \(\frac{d\vec r}{dx}\) tells us is the displacement of the curve <span class="italic">per unit of \(x\)</span>.  So really, it is the \(x\) unit vector, \(\hat x\).
+Pero lo que \(\frac{d\vec r}{dx}\) nos dice es el desplazamiento de la curva <span class = "italic"> por unidad de \(x\) </span>. Entonces, realmente, es el vector unitario \(x\), \(\hat x\).
 
 $$\frac{d\vec r}{dx} = \hat x$$
 
-It is "unit" with respect to the coordinate of the curve, not with respect to distance in the plane!
+Es "unidad" con respecto a la coordenada de la curva, ¡no con respecto a la distancia en el plano!
 <p>
-Any path within \(C\) is a sequence of infinitesimal tangent vectors.
+Cualquier camino dentro de \(C\) es una secuencia de vectores tangentes infinitesimales.
 
 <div id="fig:1d_continuum" class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/1D_continuum_path_vectors.jpg')}}"></image>
@@ -40,25 +40,25 @@ Any path within \(C\) is a sequence of infinitesimal tangent vectors.
 </div>
 </div>
 
-We can write one such path element as
+Podemos escribir un elemento de ruta como
 
 $$d\vec r = \frac{d\vec r}{dx} \, dx = \hat x \, dx$$
 
-The squared length of the path element is its dot product with itself:
+La longitud al cuadrado del elemento de ruta es su producto escalar consigo mismo:
 
 $$\lvert d\vec r \rvert^2 = (\hat x \, dx) \cdot (\hat x \, dx) = (\hat x \cdot \hat x) \, dx^2$$
 
-But since a single path can wind back and forth, we have to parametrize it by something other than \(x\); call it \(t\).  Then a path element is
+Pero dado que una sola ruta puede ir y venir, tenemos que parametrizarla con algo diferente a \(x\); llámalo \(t\). Entonces un elemento de ruta es
 
 $$d\vec r = \frac{d\vec r}{dt} dt = \frac{d\vec r}{dx} \frac{dx}{dt} dt = \hat x \frac{dx}{dt} dt$$
 
-And the length of the path is
+Y la longitud del camino es
 
 $$s = \int_a^b{\lvert \hat x \frac{dx}{dt} dt \rvert} = \int_a^b{\sqrt{(\hat x \cdot \hat x) \frac{dx}{dt}^2} dt}$$
 
-For the 1D case, such paths are really the only structures we can describe within \(C\).
+Para el caso de 1D, tales rutas son realmente las únicas estructuras que podemos describir dentro de \(C\).
 <p>
-So let's move on to a 2D surface, \(S\).  We can still describe its points as vectors from some origin \(O\), but now with two coordinates, \(x\) and \(y\).
+Así que pasemos a una superficie 2D, \(S\). Todavía podemos describir sus puntos como vectores de algún origen \(O\), pero ahora con dos coordenadas, \(x\) y \(y\).
 
 <div id="fig:1d_continuum" class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/2D_continuum_coordinate.jpg')}}"></image>
@@ -66,25 +66,25 @@ So let's move on to a 2D surface, \(S\).  We can still describe its points as ve
 </div>
 </div>
 
-And that gives us two unit vectors at each point, \(\frac{\partial\vec r}{\partial x} = \hat x\) and \(\frac{\partial\vec r}{\partial y} = \hat y\).  But a path element can be along an intermediate direction:
+Y eso nos da dos vectores unitarios en cada punto, \(\frac{\partial\vec r}{\partial x} = \hat x\) y \(\frac{\partial\vec r}{\partial y} = \hat y\). Pero un elemento de ruta puede estar en una dirección intermedia:
 
 $$d\vec r = \frac{\partial\vec r}{\partial x} dx + \frac{\partial\vec r}{\partial y} dy = \hat x \, dx + \hat y \, dy$$
 
-Again, to find its squared length, we take its self dot product.
+Nuevamente, para encontrar su longitud al cuadrado, tomamos su propio producto escalar.
 
 $$\lvert d\vec r \rvert^2 = (\hat x \, dx + \hat y \, dy) \cdot (\hat x \, dx + \hat y \, dy)
     = (\hat x \cdot \hat x) dx^2 + 2(\hat x \cdot \hat y) dx dy + (\hat y \cdot \hat y) dy^2$$
 
-This expression can be written with matrices:
+Esta expresión se puede escribir con matrices:
 
 $$\lvert d\vec r \rvert^2 = \begin{pmatrix} dx & dy \end{pmatrix} \begin{pmatrix} \hat x \cdot \hat x & \hat x \cdot \hat y \\ \hat x \cdot \hat y & \hat y \cdot \hat y \end{pmatrix} \begin{pmatrix} dx \\ dy \end{pmatrix}$$
 
-The matrix of dot products gets called the metric and given its own shorthand, since we can apply it to any path element \((dx, dy)\) to find its length.
+La matriz de productos escalares se llama métrica y se le da su propia abreviatura, ya que podemos aplicarla a cualquier elemento de ruta \((dx, dy)\) para encontrar su longitud.
 
 $$\begin{pmatrix} \hat x \cdot \hat x & \hat x \cdot \hat y \\ \hat x \cdot \hat y & \hat y \cdot \hat y \end{pmatrix}
  = \begin{pmatrix} g_{xx} & g_{xy} \\ g_{xy} & g_{yy} \end{pmatrix} = g_{ij}$$
 
-Furthermore, we can take the dot product between any two infinitesimal vectors, \(d\vec u\) and \(d\vec v\), at a given point.
+Además, podemos tomar el producto escalar entre dos vectores infinitesimales cualesquiera, \(d\vec u\) y \(d\vec v\), en un punto dado.
 
 $$d\vec u = \hat x \, dx_u + \hat y \, dy_u $$
 $$d\vec v = \hat x \, dx_v + \hat y \, dy_v $$
@@ -94,12 +94,12 @@ $$= \begin{pmatrix} dx_u & dy_u \end{pmatrix} \begin{pmatrix} \hat x \cdot \hat 
 $$= \begin{pmatrix} dx_u & dy_u \end{pmatrix} \begin{pmatrix} g_{xx} & g_{xy} \\ g_{xy} & g_{yy} \end{pmatrix} \begin{pmatrix} dx_v \\ dy_v \end{pmatrix}$$
 $$:= g(d\vec u, d\vec v)$$
 
-and use this to get the angle between them.  So we can find lengths and angles, and thus areas as well, for any path or region of the surface, as long as we know the 3 dot products of the two unit vectors at each point.
+y usa esto para obtener el ángulo entre ellos. Entonces podemos encontrar longitudes y ángulos, y por lo tanto áreas también, para cualquier camino o región de la superficie, siempre que sepamos los 3 productos escalares de los dos vectores unitarios en cada punto.
 <p>
-We know the dot product of two given vectors will come out the same no matter what coordinate system we put on the surface; the vector components will change, but so will the dot products of the coordinate vectors, and these
-changes will cancel out.  Any linear function of vectors with that property is called a tensor, so the \(g_{ij}\) matrix is called the metric tensor.
+Sabemos que el producto escalar de dos vectores dados resultará igual sin importar el sistema de coordenadas que pongamos en la superficie; los componentes del vector cambiarán, pero también lo harán los productos escalares de los vectores de coordenadas, y estos
+los cambios se cancelarán. Cualquier función lineal de vectores con esa propiedad se llama tensor, por lo que la matriz \(g_{ij}\) se llama tensor métrico.
 <p>
-What Riemann realized is that these quantities - length, angle, area - are the only ones that are really intrinsic to the surface.  The surface may have a hill on it, which we observe as having some elevation,
+De lo que se dio cuenta Riemann es de que estas cantidades (longitud, ángulo, área) son las únicas que son realmente intrínsecas a la superficie. La superficie puede tener una colina, que observamos que tiene cierta elevación,
 
 <div id="fig:1d_continuum" class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/surface_with_hill.jpg')}}"></image>
@@ -107,33 +107,33 @@ What Riemann realized is that these quantities - length, angle, area - are the o
 </div>
 </div>
 
-but that elevation is not intrinsic to the surface.  Rather, the hill is identified intrinsically by noting, for example, that the circumference of circular paths around a certain point (the peak) is <span class="italic">less</span> than \(\pi\) times their radius from that point.  This is the notion of intrinsic curvature, to be discussed in the next section.
+pero esa elevación no es intrínseca a la superficie. Más bien, la colina se identifica intrínsecamente al señalar, por ejemplo, que la circunferencia de las rutas circulares alrededor de un cierto punto (el pico) es <i>menos</i> que \(\pi\) veces su radio desde ese punto. Esta es la noción de curvatura intrínseca, que se discutirá en la siguiente sección.
 
 <div id="fig:1d_continuum" class="figure">
 <image width=70% src="{{=URL('static','spacetime/images/motivation/intrinsic_curvature.jpg')}}"></image>
 <div class="figure-caption">
-    If we limit ourselves to measurements within the surface, the radius of the red circles is measured along the purple curve, so ratio of circumference to radius will shrink with increasing radius.
+    Si nos limitamos a medir dentro de la superficie, el radio de los círculos rojos se mide a lo largo de la curva violeta, por lo que la relación entre la circunferencia y el radio se reducirá al aumentar el radio.
 </div>
 </div>
 
-And according to that description, a surface with two distant hills is intrinsically identical to one with a hill and a pit ("upside-down hill").
+Y de acuerdo con esa descripción, una superficie con dos colinas distantes es intrínsecamente idéntica a una con una colina y un pozo ("colina invertida").
 <p>
-The idea is that, if there were 2D beings living in the surface, they couldn't sense elevation, because it occurs in a dimension that extends out from the surface - a dimension of which they have no experience.
+La idea es que, si hubiera seres 2D viviendo en la superficie, no podrían sentir la elevación, porque ocurre en una dimensión que se extiende desde la superficie, una dimensión de la que no tienen experiencia.
 <p>
-So if we have a coordinate system and associated metric tensor, we no longer need to describe how the surface is positioned in 3D space using our \(\vec r\) vectors.  More essential is how points, paths, and areas of the surface are positioned <span class="italic">relative to each other along paths in the surface itself</span>.
+Entonces, si tenemos un sistema de coordenadas y un tensor métrico asociado, ya no necesitamos describir cómo se posiciona la superficie en el espacio 3D usando nuestros vectores \(\vec r\). Más esencial es cómo los puntos, las rutas y las áreas de la superficie se colocan <i>entre sí a lo largo de las rutas en la propia superficie</i>.
 <p>
-Thus Riemann pioneered the field of <span class="italic">intrinsic</span> geometry, yet we can see that it is also a shift toward <span class="italic">relative</span> geometry, so perhaps it is no surprise it should have enabled the formulation of the theory of relativity.
+Por lo tanto, Riemann fue pionero en el campo de la geometría <i>intrínseca</i>, pero podemos ver que también es un cambio hacia la geometría <i>relativa</i>, así que tal vez No es de extrañar que haya permitido la formulación de la teoría de la relatividad.
 <p>
-Also, now that we have this intrinsic structure, no longer anchored geometrically to the space outside it, we can add as many dimensions as we like.  Instead of a surface, we get a continuum, which is called a Riemannian manifold.  Thus we can describe a three- or four-dimensional curved continuum.
+Además, ahora que tenemos esta estructura intrínseca, ya no anclada geométricamente al espacio exterior, podemos agregar tantas dimensiones como queramos. En lugar de una superficie, obtenemos un continuo, que se llama variedad de Riemann. Por tanto, podemos describir un continuo curvo tridimensional o tetradimensional.
 <p>
-Riemann pointed this out, and he surmised on that basis that even the three-dimensional space around us likely has intrinsic curvature of its own.  Of course, general relativity proved him right on that count.  According to relativity, energy induces curvature in space as well as time, which becomes noticeable on large scales where much mass is present.
+Riemann señaló esto y supuso sobre esa base que incluso el espacio tridimensional que nos rodea probablemente tiene una curvatura intrínseca propia. Por supuesto, la relatividad general demostró que tenía razón en ese aspecto. Según la relatividad, la energía induce una curvatura en el espacio y en el tiempo, lo que se hace evidente a gran escala donde hay mucha masa.
 <p>
-But at the end of his seminal paper ({{cite('riemann_hypotheses')}}), Riemann wasn't concerned much with curvature on large scales.  He said this:
+Pero al final de su artículo seminal ({{cite ('riemann_hypotheses')}}), a Riemann no le preocupaba mucho la curvatura a gran escala. Dijo esto:
 
 <div class="quotation" style="font-size: 24px">
-The questions about the infinitely great are for the interpretation of nature useless questions. But this is not the case with the questions about the infinitely small. It is upon the exactness with which we follow phenomena into the infinitely small that our knowledge of their causal relations essentially depends. The progress of recent centuries in the knowledge of mechanics depends almost entirely on the exactness of the construction which has become possible through the invention of the infinitesimal calculus, and through the simple principles discovered by Archimedes, Galileo, and Newton, and used by modern physic. But in the natural sciences which are still in want of simple principles for such constructions, we seek to discover the causal relations by following the phenomena into great minuteness, so far as the microscope permits. Questions about the measure-relations of space in the infinitely small are not therefore superfluous questions.
+Las preguntas sobre lo infinitamente grande son preguntas inútiles para la interpretación de la naturaleza. Pero este no es el caso de las preguntas sobre lo infinitamente pequeño. De la exactitud con la que seguimos los fenómenos hasta lo infinitamente pequeño depende esencialmente nuestro conocimiento de sus relaciones causales. El progreso de los últimos siglos en el conocimiento de la mecánica depende casi enteramente de la exactitud de la construcción que se ha hecho posible gracias a la invención del cálculo infinitesimal y a través de los principios simples descubiertos por Arquímedes, Galileo y Newton, y utilizados por la física moderna. . Pero en las ciencias naturales que todavía carecen de principios simples para tales construcciones, buscamos descubrir las relaciones causales siguiendo los fenómenos en gran minuciosidad, hasta donde el microscopio lo permite. Las preguntas sobre las relaciones de medida del espacio en lo infinitamente pequeño no son, por tanto, preguntas superfluas.
 <p>
-If we suppose that bodies exist independently of position, the curvature is everywhere constant, and it then results from astronomical measurements that it cannot be different from zero; or at any rate its reciprocal must be an area in comparison with which the range of our telescopes may be neglected. But if this independence of bodies from position does not exist, we cannot draw conclusions from metric relations of the great, to those of the infinitely small; in that case the curvature at each point may have an arbitrary value in three directions, provided that the total curvature of every measurable portion of space does not differ sensibly from zero .... Now it seems that the empirical notions on which the metrical determinations of space are founded, the notion of a solid body and of a ray of light, cease to be valid for the infinitely small. We are therefore quite at liberty to suppose that the metric relations of space in the infinitely small do not conform to the hypotheses of geometry; and we ought in fact to suppose it, if we can thereby obtain a simpler explanation of phenomena.
+Si suponemos que los cuerpos existen independientemente de la posición, la curvatura es constante en todas partes, y de las mediciones astronómicas resulta que no puede ser diferente de cero; o en cualquier caso, su recíproco debe ser un área en comparación con la cual se puede despreciar el alcance de nuestros telescopios. Pero si esta independencia de los cuerpos respecto de la posición no existe, no podemos sacar conclusiones de las relaciones métricas de los grandes con las de los infinitamente pequeños; en ese caso, la curvatura en cada punto puede tener un valor arbitrario en tres direcciones, siempre que la curvatura total de cada porción mensurable del espacio no difiera sensiblemente de cero ... Ahora parece que las nociones empíricas sobre las cuales las determinaciones métricas de espacio se fundan, la noción de cuerpo sólido y de rayo de luz, deja de ser válida para lo infinitamente pequeño. Por tanto, tenemos la libertad de suponer que las relaciones métricas del espacio en lo infinitamente pequeño no se ajustan a las hipótesis de la geometría; y de hecho deberíamos suponerlo, si de ese modo podemos obtener una explicación más simple de los fenómenos.
 </div>
 
 

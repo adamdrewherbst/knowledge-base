@@ -1,0 +1,173 @@
+<span class="section-title">La Relatividad</span>
+
+Debido a que un camino en la superficie está formado por vectores infinitesimales, y la longitud de un vector se expresa mediante un producto escalar, terminamos con la forma cuadrática de la métrica, de la cual tenemos que sacar la raíz cuadrada para encontrar una distancia.
+
+$$\lvert d\vec r \rvert^2 = (\hat x \, dx + \hat y \, dy) \cdot (\hat x \, dx + \hat y \, dy)
+ = (\hat x \cdot \hat x) dx^2 + 2(\hat x \cdot \hat y) dx \, dy + (\hat y \cdot \hat y) dy^2$$
+$$ := g_{xx} \, dx^2 + 2 g_{xy} \, dx \, dy + g_{yy} dy^2$$
+
+Por supuesto, en una superficie real, \(\lvert d\vec r \rvert^2\) tiene que ser positivo. <i> Derivamos </i> las métricas de superficies conocidas para calcular sus propiedades, y el hecho de que fueran superficies reales para empezar asegura que la métrica siempre será positiva.
+<p>
+Pero la forma cuadrática de la métrica admite valores negativos. En particular, si el determinante de la métrica,
+
+$$ g_{xx} \, g_{yy} - g_{xy}^2 $$
+
+es negativo, entonces la métrica <i> tendrá </i> valores negativos. Podemos ver esto considerando una "curva de nivel" de la métrica: coordenadas de puntos que tienen el mismo valor métrico desde un punto dado \(p\), es decir, están "a la misma distancia del centro". (Dado que la métrica es
+sólo una aproximación de primer orden, estas coordenadas deben ser infinitesimales.) Si el determinante es positivo, entonces estas curvas de nivel serán elipses. Pero si es negativo, serán hipérbolas.
+
+<div class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/elliptic_metric.png')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/hyperbolic_metric.png')}}"></image>
+<div class="figure-caption">
+    Cada curva son las coordenadas de los puntos que se encuentran a la misma "distancia métrica" del punto central.
+</div>
+</div>
+
+Y en el caso hiperbólico, las dos familias codificadas por colores tienen signos opuestos de "\(\lvert d\vec r \rvert^2\)".
+<p>
+El caso elíptico es el que se da en superficies reales. En una superficie real, la métrica representa la distancia; por eso Riemann lo formuló en primer lugar. Y en el límite infinitesimal de una superficie, el conjunto de caminos con la misma distancia desde un punto \(p\) es un círculo verdadero. Es solo que puede <i> mapear </i> a una elipse excéntrica en el espacio de coordenadas si nuestros ejes no son perpendiculares y / o tienen diferentes factores de escala.
+
+<div class="figure">
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_measure_right.png')}}"></image>
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_coordinates_right.png')}}"></image>
+<div class="figure-caption">
+    Cuando medimos los puntos de un círculo usando dos ejes perpendiculares de igual escala (líneas verde y azul), nuestras coordenadas también forman un círculo.
+</div>
+</div>
+
+<div class="figure">
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_measure_skewed.png')}}"></image>
+<image width=30% src="{{=URL('static','spacetime/images/motivation/circle_coordinates_skewed.png')}}"></image>
+<div class="figure-caption">
+    Pero cuando los ejes están sesgados, las coordenadas resultantes tienen la ecuación de una elipse.
+</div>
+</div>
+
+Lo mismo sucede en el espacio 3D que nos rodea. Si lo etiquetamos con un sistema de coordenadas \(xyz\), entonces consideremos caminos infinitesimales de igual distancia desde un punto \(p\) en solo el plano \(xy\), todavía forman círculos y elipses en el espacio de coordenadas. De hecho, podríamos pensar que si
+Si usamos el sistema de coordenadas correcto, el cartesiano, podríamos extender estos caminos indefinidamente y aún formarían elipses de coordenadas proporcionales si tuvieran la misma distancia de \(p\). Pero al encontrar que la matemática de las superficies curvas se extiende a tres dimensiones, Riemann demostró que,
+si el espacio es curvo, no existe tal sistema de coordenadas.
+<p>
+Entonces, ¿qué pasa con el caso hiperbólico? Podría ser simplemente una curiosidad matemática.
+<p>
+Por supuesto, Einstein demostró lo contrario, a través de los dos enormes cambios de paradigma de la relatividad general y especial. Pero desde la comodidad de la retrospectiva, podemos especular
+que la mayor parte de esa transición podría haberse logrado de manera más simple, a la luz del trabajo de Riemann.
+<p>
+Se podría haber llegado a la relatividad postulando solo que el espacio-tiempo <i> es </i> un continuo. Porque ya sabemos por experiencia que el espacio es riemanniano, es decir. las coordenadas de las curvas métricas iguales forman elipses al <i> mínimo </i> para
+medidas pequeñas, si no grandes. Entonces, incluso si el tiempo se incorpora como una cuarta dimensión, el conjunto debería seguir siendo riemanniano. Por lo tanto, un punto especifica tanto una ubicación como un instante, y las rutas incluyen no solo
+caminos espaciales, sino trayectorias. Los primeros se denominan "espaciales", los segundos "temporales". Y dado que las medidas de estos caminos pueden ser distancias o tiempos, simplemente las llamamos "intervalos".
+<p>
+Ya sabemos por qué tipo de métrica se relacionan las dimensiones del espacio entre sí: elípticas.
+Así que solo nos queda descubrir cómo se relacionan el espacio y los intervalos de tiempo. Pero si también fueran elípticos, el tiempo sería matemáticamente equivalente a una cuarta dimensión del espacio, por lo que no deberíamos percibir
+como un tipo diferente de cantidad.
+<p>
+Entonces, realmente, la métrica del espacio-tiempo debe ser hiperbólica. Solo tenemos que comprobar que podemos hacerlo funcionar. Como en el caso espacial, nuestras coordenadas representan medidas infinitesimales relativas a algún punto \(p\), pero ahora
+están midiendo intervalos de tiempo junto con distancias. Afirmamos que los conjuntos de caminos infinitesimales de "intervalo igual" de \(p\) se miden como hipérbolas.
+<p>
+El conjunto de medidas más natural que podemos utilizar son las realizadas por un solo observador; llámalos \(A\). Entonces, cuando graficamos las medidas de \(A\), deberíamos terminar con la forma más natural de la hipérbola: los vértices
+intersecan los ejes del espacio y el tiempo.
+
+<div class="figure">
+<image width=50% src="{{=URL('static','spacetime/images/motivation/rest_frame_axes.png')}}"></image>
+<div class="figure-caption">
+    La trayectoria de \(A\) (eje \(dt\)) y los caminos que \(A\) percibe como espacio (líneas rojas), en el mapa de las propias medidas de \(A\)
+</div>
+</div>
+
+El eje de tiempo de \(A\) es también su trayectoria, porque no miden que se hayan movido. Además, podemos ver que los ejes espaciales de \(A\) son tangentes a las hipérbolas de tiempo.
+<p>
+Las trayectorias de cualquier otro observador \(B\) que pasó por el punto \(p\) también deben estar en este mapa. En su lugar, podríamos cambiar nuestros ejes para representar las medidas de \(B\). Entonces la trayectoria de \(B\) pasaría
+a través del vértice de la hipérbola, y su eje espacial sería tangente a él. Pero un cambio de coordenadas no altera si dos curvas reales se intersecan o son tangentes; y recuerda que la hipérbola representa el mismo real
+curva para ambos observadores: un conjunto de puntos con una cierta métrica de trayectoria de \(p\). Por lo tanto, la trayectoria de \(B\) y el eje espacial deben intersecarse y ser tangentes a esa hipérbola de acuerdo con las medidas de \(A\) también.
+
+<div class="figure">
+<image width=50% src="{{=URL('static','spacetime/images/motivation/moving_frame_axes.png')}}"></image>
+<div class="figure-caption">
+    La trayectoria de \(B\) (línea negra) y los caminos que \(B\) percibe como espacio (líneas naranjas), nuevamente en el mapa de las medidas de \(A\)
+</div>
+</div>
+
+Para especificar completamente la naturaleza de las pequeñas mediciones, solo necesitamos una observación más: que para que el continuo sea percibido de la misma manera por todos los observadores, el espacio / tiempo
+la pendiente de la asíntota de la hipérbola debe ser invariante. Por supuesto, llamamos a esa pendiente la velocidad de la luz.
+<p>
+Pero estas son solo las leyes de la relatividad. Así que la relatividad es realmente la <i> única </i> forma razonable de que el espacio-tiempo sea un continuo.
+<p>
+La pregunta es, ¿por qué alguien postularía que la forma matemática del espacio y el tiempo es un continuo único? Pero entonces, ¿por qué alguien postularía algo más? Newton devoto
+gran parte de la <a href="https://en.wikisource.org/wiki/The_Mathematical_Principles_of_Natural_Philosophy_(1846)/Definitions"> sección "Scholium" de los Principia </a> para definir explícitamente la absoluta
+espacio y tiempo; sin embargo, había poca justificación que ofrecer. El espacio newtoniano es infinito y euclidiano, y hay una instancia distinta de él para cada instante de tiempo, lo que hace que el espacio-tiempo
+fundamentalmente un producto cartesiano de un espacio tridimensional y un tiempo unidimensional. Newton tuvo que elegir su modelo entre las estructuras matemáticas que se conocían en ese momento.
+<p>
+Pero, ¿y si la gran integración de las matemáticas y la física, encarnada por los Principia, hubiera ocurrido después del desarrollo de la geometría diferencial intrínseca? El espacio euclidiano es sólo un caso especial de un riemanniano.
+múltiple, que tiene las restricciones adicionales impuestas por los postulados de Euclides. Entonces, la afirmación más sabia hubiera sido solo que el espacio es riemanniano, porque eso
+implica menos suposiciones, lo que permite más espacio para que la teoría sea correcta.
+<p>
+Y debido a que la métrica hiperbólica aparece naturalmente en la geometría intrínseca (para ser excluida, debe afirmarse explícitamente que la métrica solo proporciona valores positivos), podría haberse considerado,
+y resultó ser un medio de relacionar medidas espaciales y temporales, sin tener que postular el tiempo como una entidad adicional. En otras palabras, la navaja de Occam podría haber llevado naturalmente al relativista
+modelo de espacio-tiempo en primer lugar. Entonces, la existencia de una velocidad máxima invariante habría sido una predicción novedosa de la teoría, que se vería confirmada más tarde cuando las teorías electromagnéticas y / o
+Se desarrollaron y confirmaron ondas gravitacionales. Quién sabe, si Riemann no hubiera muerto a los 39, tal vez él mismo hubiera explorado esta avenida.
+<p>
+Pero, ¿cómo se desarrolló históricamente esa transición? Primero, Einstein encontró la métrica hiperbólica de la relatividad especial para <i> explicar </i> la velocidad invariante que ya había sido descubierta por
+electromagnetismo. Pero por el momento, los postulados euclidianos se dejaron en su lugar. Sin embargo, incluso en este paso, el modelo del espacio-tiempo se volvió más simple en la medida en que postulaba solo
+una entidad, con una métrica, en lugar de dos.
+<p>
+Debido a que la relatividad especial proporcionó una única métrica para cualquier camino en el espacio-tiempo, las trayectorias de los cuerpos podrían compararse de acuerdo con su "intervalo" (que también es el tiempo medido por un observador en esa trayectoria).
+Y como era de esperar, se encontró que las trayectorias "inerciales" - la familia de caminos que mantienen velocidades constantes entre sí, de ahí las trayectorias
+que serán seguidos por cuerpos no forzados - fueron también los caminos matemáticamente distinguidos según su intervalo. (Específicamente, eran las rutas del intervalo <i> máximo </i> entre dos puntos, lo que puede parecer
+opuesto de lo que uno adivinaría, pero es solo el resultado de la naturaleza hiperbólica de la métrica). Es decir, son las generalizaciones de líneas rectas. Este resultado aparentemente fue publicado por primera vez por Planck.
+<p>
+La siguiente inconsistencia que se hizo evidente fue la que existe entre la relatividad especial y la gravitación. Y fue sólo en el intento de reconciliarlos que Einstein tuvo su "pensamiento más feliz": que la experiencia <i> local </i> de
+un observador en caída libre gravitacional, no es diferente a la experiencia <i> local </i> de un observador a la deriva inercialmente,
+libre de todas las fuerzas. En cualquier caso, todos los cuerpos en las proximidades experimentan la misma aceleración gravitacional (finita en el primer caso, cero en el segundo) por lo que solo se perciben entre sí como acelerando en la medida en que
+se interactúan. Solo desde la distancia los observadores que se mueven inercialmente y en caída libre se perciben a sí mismos acelerando hacia o alejándose unos de otros.
+
+<div class="figure">
+<image width=50% src="{{=URL('static','spacetime/images/motivation/gravitational_paths.jpg')}}"></image>
+<div class="figure-caption">
+    Trayectorias de la Tierra (verde) y tres observadores: dos en caída libre y uno en movimiento inercial, tan lejos de la Tierra como para no desviarse.
+    Debido a la Tierra, estas trayectorias se aceleran entre sí, pero cada observador no percibe ninguna aceleración de los objetos en su vecindad inmediata.
+</div>
+</div>
+
+Entonces, si las leyes de la física fueran de carácter local, quizás la misma ley podría describir ambos tipos de movimiento. Pero ya se sabía que las trayectorias inerciales eran las de intervalo máximo según la métrica del espacio-tiempo:
+las "líneas rectas". Y el único tipo de estructura en la que las "líneas rectas" pueden tener una aceleración relativa es una <i> curva </i>. En este caso, el término es "geodésicas" en lugar de líneas, pero siguen siendo las más cortas.
+o caminos más largos entre dos puntos.
+
+<div class="figure">
+<image width=40% src="{{=URL('static','spacetime/images/motivation/hyperboloid_geodesics.jpg')}}"></image>
+<image width=40% src="{{=URL('static','spacetime/images/motivation/sphere_geodesics.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Así, Einstein se dio cuenta de que los postulados euclidianos debían dejarse de lado para permitir que el espacio-tiempo se curvara, dejando incluso menos supuestos que antes. La ley gravitacional del movimiento se convirtió entonces en: los cuerpos en caída libre siguen las geodésicas en una variedad de Riemann <i> curvada </i>.
+<p>
+Por supuesto, eso significaba que la curvatura debe corresponder al campo gravitacional, por lo que la masa debe inducir una curvatura en su vecindad. Esto llevó a la famosa carrera por la ecuación de campo para describir cómo la presencia de masa y energía induce
+curvatura en primer lugar. Una vez que se encontró esto, hubo dos ecuaciones acopladas que juntas describieron cómo la misma sustancia que induce la curvatura localmente, luego procede a fluir a lo largo de las geodésicas inducidas por la sustancia que la rodea.
+Es decir, las leyes de la gravedad ahora eran completamente locales.
+<p>
+De hecho, si todos los fenómenos fueran gravitacionales, entonces en este punto podríamos haber abandonado la noción de masa-energía por completo, identificándola completamente con la curvatura del espacio-tiempo que "induce". Una descripción válida de la física fundamental sería, en términos generales, "espacio-tiempo
+es un continuo de Riemann con una métrica hiperbólica, cuya curvatura fluye a lo largo de sus propias geodésicas "- la versión más precisa serían las propias ecuaciones de Einstein.
+<p>
+Sólo porque hay fenómenos extragravitacionales necesitamos retener una descripción de "cuerpos". Los cuerpos todavía inducen la curvatura de la misma manera, pero no necesariamente se mueven a lo largo de las geodésicas. Cuando no lo hacen, lo atribuimos a una fuerza, como
+electromagnetismo.
+<p>
+Pero ahora piense en el caso hipotético en el que la naturaleza hiperbólica riemanniana del espacio-tiempo se postuló desde el principio, simplemente porque contiene la menor cantidad de entidades y suposiciones.
+<p>
+Sin haber postulado aún más entidades, tal teoría ya tendría muchos grados posibles de libertad, en la curvatura de la variedad del espacio-tiempo. La teoría de la gravitación de Newton tenía un grado de libertad en cada lugar y momento: la densidad de masa.
+Mientras que el espacio-tiempo de Riemann ya tiene diez, en las componentes del tensor métrico. Dada una teoría, sus grados de libertad son con lo que podemos jugar para tratar de encontrar el modelo que mejor describa nuestro mundo. Al comenzar con el espacio-tiempo riemanniano ilimitado,
+somos libres de esculpir su curvatura como queramos, en un intento de recrear los patrones de materia y movimiento que nos rodean. En particular, no hay razón para suponer que la gravitación debería ser más susceptible que cualquier otro fenómeno a una descripción en términos de curvatura del espacio-tiempo.
+Tampoco hay razón para suponer que pueda describir mejor los fenómenos macroscópicos que los microscópicos.
+<p>
+En el proceso, podemos identificar la ley o leyes a las que se adhieren todos esos patrones de curvatura, y no es necesario que sean las ecuaciones de Einstein, siempre y cuando reproduzca sus resultados donde hayan tenido éxito.
+<p>
+Ese fue el espíritu del programa de unificación perseguido por el propio Einstein y varios otros físicos a lo largo de los años, y también se adopta aquí.
+<p>
+Por supuesto, no es necesario invocar el orden de la historia o imaginarlo de manera diferente para justificar un enfoque en particular. Solo lo expuse de esta manera porque siempre había tenido la impresión de que la curvatura del espacio-tiempo estaba indisolublemente ligada a la gravedad.
+Pero la comprensión de las matemáticas básicas muestra que este no es el caso. Y al examinar la historia podemos ver cómo surgió tal enredo conceptual en el entendimiento popular, de modo que podamos desenredarlo con mayor facilidad y confianza.
+
+
+
+
+
+
+
+
