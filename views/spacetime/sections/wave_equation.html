@@ -1,0 +1,291 @@
+<span class="section-title">The Wave Equation</span>
+
+{{
+
+import json
+import pprint
+
+class Index:
+    def __init__(self, expr, type, v=None):
+        self.expr = expr
+        self.type = type
+        self.val = v
+        pass
+
+    def get(self):
+        return self.val
+
+    def set(self, v):
+        self.val = v
+        pass
+
+    pass
+
+
+class Expression:
+    def __init__(self, *children):
+        self.ind = []
+        self.children = []
+        self.isInverse = False
+        self.addChildren(*children);
+        pass
+
+    def addIndex(self, type, i=None):
+        if i is None:
+            i = Index(self, type)
+        elif isinstance(i, str):
+            i = Index(self, type, i)
+            pass
+        self.ind.append(i)
+        return i
+
+    def addUpperIndex(self, i):
+        return self.addIndex('upper', i)
+
+    def addLowerIndex(self, i):
+        return self.addIndex('lower', i)
+
+    def addSummedIndex(self):
+        return self.addIndex('summed')
+
+    def addChild(self, child):
+        self.children.append(child)
+        pass
+
+    def addChildren(self, *children):
+        for child in children:
+            self.children.append(child)
+            pass
+        pass
+
+    def inverse(self):
+        self.isInverse = not self.isInverse
+        return self
+
+    def clone(self):
+        copy = self.__class__()
+        copy.ind = [i for i in self.ind]
+        copy.children = [child.clone() for child in self.children]
+        copy.isInverse = self.isInverse
+        return copy
+
+    def replaceIndex(self, i, j):
+        for a in range(len(self.ind)):
+            if self.ind[a] is i:
+                self.ind[a] = j
+                pass
+            pass
+        return self
+
+    def printInd(self, i):
+        return self.ind[i].get()
+
+    def symbol(self):
+        return '(UNKNOWN SYMBOL)'
+
+    def maxIndex(self):
+        maxInd = 0
+        for i in self.ind:
+            if i.expr == self and i.type != 'summed' and ord(i.val) > maxInd:
+                maxInd = ord(i.val)
+                pass
+            pass
+        for child in self.children:
+            childMax = child.maxIndex()
+            if childMax > maxInd:
+                maxInd = childMax
+                pass
+            pass
+        return maxInd
+
+    def assignIndices(self, nextInd=None):
+        if nextInd is None:
+            nextInd = self.maxIndex()+1
+            pass
+        for i in self.ind:
+            if i.expr == self and i.type == 'summed':
+                i.set(chr(nextInd))
+                nextInd += 1
+                pass
+            pass
+        for child in self.children:
+            child.assignIndices(nextInd)
+            pass
+        pass
+
+    def display(self):
+        self.assignIndices()
+        return '\(' + self.symbol() + '\)'
+
+    pass
+
+
+class Sum(Expression):
+    def __init__(self, *operands):
+        Expression.__init__(self, *operands)
+        pass
+
+    def symbol(self):
+        ret = ''
+        for operand in self.children:
+            if ret != '':
+                ret += ' - ' if operand.isInverse else ' + '
+                pass
+            ret += operand if isinstance(operand, str) else operand.symbol()
+            pass
+        return ret
+
+    pass
+
+
+class Product(Expression):
+    def __init__(self, *operands):
+        Expression.__init__(self, *operands)
+        pass
+
+    def symbol(self):
+        ret = ''
+        for operand in self.children:
+            if isinstance(operand, str):
+                f = operand
+            else:
+                f = operand.symbol()
+                if isinstance(operand, Sum):
+                    f = '(' + f + ')'
+                    pass
+                pass
+            ret += f
+            pass
+        return ret
+
+    pass
+
+
+class Partial(Expression):
+    def __init__(self, *args):
+        Expression.__init__(self)
+        if len(args) > 1:
+            self.addLowerIndex(args[0])
+            self.addChild(args[1])
+            pass
+        pass
+
+    def symbol(self):
+        func = self.children[0]
+        if isinstance(func, str):
+            f = func
+        else:
+            f = func.symbol()
+            if isinstance(func, Product) or isinstance(func, Sum):
+                f = '(' + f + ')'
+                pass
+            pass
+        return '\partial_{' + self.printInd(0) + '}{' + f + '}'
+
+    pass
+
+
+class Metric(Expression):
+    def __init__(self, *args):
+        Expression.__init__(self)
+        if len(args) > 2:
+            self.isInverse = True if args[2] else False
+            pass
+        if len(args) > 1:
+            type = 'upper' if self.isInverse else 'lower'
+            self.addIndex(type, args[0])
+            self.addIndex(type, args[1])
+            pass
+        pass
+
+    def symbol(self):
+        sep = '^' if self.isInverse else '_'
+        return 'g' + sep + '{' + self.printInd(0) + self.printInd(1) + '}'
+
+    pass
+
+
+class Connection(Product):
+    def __init__(self, *args):
+        Product.__init__(self)
+        if len(args) > 2:
+            a = self.addUpperIndex(args[0])
+            b = self.addLowerIndex(args[1])
+            c = self.addLowerIndex(args[2])
+            d = self.addSummedIndex()
+            self.addChildren(Metric(a, d, True), Sum(Partial(c, Metric(d, b)), Partial(b, Metric(d, c)), Partial(d, Metric(b, c)).inverse()))
+            pass
+        pass
+
+    def symbol(self, short=False):
+        if short:
+            return '{\Gamma^' + self.printInd(0) + '}_{' + self.printInd(1) + self.printInd(2) + '}'
+        else:
+            return Product.symbol(self)
+        pass
+
+    pass
+
+
+class Riemann(Sum):
+    def __init__(self, *args):
+        Sum.__init__(self)
+        if len(args) > 3:
+            a = self.addUpperIndex(args[0])
+            b = self.addLowerIndex(args[1])
+            c = self.addLowerIndex(args[2])
+            d = self.addLowerIndex(args[3])
+            e = self.addSummedIndex()
+            self.addChildren(Partial(c, Connection(a, d, b)), Partial(d, Connection(a, c, b)).inverse(), \
+                Product(Connection(a, c, e), Connection(e, d, b)), Product(Connection(a, d, e), Connection(e, c, b)).inverse())
+            pass
+        pass
+
+    def symbol(self, short=False):
+        if short:
+            return '{R^' + self.printInd(0) + '}_{' + self.printInd(1) + self.printInd(2) + self.printInd(3) + '}'
+        else:
+            return Sum.symbol(self)
+        pass
+
+    pass
+
+
+class CovariantDerivative(Sum):
+    def __init__(self, *args):
+        Sum.__init__(self)
+        if len(args) > 1:
+            a = self.addLowerIndex(args[0])
+            b = args[1]
+            self.addChild(Partial(a, b))
+            c = self.addSummedIndex()
+            for i in b.ind:
+                if i.expr == b:
+                    if i.type == 'upper':
+                        self.addChild(Product(Connection(i, c, a), b.clone().replaceIndex(i, c)))
+                    elif i.type == 'lower':
+                        self.addChild(Product(Connection(c, i, a), b.clone().replaceIndex(i, c)).inverse())
+                        pass
+                    pass
+                pass
+            pass
+        pass
+
+    def symbol(self, short=False):
+        if short:
+            return '\nabla_{' + self.printIndex(0) + '}{' + self.children[0].symbol() + '}'
+        else:
+            return Sum.symbol(self)
+        pass
+
+    pass
+
+
+r = CovariantDerivative('a', Metric('b', 'c'))
+}}
+
+<div class="indented">{{=r.display()}}</div>
+
+
+
+

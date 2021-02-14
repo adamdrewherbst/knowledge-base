@@ -112,9 +112,11 @@ one entity, with one metric, instead of two.
 Because special relativity provided a single metric for any path in spacetime, the trajectories of bodies could be compared according to their "interval" (which is also the time measured by an observer on that trajectory).
 And not surprisingly, it was found that the "inertial" trajectories -- the family of paths that all maintain constant velocities relative to one another, hence the trajectories
 that will be followed by unforced bodies -- were also the mathematically distinguished paths according to their interval.  (Specifically, they were the paths of <i>maximum</i> interval between any two points, which may seem
-opposite of what one would guess, but it's just a result of the hyperbolic nature of the metric.)  That is, they are the generalizations of straight lines.
+opposite of what one would guess, but it's just a result of the hyperbolic nature of the metric.)  That is, they are the generalizations of straight lines.  This result was first found by
+Planck, as noted <a href="https://www.sciencedirect.com/science/article/pii/S1355219813000695">in this article</a>.
 <p>
-The next inconsistency that became apparent was that between special relativity and gravitation.  And it was only in the attempt to reconcile these that Einstein had his "happiest thought": that the <i>local</i> experience of
+The next inconsistency that became apparent was that between special relativity and gravitation.  And it was only in the attempt to reconcile these that Einstein had his "happiest thought", which, in streamlined form, can
+be stated as follows: the <i>local</i> experience of
 an observer in gravitational free fall, is no different than the <i>local</i> experience of an observer drifting inertially,
 free of all forces.  In either case, all bodies in the vicinity experience the same gravitational acceleration -- finite in the first case, zero in the second -- so they only perceive each other as accelerating to the extent
 that they interact.  Only from a distance do the inertially moving and free-falling observers perceive themselves as accelerating toward or away from each other.
@@ -128,8 +130,8 @@ that they interact.  Only from a distance do the inertially moving and free-fall
 </div>
 
 So, if the laws of physics were local in character, perhaps the same law could describe both types of motion.  But inertial trajectories were already known to be the maximal-interval ones according to the metric of spacetime:
-the "straight lines".  And the only type of structure in which "straight lines" can have relative acceleration, is a <i>curved</i> one.  In this case the term is "geodesics" rather than lines, but they are still the shortest
-or longest paths between two points.
+the "straight lines".  And the only type of structure in which "straight lines" can have relative acceleration, is a <i>curved</i> one.  In this case the term is "geodesics" rather than lines, but they are still the maximal
+(shortest or longest) paths between two points.
 
 <div class="figure">
 <image width=40% src="{{=URL('static','spacetime/images/motivation/hyperboloid_geodesics.jpg')}}"></image>
@@ -138,31 +140,48 @@ or longest paths between two points.
 </div>
 </div>
 
-Thus Einstein became aware that the Euclidean postulates needed to be let go to allow spacetime to curve, leaving even fewer assumptions than before.  The gravitational law of motion then became: free-falling bodies follow geodesics in a <i>curved</i> Riemannian manifold.
+Thus Einstein, with the help of <a href="https://en.wikipedia.org/wiki/Marcel_Grossmann">Marcel Grossmann</a>, became aware that the Euclidean postulates needed to be let go to allow spacetime to curve, leaving even fewer assumptions than
+before.  The gravitational law of motion then became: free-falling bodies follow geodesics in a <i>curved</i> Riemannian manifold.
 <p>
-Of course, that meant the the curvature must correspond to the gravitational field, hence mass must induce curvature in its vicinity.  This led to the famous race for the field equation to describe how the presence of mass and energy induces
-curvature in the first place.  Once this was found, there were two coupled equations that together described how the same substance that induces curvature locally, then proceeds to flow along the geodesics induced by the substance around it.
-That is, the laws of gravity were now entirely local.
+Of course, that meant the the curvature should correspond to the gravitational field, hence mass must induce curvature in its vicinity.  This led to the race between Einstein and Hilbert for the field equation to describe how the presence
+of mass and energy induces curvature in the first place.  And this is where physical insight led to a rather profound mathematical discovery.  Einstein was guided by the <i>physical</i> knowledge that energy and momentum should be conserved,
+and this meant that whatever curvature it corresponds to should have zero divergence.  And he found just such a form of curvature; in fact, the form of curvature he discovered turned out to have <i>identically</i> zero divergence
+at <i>every</i> point in <i>any</i> Riemannian manifold.  The Einstein field equation merely says that this form of curvature, called the "Einstein curvature tensor", is the one induced by energy/momentum.
 <p>
-In fact, if all phenomena were gravitational, then at this point we could have let go of the notion of mass-energy altogether, by identifying it completely with the spacetime curvature it "induces".  A valid description of fundamental physics would then be, roughly speaking, "spacetime
-is a Riemannian continuum with a hyperbolic metric, whose curvature flows along its own geodesics" -- the more precise version would be the Einstein equations themselves.
+So now there were two equations.  The field equation determined the curvature of the manifold completely, given a matter distribution that obeys conservation of energy/momentum.  But
+this <i>in no way restricts the possible form of the manifold</i>.  Because the non-divergence of the Einstein tensor is a <i>mathematical</i> identity, we can pick <i>any</i> 4D manifold with hyperbolic metric, calculate its Einstein curvature
+tensor at each point, declare that the values we find are the energy and momentum of a hypothetical matter distribution, and rest assured that the energy/momentum of the matter is conserved.
 <p>
-Only because there are extra-gravitational phenomena do we need to retain a description of "bodies".  Bodies still induce curvature in the same way, but they do not necessarily move along geodesics.  When they don't, we ascribe this to a force, such as
-electromagnetism.
+The only question, given that the matter is conserved, is how it flows.  And this is specified by the geodesic equation.
 <p>
-But now think back to the hypothetical case in which the hyperbolic Riemannian nature of spacetime had been postulated from the outset, simply because it contains the fewest entities and assumptions.
+But at this point, there is nothing to prevent us from <i>identifying</i> the Einstein curvature with the matter that allegedly induces it.  We can equally well say that <i>matter</i> flows along geodesics, or that
+<i>curvature</i> flows along geodesics.  Mathematically, the notion of matter becomes merely a middle man, a conceptual crutch, whereas all we really have to do is restrict the <i>manifold</i> by
+the geodesic equation, then extract its curvature, and we will find a "matter distribution" that is not only conserved, but moves in the familiar manner of gravitating mass.
 <p>
-Without yet having postulated any further entities, such a theory would already have many possible degrees of freedom, in the curvature of the spacetime manifold.  Newton's theory of gravitation had one degree of freedom at each place and time: the mass density.
-Whereas Riemannian spacetime already has ten, in the components of the metric tensor.  Given a theory, its degrees of freedom are what we can play with so as to try to find the model that best describes our world.  By starting with unconstrained Riemannian spacetime,
-we are free to sculpt its curvature however we wish, in an attempt to recreate the patterns of matter and motion around us.  In particular, there is no reason to suppose that gravitation should be more amenable than any other phenomenon to a description in terms of spacetime curvature.
-Nor is there reason to suppose that it can better describe macroscopic than microscopic phenomena.
+Thus we see that, from the point of view of the manifold, the geodesic equation is the only true restriction: it answers the question, "How does the (inherently conserved) Einstein curvature flow?"
 <p>
-In the process, we can identify the law or laws that all those patterns of curvature adhere to, and it need not be the Einstein equations, as long as it reproduces their results where they have been successful.
+It is only because matter does <i>not</i> only move gravitationally that we need to retain it as a theoretical entity.  Thus we can allow additional properties of bodies, such as charge, and the interactions of
+these extra properties can explain why a body, and its associated Einstein curvature, deviates from its geodesic path.
 <p>
-That was the spirit of the unification program pursued by Einstein himself and a number of other physicists over the years, and it is adopted here as well.
+Now, as we have seen, the postulate of geodesic motion was, in essence, the epiphany that led to general relativity.  It was the impetus to allow spacetime to curve in the first place.  In accepted physical theories, curved spacetime
+has never existed <i>without</i> the restriction of the geodesic equation.  But as we have also seen, <i>a curved manifold in and of itself is already remarkably similar to the world we live in</i>.  If, as we have imagined,
+curved manifolds with hyperbolic metric had been considered directly from analysis of Riemannian geometry, they might well have seemed like a compelling choice for a model of spacetime.  And, if the Einstein tensor with its
+inherent property of conservation had been stumbled upon, surely it would have appeared striking in its resemblance to the matter that surrounds us.
 <p>
-Of course there is no need to invoke the order of history or imagine it differently in order to justify a particular approach.  I only lay it out this way because I had always been under the impression that curvature of spacetime was inextricably linked to gravity.
-But an understanding of the basic math shows this is not the case.  And by perusing the history we can see how such a conceptual entanglement arose in the popular understanding, so that we can more easily and confidently disentangle it.
+Surely, if there is a pure mathematical entity whose inherent patterns so closely parallel those of nature, and which, by its degrees of freedom, can take such an infinity of forms on scales both
+large and small, we should ask if all the forms we see in nature are in fact among those infinite possibilities, and all their motions are due to some principle as yet unknown.
+<p>
+History aside, the point is that, magnificently elegant though it may be as a law of gravity, we are free to let go of the geodesic equation, and contemplate unrestricted Riemannian
+spacetime in its own right.  We know it will in general contain "matter", so the question again is how the matter flows, in other words, what law restricts the manifold?  And since geodesic
+motion must still be observed on macroscopic scales, the difference should be most noticeable in the microscopic realm.
+<p>
+But, having come up into the open air of unfettered spacetime, we can start simply by playing, attempting to sculpt the manifold in new and interesting ways, and see if we can find
+any that loosely mimic the particles and phenomena that were not explained by gravity.  In particular, there is <i>a priori</i> no reason to suppose that gravitation should be more amenable than any other
+phenomenon to a description in terms of spacetime curvature.  Nor is there reason to suppose that it can better describe macroscopic than microscopic phenomena.
+<p>
+Along the way, we can try to identify the law or laws that all those patterns of curvature adhere to.
+<p>
+That was apparently the spirit of the unification program pursued by Einstein himself and a number of other physicists over the years, and it is adopted here as well.
 
 
 
