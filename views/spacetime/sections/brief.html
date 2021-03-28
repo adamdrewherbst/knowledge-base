@@ -1,0 +1,298 @@
+<span class="section-title">A Geometrodynamic Model for Charged Fermions</span>
+
+<p>
+N.B. At this point, the most compelling argument for this model is its explanation of the baryons, so please read at least that section!
+<p>
+<i>The Equation</i>
+<p>
+Here it is proposed that spacetime may be governed by a wave equation of higher order than the vacuum Einstein field equation, and that particles
+could be soliton solutions of said equation.  At present, the suggested candidate is the curvature wave equation
+
+\begin{equation}
+\Box R_{\rho\sigma\mu\nu} = 0
+\end{equation}
+
+Note that this also implies
+
+\begin{equation}\displaylines{
+\Box R_{\mu\nu} = 0 \\
+\Box R = 0
+}\end{equation}
+
+In fact, if we limit ourselves to the second version, for the Ricci tensor only, then any Ricci-flat manifold is automatically a solution, so
+the entire class of vacuum gravitational fields studied in GR are immediately allowed.  But it is worth exploring the effects of constraining
+the entire Riemann tensor.
+<p>
+The simplest problem that could be resolved by this equation, like many modified gravity theories, is dark energy.  Dark energy corresponds to an
+isotropic and homogeneous, but non-zero, vacuum Ricci tensor (de Sitter space).  Hence, its covariant derivatives all disappear, and so it
+trivially satisfies the wave equation.  Even if it turned out not to be perfectly homogeneous, it is still quite possible
+that it could be a solution of this equation.
+<p>
+Because particles live in the midst of the vacuum, if they are soliton waves of the same continuum, the asymptotic boundary condition of
+the particle wave is the vacuum Ricci curvature.  So the precise form of the wave, and therefore its perceived mass among other properties, will
+necessarily vary with the vacuum energy density.  Therefore, dark energy in this model is also identified with the Higgs field.  This is
+possible because both fields are essentially determined by a single scalar: the Higgs expectation value in one case, the vacuum energy
+density in the other.
+<p>
+<i>The Electron</i>
+<p>
+The model of the electron is based the notion of equivalence between a complete loop and a \(360^{\circ}\) twist.  This can be demonstrated with
+a flat belt.  If the ends of the belt are not allowed to twist, the only way to create a loop is to form a hump and then twist it about the
+vertical; and in this case, a \(360^{\circ}\) twist is simultaneously induced along the axis of the belt.  Two such twisted loops tend to repel
+if they have the same sense of twist, or attract if opposite.
+
+<div id="fig:belt_loop_and_twist" class="figure">
+<image width=30% src="{{=URL('static','spacetime/images/belt_flat.JPG')}}"></image>
+<image width=30% src="{{=URL('static','spacetime/images/belt_hump.JPG')}}"></image>
+<image width=30% src="{{=URL('static','spacetime/images/belt_loop_twist.JPG')}}"></image>
+<div class="figure-caption">
+    Forming a loop from a flat belt without allowing its ends to twist induces a compensating \(360^{\circ}\) twist.
+</div>
+</div>
+
+To create an analogous loop structure in space without tearing or kinking the manifold, we introduce a topological defect.  Specifically,
+given spherical coordinates, we let \(g_{\phi\phi}\), which varies as \(\sin^2{\theta}\) in Euclidean space, transition smoothly to the
+form \(\sin^2{2\theta}\) at a critical radius \(r_c\) (possibly zero).  Thus, the radial cross-section at \(r_c\), rather than a single
+sphere, is a pair of spheres joined at a single point, which we call \(x\): one sphere for the half-space \(\theta\in[0,\frac{\pi}{2}]\)
+and the other for the half-space \(\theta\in[\frac{\pi}{2}, \pi]\).  Next, we take a space that is topologically a 3-cylinder
+(\(S^2 \times [0,1]\)), and identify each
+of its ends with one of these two half-spaces, thus forming a loop between them; this loop replaces the space that would normally have
+existed at \(r \lt r_c\).
+<p>
+If we make our coordinates continuous across the transition, we can say that \(\theta\) only ranges from \(0\) to \(\frac{\pi}{2}\)
+inside the loop.  In other words, all radial geodesics from the "dividing plane" \(\theta = \frac{\pi}{2}\) merge into
+one as they pass into the loop, and this requires a curvature singularity.  Of course, it is to be expected that a wave equation
+will admit singular solutions; usually, the only caveat is that the equation breaks down at the singularity itself, and there must be a
+"point source" of the field in question.  But as we have seen, at the point \(x\) the manifold remains continuous -- it merely passes
+into the loop, across the topological transition -- and so it is conceivable that the entire manifold may satisfy the wave equation,
+with the point source replaced by the loop.
+
+<div id="fig:loop_cross_section" class="figure">
+<image width="50%" src="{{=URL('static','spacetime/images/Electron_Radial_Sections.jpg')}}"></image>
+<image width="37%" src="{{=URL('static','spacetime/images/Dividing_Plane.jpg')}}"></image>
+<div class="figure-caption">
+    LEFT: Cross-sections of radial geodesics, in a plane of constant \(\phi\).  At \(r=r_c\), "space pinches into two", and
+    the two sides enter opposite ends of a loop, shown separately for clarity.
+    RIGHT: In the "dividing plane", \(\theta = \frac{\pi}{2}\), all radial geodesics (red lines) become parallel at \(x\),
+    thus merging into a single geodesic (dashed blue line, also dashed violet line at left) that traverses the loop.
+</div>
+</div>
+
+Although there is generally no intrinsic notion of "twist" in a manifold, it is hypothesized that one way the twist associated with
+the loop will manifest is through the variation of the Ricci tensor.  In particular, \(R_{\mu\nu}\) has an orthonormal basis of
+eigenvectors at each point, and if the eigenvalues are distinct, then, as we move along a radial geodesic, it is possible for a
+tangential eigenvector to twist relative to its own parallel transport.  A key question here is whether this twist is naturally
+induced by the wave equation applied to the topological defect, or if
+the twist is a feature that is pre-determined by the formation of the loop from "flat space".  If it were the latter case, we would require
+an additional topological constraint, eg. that the Chern-Gauss-Bonnet integral of the looped space be the same as that of empty de Sitter
+space.  But it is hoped that the wave equation alone will be sufficient to induce this behavior, as it will tend to strive for all forms of
+equilibrium, including "topological equilibrium", between the loop and the space around it.
+
+<div id="fig:ricci_twist" class="figure">
+<image width="40%" src="{{=URL('static','spacetime/images/Twisting_Tangential_Ricci_Field.jpg')}}"></image>
+<div class="figure-caption">
+    If the curvature in tangential planes is anisotropic, it can twist along the radial direction with respect to the
+    Levi-Civita connection.  The purple and yellow arrows are taken to be two eigenvector fields of the Ricci tensor,
+    and their lengths the eigenvalues.  The small green arrows represent a vector being transported by the connection.
+    The red dot is the singularity.  This drawing represents the space outside the loop, but a similar twist would occur
+    along radial geodesics as they traverse the inside of the loop.
+</div>
+</div>
+
+Furthermore, because there is ultimately no way for this twist to emerge but through the curvature itself, it is suspected that the rate
+of twist with radial distance will be proportional to the magnitude of the Ricci curvature.  Much like that of a helicoid embedded in
+Euclidean 3-space.  So we can suppose that some of the geodesic sections tend to form helicoids along the radial direction, while the
+tangential geodesic sections, which transition to the \(S^2\) cross sections of the loop, have positive curvature instead.  Thus the
+net spatial curvature may be quite small, and, in retrospect, this "net Euclidean" character may even help explain why the hyperbolic sections
+twist as they would when embedded.  It could also have to do with the weakness of gravity relative to the electric force.
+<p>
+The idea then is that two such electrons in close proximity, and with their "loop axes" (\(\theta = 0\)) aligned, both have this tendency
+to "twist" the space around them in the same sense.  The space in between them will therefore be more heavily twisted, and, because this
+corresponds to an increase in both the magnitude and twist rate of the Ricci eigenvectors, the wave equation will attempt to relieve this
+excess by forcing them apart.
+<p>
+In this context, the electric field effectively becomes identified with the gradient of this twist rate (which we can see by symmetry
+reaches zero midway between the two electrons).  This too should be commensurate with curvature; and as we have seen that there is a curvature
+singularity at \(x\), this ought to give roughly the radial profile expected of the electric field for a point charge.  In fact, this may be
+an argument for making \(r_c = 0\), so that the ends of the loop contract completely to the point \(x\), and a singularity exists along all
+radial directions.  Regardless, the Hairy Ball Theorem precludes spherical symmetry, but it is thought that the Coulomb field will be a
+macroscopic, time-averaged result of many particles combined with random loop axis orientations.
+<p>
+Note that the wave equation demands that even an "electrostatic" field must be dynamic at the smallest scales; we should expect the twisting
+Ricci curvature to propagate along the radial directions, and for this to be continuous, it must propagate inward from one half-space,
+through the loop, and outward into the other half-space.  But the ramifications of this feature are not clear.
+<p>
+<i>The Baryons</i>
+<p>
+So this is a very loose, qualitative, and highly speculative model, and it would hardly be worth pursuing quantitatively, except for the fact
+that it can exactly explain the charges, confinement, and to some extent the spin states of quarks in baryons.  In this case, we simply
+posit that the "3-cylinder", instead of bridging the two half-spaces of a single point, connects one half-space of one point to any
+half-space of another point.  The points in
+question are the quarks, and the bridges are the strong force.  For the manifold to be complete, each half-space must connect to a bridge, and
+so the union of the bridges still forms a complete loop.  Now, the relative positions and loop axis orientations of the three quarks could
+in principle be any.  But as we will see in the discussion of spin, the quarks will tend to position themselves on an equilateral triangle
+with their axes tangent to the circle they lie on.  And then there are only four ways of interconnecting their half-spaces:
+
+<div id="fig:baryons" class="figure">
+<image width="50%" src="{{=URL('static','spacetime/images/Baryons_II.jpg')}}"></image>
+<div class="figure-caption">
+    The four ways of connecting three quarks if their loop axes are tangent to the circle they lie on.
+</div>
+</div>
+
+Here we can see that the overall loop turns by \(240^{\circ}\) about each up quark (before becoming parallel with the sides of the triangle),
+and \(120^{\circ}\) about each down quark, and the sense of the turn is opposite between the two types of quark.  Thus, if turn induces twist,
+and twist corresponds to electric field, we recover the permissible quark charges and combinations thereof.  Their spin states will be covered
+in the next section.
+<p>
+<i>Spin</i>
+<p>
+The spatial structure described above is present in each time-slice.  We can also consider the behavior of timelike geodesics.
+If radial spatial geodesics at \(x\) traverse a loop, it would not be surprising if timelike ones did the same.  In which case, there will
+be a tendency for Ricci curvature to twist about the time direction of the particle.  But since Ricci curvature is mass-energy, and twisting
+about time is equivalent to rotation, we can reasonably expect to end up with rotating mass, ie. angular momentum.  And if this turns out
+to be a topological invariant, then it must be Planck's constant.
+
+<div id="fig:electron_time_loop" class="figure">
+<image width="60%" src="{{=URL('static','spacetime/images/Electron_Time_Loop.jpg')}}"></image>
+<div class="figure-caption">
+    Schematic representation of a timelike geodesic (blue) traversing the spatial cross-sections (red) of the electron.  It, too,
+    could traverse a loop, though in this case we cannot be sure where along the worldline it will exit.
+</div>
+</div>
+
+In particular, although the variability in spatial turn gives particles their different charges, the turn of a time loop can only have one
+value, as time is one-dimensional.  So each "bridge" in a baryon, though it has a fraction of the electron charge, carries the full spin of the
+electron.
+<p>
+Furthermore, the wave equation matches spatial and temporal variation, so it should ensure that the plane about which space twists,
+\(\theta = \frac{\pi}{2}\), is the same as that of the time twist.  Hence, the spin axis of the particle is the same as the loop
+axis, \(\theta = 0\).
+<p>
+The question then is how a curvature field inhabiting all of space can spin (a) about a single spatial axis, (b) at a single frequency
+(so as to be a stationary solution), (c) without shearing itself apart, and (d) without superluminal propagation.  And this question is
+answered by a phenomenon termed "spherical rotation" by the authors who analyzed it; this pattern exhibits the frequency-doubling effect
+commonly ascribed to spinors, and moreover, the authors showed how it can be described by the Dirac equation.  So we can surmise that the
+curvature of the electron flows in a similar manner.
+
+<div id="fig:belt_trick_animation" class="figure">
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/JaIR-cWk_-o" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    <div class="figure-caption">
+        Animation of "spherical rotation".  Loosely, we can think of
+        each "belt element" as representing a certain value within the curvature field, so that the motion of all elements shows us
+        how the curvature might propagate.
+    </div>
+</div>
+
+Additionally, there is the question of interaction between two spins, or one spin and an electromagnetic field.  But this model paints spin as
+something very close to a fluid vortex, and because that fluid (spacetime) is governed by a wave equation, it is only natural that a pair of
+such vortices will only be stable if their spin axes are opposite.
+<p>
+And although we have not considered the magnetic field here, it was already seen that even an electrostatic field becomes in this model
+a dynamic wave.  So, we can imagine that the dynamic behavior of a "static" magnetic field, combined with the "spherically rotating" spin
+of a particle, has the effect of forcing the spin to align with the field.  If it aligns through the shortest possible rotation, there will
+be only two possibilities, spin up and spin down.  And if this is a strong effect that occurs over very short timescales, it will appear
+as if every particle collapsed to an allowable spin state as soon as it entered the measurement apparatus.
+<p>
+Finally, this model of spin completes the structural explanation of the baryons.  First, if spins are vortical in nature, then three spins
+will prefer to form a "vortex ring", meaning they will align tangent to their common circle; but this is exactly the restriction that was
+needed to give us the known quark charges, now that the loop and spin axes have been shown to coincide.
+<p>
+And second, with one additional postulate, we can justify the known baryonic spin states.  This postulate is that one quark has
+its spin vector anti-aligned with the other two, relative to the flow of the loop.  If we follow this rule, there are six possible states:
+
+<div id="fig:baryon_spin" class="figure">
+<image width=80% src="{{=URL('static','spacetime/images/Baryon_Spin_II.jpg')}}"></image>
+<div class="figure-caption">
+    The allowable spin states for the baryons, assuming one spin vector (purple arrow) is anti-aligned with the others (orange arrows) relative to the flow of the loop
+</div>
+</div>
+
+The four on the left are the delta baryons, in which the external "vortex ring" has been ruptured, which should explain their higher energies.
+The spin vector diagram suggests how they could all align with an appropriate measurement axis, giving a spin of \(\frac32\).  And the two on
+the right are the nucleons; their spin vectors actually sum to zero, but given an axis, two will align one way and the third the other, giving
+a measured spin of \(\frac12\).
+
+The reason for this extra restriction on the spin vectors is not clear at present.  It is tempting to think that the quark spins interact
+via the bridges, and strongly prefer to be anti-aligned.  But note that the spin vectors are parallel to the bridge, whereas spin interaction,
+in analogy with vortices, should be much stronger when the vectors are perpendicular to the separation between them.  And this point is
+reinforced when we consider the mesons.  The pions, for example, which must carry zero net spin, should have the following configurations:
+
+<div id="fig:pion_spin" class="figure">
+<image width=50% src="{{=URL('static','spacetime/images/pions_with_spin.jpg')}}"></image>
+<div class="figure-caption">
+</div>
+</div>
+
+Notice how the charged pion has its spins anti-aligned with respect to the loop, while in the neutral pion they are aligned.  Yet the masses
+of these two particles are known to differ by only a few percent, and in fact the neutral pion's is slightly lower.  So apparently there is
+no strong preference either way.  Then perhaps it is an inherent feature of the process that forms baryons, that one spin must be
+anti-aligned along the loop.
+<p>
+<i>Mass</i>
+<p>
+Mass-energy is identified with Einstein/Ricci curvature, and for a stationary distribution we can apply the Komar integral.
+In this context, though, the most important qualitative feature of a particle is that it should have
+net positive Ricci curvature along the time direction, so as to generate an attractive gravitational field (whereas there is perhaps more
+flexibility in the net spatial curvatures, given the presence of the EM field).  But the loop structure is
+based on geodesic convergence; timelike geodesics diverge from one end after entering, and re-converge to the other end.  So it should not
+be surprising if \(\int{R_{tt}\ d\mu_g} \gt 0\).
+<p>
+Likewise, the particle itself must follow a geodesic in vacuum, in accordance with general relativity.  But here the symmetry of the wave
+equation hardly allows any alternative; there is no reason a soliton solution should deviate from geodesic motion along any particular
+direction.  This ought to be conceptually similar to the known derivation of geodesic motion from the Einstein equations.
+<p>
+Furthermore, this total mass should obey the Planck-Einstein-de Broglie relation.  Here, we identify the de Broglie frequency as that of the
+"spherically rotating" spin.  It would be difficult to calculate the general-relativistic spin angular momentum, but if the classical
+approximation serves,
+
+\begin{equation}
+L_{\text{spin}} = m r_{\text{eff}}^2 \omega
+\end{equation}
+
+with \(r_{\text{eff}}\) the effective radius of the spinning curvature, then we have only to note that \(r\) and \(\omega\) will naturally
+be inversely proportional according to the wave equation, since the spatial extent of the waveform should be proportional to its period.
+Then, if \(L_{\text{spin}}\) is topologically fixed to Planck's constant, \(m\) and \(\omega\) must be proportional as well.
+<p>
+It has already been noted that the asymptotic de Sitter space provides the boundary condition for the particle wave, thus
+determining its mass.  In the same vein, it is hoped that the discrete generations will arise as the frequencies that are simultaneously
+compatible with this asymptotic condition as well as the topological boundary imposed by the loop and its associated singularity.
+<p>
+We can also consider how the strong force gives so much mass to the baryons.  In effect, we can expect that the external interaction of
+the spins of the quarks will keep them some distance apart (which according to experiment should be about a femtometer).  Now, the
+length of the bridge is in principle independent of the separation between the quarks through external space.  But the idea is that the
+wave equation equilibrates the curvature in these two regions, so it is reasonable to suppose it may enforce some kind of coupling between
+their dimensions.  In which case, a higher quark separation would induce a larger bridge volume, amplifying its curvature
+and hence energy.  Thus the bridges should establish a restoring force, as expected, explaining the confinement model.  And if the
+dimensions of the bridge in the equilibrium state are much higher than those of the electron's loop, this could explain why the baryons
+have such large mass compared to the electron.
+<p>
+Although the bosons and neutrinos are generally not considered here, it is possible that the Higgs boson takes the form of a "bubble" in
+spacetime.  This requires, first, a "neck pinch singularity" of all spatial directions, rather than the single plane \(\theta = \frac{\pi}{2}\).
+On the other side of the singularity, the completion of the manifold would then look like a sphere, rather than a loop:
+
+<div id="fig:Higgs_boson" class="figure">
+<image width="30%" src="{{=URL('static','spacetime/images/Higgs_Boson_2D_cross_section.jpg')}}"></image>
+<div class="figure-caption">
+    A two-dimensional spatial cross-section of the Higgs boson
+</div>
+</div>
+
+Finally, we can speculate that dark matter may crop up as a kind of transition region between a large clustering of particulate matter and
+the background vacuum curvature.  That is, it is another inherently nonlinear effect, in which the wave equation attempts to eliminate
+sharp transitions in stable structures, in this case by inducing positive \(R_{tt}\) in the background to match that of the galactic material.
+<p>
+<i>Conclusion</i>
+<p>
+This model remains entirely speculative.  The only way to see if it holds water is to derive from it a known parameter from particle physics.
+And apparently the easiest to get at would be the electron mass.  To this end, we can attempt to find, most likely through numerical simulation,
+a spacetime that matches the model of the electron described above.
+
+
+
+
+
+
+
+
+

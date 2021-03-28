@@ -1,6 +1,8 @@
 <span class="section-title">A Space Model</span>
 
-Could the same phenomenon occur in a 3D manifold?  At one particular point \(x\), we can choose a plane through \(x\), thus dividing space into two half-spaces.  Then we demand that every geodesic passing through \(x\) from one half-space traverses a loop before entering the other half-space.  The geodesics maintain their connectivity inside the loop.
+Could a similar structure occur in a 3D manifold?  At one particular point \(x\), we can choose a plane through \(x\), thus dividing
+space into two half-spaces.  Then we demand that every geodesic passing through \(x\) from one half-space traverses a loop before
+entering the other half-space.
 <p>
 
 
@@ -8,89 +10,198 @@ Could the same phenomenon occur in a 3D manifold?  At one particular point \(x\)
 <image width=50% src="{{=URL('static','spacetime/images/Half_Spaces.jpg')}}"></image>
 <image width=40% src="{{=URL('static','spacetime/images/Half_Spaces_With_Loop.jpg')}}"></image>
 <div class="figure-caption">
-    Left: Euclidean space, where all geodesics from one half-space of a point (red) pass directly to its other half-space (green) as they cross it.  Right: looped space - all geodesics from one half-space traverse a loop (blue) before entering the other half-space.
+    Left: Euclidean space, where all geodesics from one half-space of a point (red) pass directly to its other half-space (green)
+    as they cross it.  Right: looped space - all geodesics from one half-space traverse a loop (blue) before entering the other half-space.
 </div>
 </div>
 
-In the picture above, the loop appears to overlap the space around it, but in reality it is completely separate; it only intersects the rest of the manifold at the point \(x\).  That is clearer in the two-dimensional cross-sections drawn below.
+In the picture above, the loop appears to overlap the space around it, but in reality it is completely separate; it only intersects
+the rest of the manifold at the point \(x\).
+<p>
+We can refer to the loop by its dividing plane, which separates the two half-spaces, or we can refer to the “loop axis”, the line
+(geodesic) orthogonal to this plane.
+<p>
+In principle the loop might have a boundary.  This is indicated by the peach-colored cross-section in the sketch; the edges of all
+such disks form the boundary of the loop.  But then again, it may be more intuitive that space should be unbounded, at least locally,
+and so it is worth asking whether the boundary can be avoided.  And it can, as long as the radial cross-sections of the loop, in place
+of solid disks, are closed surfaces such as spheres.  In other words, the loop should have the topology of a 3-cylinder -- a 3D
+version of the cylinder, whose cross-sections are spheres rather than circles.
+<p>
+How can the space outside the loop connect smoothly to a space with different topology?  Each spherical end-cap of the 3-cylinder
+must connect to one of the aforementioned half-spaces of the point \(x\).  This means that the radial cross-section of <i>each</i>
+half-space must approach a <i>complete</i> sphere, as we move radially inward toward \(x\).  Such that the full radial cross-section
+is a <i>pair</i> of joined spheres.
+<p>
+If we start with Euclidean space, expressed in spherical coordinates about \(x\), the metric will be diagonal, with components:
+
+\begin{equation}
+\displaylines{
+g_{rr} = 1 \newline
+g_{\theta\theta} = r^2 \newline
+g_{\phi\phi} = r^2\sin^2{\theta}
+}
+\end{equation}
+
+In this case, a radial cross-section is a single sphere.  In order to make it a pair of spheres, one for each half-space, we can simply
+replace \(g_{\phi\phi}\) with
+
+\begin{equation}
+g_{\phi\phi} = r^2\sin^2{2\theta}
+\end{equation}
+
+And to have a single-sphere cross section at \(r=\infty\) transition to a double-sphere cross section at \(r=0\), we can effect an
+interpolation such as
+
+\begin{equation}
+g_{\phi\phi} = a(r) r^2\sin^2{\theta} + (1 - a(r)) r^2\sin^2{2\theta}
+\end{equation}
+
+Where \(a(r)\) could be something like
+
+\begin{equation}
+a(r) = e^{-\frac{1}{r^2}}
+\end{equation}
+
+We can affix a similar coordinate system to the loop itself, except that \(r\) will have only a finite interval, and \(\theta\) need only span
+a single half-space.  We can do this by extending \(r\) to negative values, which will represent the loop.  Thus the coordinate system for all
+of space becomes:
+
+\begin{equation}
+\displaylines{
+    r\in[-L, \infty) \\
+    \theta\in \begin{cases}
+        [0, \pi] & r \ge 0 \\
+        [0,\frac{\pi}{2}] & r \lt 0
+    \end{cases}\\
+    \phi\in[0,2\pi)
+}
+\end{equation}
+
+with \(L\) the length of the loop.  Thus the loop end at \(r=0\) is already joined to the half-space \(\theta\in[0,\frac{\pi}{2}]\),
+and we can join the other end with the identification:
+
+\begin{equation}
+    (-L, \theta, \phi) \leftrightarrow (0, \pi - \theta, \phi)
+\end{equation}
+
+\(g_{\theta\theta}\), which is zero at the ends of the loop, must expand as we approach the loop center.  For this to be a smooth
+continuation of the behavior outside the loop, we must modify the latter.  \(g_{\theta\theta}\) will thus approach \(r^2\) only
+asymptotically as \(r \rightarrow \infty\).  As an example, a function that very nearly has this behavior is
+
+\begin{equation}
+    g_{\theta\theta} = (\sqrt{1 + (r + \frac{L}{2})^2} - 1 - Ae^{-k(r + \frac{L}{2})^2})^2
+\end{equation}
+
+with \(A\) and \(k\) chosen to produce the zeros at \(r = 0, -L\).
+<p>
+Having constructed this, however, it becomes evident that the topological transition, in principle, need not occur at the "origin" -- that is,
+at a point where radial cross-sections vanish.  The loop can just as easily connect two finite spheres.  That is, we can still label
+the loop endpoints with \(r = 0, -L\), but \(g_{\theta\theta}\) can be non-zero here.  Such that \(g_{\theta\theta}\) might not have
+any zeros, thanks to the loop.
+<p>
+What remains important is that \(g_{\phi\phi}\) transition to the form \(\sin^2{2\theta}\) for the duration of the loop, so that the
+loop stays geodesically closed (without boundary).  Such that \(a(r) = 0\) for all \(r \le 0\).  But because of the form chosen for
+\(a(r)\) above, appending this constant piece to it does not violate its smoothness.  Then we will have
+
+\begin{equation}\displaylines{
+    g_{\phi\phi} = (a(r) \sin^2{\theta} + (1 - a(r)) \sin^2{2\theta}) g_{\theta\theta} \\
+    a(r) = \begin{cases} e^{-\frac{1}{r^2}} & r \gt 0 \\ 0 & r \le 0 \end{cases}
+}\end{equation}
 <p>
 
-	We can refer to the loop by its dividing plane, which separates the two half-spaces, or we can refer to the “loop axis”, the line (geodesic) orthogonal to this plane.
-<p>
-
-	If the loop has finite volume, its 2D cross-section will be like a disk (the peach-colored disk in the right-hand drawing above), where the boundary of the disk is formed from those geodesics that lie in the dividing plane.  But that would be geodesically incomplete.  So we have the geodesic cross sections form closed surfaces, by giving them sufficient positive curvature.
-<p>
-
-	In order for that to happen, the radial geodesics must become momentarily parallel at \(x\).  We can see this by considering a planar section of the manifold:
+Thus, as \(r \rightarrow 0^+\), the "dividing plane" \(\theta = \frac{\pi}{2}\) contracts to a single point (at which the
+"pair of spheres" of the radial cross-section are joined), and this point is what we can continue to refer to as \(x\).  And since
+\(\theta = \frac{\pi}{2}\) remains a single point along the loop, all radial geodesics from that plane have effectively merged into
+one.  Thus, they must have become parallel at \(x\), as illustrated below.
 
 <div id="fig:loop_cross_section" class="figure">
-<image width=45% src="{{=URL('static','spacetime/images/Geodesically_Incomplete_Loop.jpg')}}"></image>
-<image width=45% src="{{=URL('static','spacetime/images/Geodesically_Complete_Loop.jpg')}}"></image>
+<image width=50% src="{{=URL('static','spacetime/images/Dividing_Plane.jpg')}}"></image>
 <div class="figure-caption">
-    A 2D cross section of looped space.  The cross section of the loop (dashed black lines) would be an incomplete line segment (left) [a disk in three dimensions], but if there is sufficient positive curvature, it will close, keeping the manifold complete (right) [in 3D these cross-sections would look like spheres].  This requires a “neck pinch” singularity, where geodesics become parallel.
+    In the dividing plane, all radial geodesics (red lines) become parallel at \(x\), thus merging into a single geodesic
+    (dashed blue line) that traverses the loop.
 </div>
 </div>
 
-This also has the consequence that the geodesics lying in the dividing plane coincide as they pass through the loop, because the boundary of the disk mentioned above has been contracted to a single point.
+The point \(x\) is then a species of “neck pinch singularity”.  The radial curvature is negative, and its magnitude approaches infinity at
+the singularity.  Singularities of this general class have been studied, for example in {{cite('ricci_neckpinch_2012')}} and
+{{cite('ricci_neckpinch_2014')}}.
 <p>
-
-	The point \(x\) is then a species of “neck pinch singularity”.  The radial curvature is negative, and its magnitude approaches infinity at the singularity.  Singularities of this general class have been studied, for example in {{cite('ricci_neckpinch_2012')}} and {{cite('ricci_neckpinch_2014')}}.
-
+If the analogy to the belt holds, how might the axial twist manifest?  In the belt, it essentially results from the topology of the belt
+being preserved, and something analogous should hold in 3D.  In particular, it should be an intrinsic feature, and we should not have to
+impose any arbitrary structures, such as a connection with torsion, in order to see it.
 <p>
-
-How does the twist manifest?  In the belt, it essentially results from the topology of the belt being preserved, and something analogous should hold in 3D.  In particular, it should be an intrinsic feature, and we should not have to impose any arbitrary structures, such as a connection with torsion, in order to see it.
+So if we use the natural Levi-Cevita connection, what could twist relative to it?  Not the geodesics, because the Levi-Cevita connection is
+essentially defined in terms of these.
 <p>
-
-	So if we use the natural Levi-Cevita connection, what could twist relative to it?  Not the geodesics, because the Levi-Cevita connection is essentially defined in terms of these.
-<p>
-
-	The next sensible candidate is the curvature.  Consider the Ricci tensor: it is a second-rank symmetric tensor, and as such it has an orthonormal basis of eigenvectors at every point.  So as we move along a path, the direction of a given eigenvector may turn relative to its parallel transport, and that constitutes a twisting field.  A right-handed twist corresponds to one sign of charge, left-handed to the other.
-<p>
-
+The next sensible candidate is the curvature.  Consider the Ricci tensor: it is a second-rank symmetric tensor, and as such it has an
+orthonormal basis of eigenvectors at every point.  So as we move along a path, the direction of a given eigenvector may turn relative
+to its parallel transport, and that constitutes a twisting field.  A right-handed twist corresponds to one sign of charge, left-handed
+to the other.
 
 <div id="fig:ricci_twist" class="figure">
 <image src="{{=URL('static','spacetime/images/Twisting_Tangential_Ricci_Field.jpg')}}"></image>
 <div class="figure-caption">
-    If the curvature in tangential planes is anisotropic, it can twist along the radial direction with respect to the Levi-Civita connection.  The purple and yellow arrows are taken to be two eigenvector fields of the Ricci tensor, and their lengths the eigenvalues.  The small green arrows represent a vector being transported by the connection.  The red dot is the singularity.  This drawing represents the space outside the loop, but a similar twist would occur along radial geodesics as they traverse the inside of the loop.
+    If the curvature in tangential planes is anisotropic, it can twist along the radial direction with respect to the
+    Levi-Civita connection.  The purple and yellow arrows are taken to be two eigenvector fields of the Ricci tensor,
+    and their lengths the eigenvalues.  The small green arrows represent a vector being transported by the connection.
+    The red dot is the singularity.  This drawing represents the space outside the loop, but a similar twist would occur
+    along radial geodesics as they traverse the inside of the loop.
 </div>
 </div>
 
-Note that this can only happen if the curvature in the plane orthogonal to the path is anisotropic, i.e. the Ricci tensor has distinct eigenvalues.  Otherwise it would be meaningless to say whether it twists or not.
+Note that this can only happen if the curvature in the plane orthogonal to the path is anisotropic, i.e. the Ricci tensor has distinct
+eigenvalues.  Otherwise it would be meaningless to say whether it twists or not.
 <p>
-
-	The 3D loop described above is a radial phenomenon, in that every radial geodesic traverses the loop.  So it would make sense that the anisotropic Ricci field would twist about these radial lines, giving a radial electric field, just as we expect for a point particle.  And the twisting field, just like the radial curvature itself, will be strongest near the singularity where the distortion is concentrated, decaying with radial distance. This is portrayed in the picture above.
+The 3D loop described above is a radial phenomenon, in that every radial geodesic traverses the loop.  So it would make sense that the
+anisotropic Ricci field would twist about these radial lines, giving a radial electric field, just as we expect for a point particle.
+And the twisting field, just like the radial curvature itself, will be strongest near the singularity where the distortion is concentrated,
+decaying with radial distance. This is portrayed in the picture above.
 <p>
-
-	That means the curvature components that are twisting are themselves tangential to spheres centered on the singularity.  And this implies the field cannot be spherically symmetric, because a smooth vector field on a sphere cannot be everywhere nonzero, by the <a href="https://en.wikipedia.org/wiki/Hairy_ball_theorem">Hairy Ball Theorem</a>.  But that is okay, because the electron, due to its gyromagnetic behavior, is not spherically symmetric anyway.  This suggests that an ideal Coulomb field, even in principle, can only exist as a macroscopic time average when many of these microscopic fields are combined with random orientations.
+That means the curvature components that are twisting are themselves tangential to spheres centered on the singularity.  And this implies
+the field cannot be spherically symmetric, because a smooth vector field on a sphere cannot be everywhere nonzero, by the
+<a href="https://en.wikipedia.org/wiki/Hairy_ball_theorem">Hairy Ball Theorem</a>.  But that is okay, because the electron, due to its
+gyromagnetic behavior, is not spherically symmetric anyway.  This suggests that an ideal Coulomb field, even in principle, can only exist
+as a macroscopic time average when many of these microscopic fields are combined with random orientations.
 <p>
-
-	If we suppose that the curvature is strongest along the axis of the loop, then the tangential Ricci eigenvector field on spheres centered at the singularity could look like this:
-<p>
-
+If we suppose that the curvature is strongest along the axis of the loop, then the tangential Ricci eigenvector field on spheres centered
+at the singularity could look like this:
 
 <div id="fig:ricci_sphere" class="figure">
 <image width=60% src="{{=URL('static','spacetime/images/Ricci_Eigenvectors_on_Spheres.jpg')}}"></image>
 <div class="figure-caption">
-    A possible view of two spheres centered on the singularity, as seen when looking along the loop axis.  The red arrows are one of the eigenvector fields, with their size indicating eigenvalue (curvature).  The curvature is strongest on the loop axis, and drops to zero as we reach the dividing plane (equator of the sphere).  As we move inward radially (from the left sphere to the right one), the eigenvector field twists.
+    A possible view of two spheres centered on the singularity, as seen when looking along the loop axis.
+    The red arrows are one of the eigenvector fields, with their size indicating eigenvalue (curvature).
+    The curvature is strongest on the loop axis, and drops to zero as we reach the dividing plane (equator of the sphere).
+    As we move inward radially (from the left sphere to the right one), the eigenvector field twists.
 </div>
 </div>
 
-Does the curvature have to be of a particular form in order to exhibit this twist?  The best example we have of a “twisting” manifold is the helicoid.  It has negative Gaussian curvature at all points, which is proportional to the square of its axial twist rate.  On the other hand, the twist of the helicoid is not intrinsic; it is induced by embedding the surface isometrically in Euclidean 3-space.
+In our experience, the best example we have of a “twisting” manifold is the helicoid.  It has negative Gaussian curvature at all points,
+which is proportional to the square of its axial twist rate.  On the other hand, the twist of the helicoid is not intrinsic; it is
+induced by embedding the surface isometrically in Euclidean 3-space.
 <p>
-
-	As an alternative to eigenvalues, we can describe the Ricci tensor by the sectional curvatures in the planes formed by its eigenvectors; the eigenvalues are averages of these sectional curvatures.  If one eigenvector is radial, then one section is tangential, and the other two include the radial direction.  Now, in the spirit of Riemann ({{cite('riemann_hypotheses')}}), we might suppose that space, at least outside the loop, is nearly flat on the whole, meaning that these sectional curvatures more or less cancel each other out.  Such that one has positive curvature, one negative, and the third may be either (or zero).  And because space is flat on average, maybe these sections behave almost like 2D surfaces embedded in Euclidean 3-space.  In particular, the one with negative curvature twists like a helicoid relative to the connection.
+As an alternative to eigenvalues, we can describe the Ricci tensor by the sectional curvatures in the planes formed by its eigenvectors;
+the eigenvalues are averages of these sectional curvatures.  If one eigenvector is radial, then one section is tangential, and the other
+two include the radial direction.  Now, in the spirit of Riemann ({{cite('riemann_hypotheses')}}), we might suppose that space, at least
+outside the loop, is nearly flat on the whole, meaning that these sectional curvatures more or less cancel each other out.  Such that one
+has positive curvature, one negative, and the third may be either (or zero).  And because space is flat on average, maybe these sections
+behave almost like 2D surfaces embedded in Euclidean 3-space.  In particular, the one with negative curvature twists like a helicoid
+relative to the connection.
 <p>
-
-	In that case, the negative section must be one of the radial ones, so that we have the desired twist along the radial direction.  If it behaves like an embedded surface, its curvature will vary as the square of its twist rate.
+In that case, the negative section must be one of the radial ones, so that we have the desired twist along the radial direction.
+If it behaves like an embedded surface, its curvature will vary as the square of its twist rate.
 <p>
-
-	And we have already assigned positive curvature to the cross sections inside the loop, so as to make them closed, and thus keep the manifold complete.  By continuation, we can make the tangential sections outside the loop positive as well.  For our purposes we need not consider the other radial section, as long as its curvature is distinct from the first one, so as to produce the required anisotropy.
+And we have already assigned positive curvature to the cross sections inside the loop, so as to make them closed, and thus keep the
+manifold complete.  By continuation, we can make the tangential sections outside the loop positive as well.  For our purposes we need not
+consider the other radial section, as long as its curvature is distinct from the first one, so as to produce the required anisotropy.
 
 <div id="fig:external_sections" class="figure">
 <image width=60% src="{{=URL('static','spacetime/images/electron_external_sections.jpg')}}"></image>
 <div class="figure-caption">
-    2D sections formed by extending spatial geodesics from a point (green dot) outside the singularity (red dot).  One of the radial sections (yellow surface) should have negative curvature, allowing it to twist, while the tangential section (blue surface)
-    should have positive curvature, since the tangential sections transition to become the cross sections of the loop, which must close.  The radial twist is relative to the Levi-Civita connection.
+    2D sections formed by extending spatial geodesics from a point (green dot) outside the singularity (red dot).
+    One of the radial sections (yellow surface) should have negative curvature, allowing it to twist, while the
+    tangential section (blue surface) should have positive curvature, since the tangential sections transition to become
+    the cross sections of the loop, which must close.  The radial twist is relative to the Levi-Civita connection.
 </div>
 </div>
 
@@ -98,13 +209,27 @@ Does the curvature have to be of a particular form in order to exhibit this twis
 
 <span class="side-note">Topological Invariance</span>
 
-Of course, we cannot simply prescribe a Ricci tensor field and declare that such a manifold exists.  In fact, given a second-rank symmetric tensor field over a coordinate system, it not necessarily a tractable problem to prove that it <span class="italic">is</span> the Ricci curvature of a valid manifold.  That issue is addressed in depth by DeTurck ({{cite('deturck_ricci')}}, {{cite('deturck_ricci_local')}}).
+Of course, we cannot simply prescribe a Ricci tensor field and declare that such a manifold exists.  In fact, given a second-rank symmetric
+tensor field over a coordinate system, it not necessarily a tractable problem to prove that it <span class="italic">is</span> the Ricci
+curvature of a valid manifold.  That issue is addressed in depth by DeTurck ({{cite('deturck_ricci')}}, {{cite('deturck_ricci_local')}}).
 <p>
-
-	But it's likely that wouldn't be the most efficient approach in this context anyway.  In this case, we are imagining that the twisting Ricci field is <span class="italic">induced</span> by the formation of a loop in a space that was initially homogeneous.  (We say <span class="italic">homogeneous</span> rather than <span class="italic">flat</span>, because space in our universe is not asymptotically flat, as evidenced by "dark energy", and this fact could be topologically important for the formation of the loop; this will be touched on again in "{{section('higgs_field')}}").  This paper will not attempt to identify the process by which the loop is formed.  But the key to this whole theory is that the process must be one that preserves the topological invariants of spacetime, and that the twist is of just the right magnitude to achieve this.
+But it's likely that wouldn't be the most efficient approach in this context anyway.  In this case, we are imagining that the twisting Ricci
+field is <span class="italic">induced</span> by the formation of a loop in a space that was initially homogeneous.  (We say
+<span class="italic">homogeneous</span> rather than <span class="italic">flat</span>, because space in our universe is not
+asymptotically flat, as evidenced by "dark energy", and this fact could be topologically important for the formation of the loop;
+this will be touched on again in "{{section('higgs_field')}}").  This paper will not attempt to identify the process by which the
+loop is formed.  But the key to this whole theory is that the process must be one that preserves the topological invariants of spacetime,
+and that the twist is of just the right magnitude to achieve this.
 <p>
-
-	Perhaps the most notable topological theorem on manifolds is the <a href="https://en.wikipedia.org/wiki/Chern–Gauss–Bonnet_theorem">Chern-Gauss-Bonnet theorem</a>.  This states that the volume integral of a particular function of the curvature is equal to the Euler-Poincare characteristic of the manifold.  Yet it apparently does not apply in a meaningful way to odd-dimensional manifolds.  It does hold, however, in four-dimensional Lorentzian spacetime.  So if we could find the asymptotically homogeneous spacetime corresponding to an isolated charged particle, we could check that it obeys Chern's theorem, with the Euler characteristic being that of the homogeneous background spacetime itself.  And if the particle spacetime is stationary, it should be sufficient to take the integral over a three-dimensional spatial cross-section.  (But the function integrated would include the timelike curvature, which is why it is still a four-dimensional result.)
+Perhaps the most notable topological theorem on manifolds is the <a href="https://en.wikipedia.org/wiki/Chern–Gauss–Bonnet_theorem">Chern-Gauss-Bonnet theorem</a>.
+This states that the volume integral of a particular function of the curvature is equal to the Euler-Poincare characteristic of the
+manifold.  Yet it apparently does not apply in a meaningful way to odd-dimensional manifolds.  It does hold, however, in four-dimensional
+Lorentzian spacetime.  So if we could find the asymptotically homogeneous spacetime corresponding to an isolated charged particle, we could
+check that it obeys Chern's theorem, with the Euler characteristic being that of the homogeneous background spacetime itself.  And if the
+particle spacetime is stationary, it should be sufficient to take the integral over a three-dimensional spatial cross-section.  (But the
+function integrated would include the timelike curvature, which is why it is still a four-dimensional result.)
 <p>
+Still, it seems this method could only verify an existing solution.  The open question, then, and the first challenge in constructing
+a quantitative theory from these ideas, is whether and exactly how the analogy of the belt carries over to this singular looped manifold.
 
-	Still, it seems this method could only verify an existing solution.  The open question, then, and the first challenge in constructing a quantitative theory from these ideas, is whether and exactly how the analogy of the belt carries over to this singular looped manifold.
+

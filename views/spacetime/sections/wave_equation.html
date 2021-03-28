@@ -4,6 +4,7 @@
 
 import json
 import pprint
+import re
 
 class Index:
     def __init__(self, expr, type, v=None):
@@ -52,9 +53,73 @@ class Expression:
         self.children.append(child)
         pass
 
+    def takeIndices(self, exp, **kwargs):
+        includeSummed = 'summed' in kwargs and kwargs['summed']
+        owner = 'owner' not in kwargs or kwargs['owner']
+        for i in exp.ind:
+            if i.type != 'summed' or includeSummed:
+                if owner:
+                    if i.expr == exp:
+                        i.expr = self
+                        self.ind.append(i)
+                        pass
+                else:
+                    self.ind.append(i)
+                    pass
+                pass
+            pass
+        pass
+
+    def replaceIndex(self, i, j):
+        for a,ind in enumerate(self.ind):
+            if ind is i:
+                self.ind[a] = j
+                pass
+            pass
+        return self
+
+    def replaceIndices(self, exp, newInd=None, root=None):
+        newInd = newInd or [None for i in range(len(exp.ind))]
+        root = root or self
+        for child in self.children:
+            if isinstance(child, Expression):
+                child.replaceIndices(exp, newInd, root)
+                pass
+            pass
+        for i,oldInd in enumerate(exp.ind):
+            if oldInd.type != 'summed':
+                continue
+            found = False
+            for j,myInd in enumerate(self.ind):
+                if myInd is oldInd:
+                    if newInd[i] is None:
+                        newInd[i] = Index(root, oldInd.type, oldInd.val)
+                        pass
+                    self.ind[j] = newInd[i]
+                    found = True
+                    pass
+                pass
+            if self is root and newInd[i] and not found:
+                self.ind.append(newInd[i])
+                pass
+            pass
+        pass
+
     def addChildren(self, *children):
         for child in children:
             self.children.append(child)
+            pass
+        pass
+
+    def removeChild(self, child):
+        self.children.remove(child)
+        pass
+
+    def replaceChild(self, child, newChild):
+        for i,c in enumerate(self.children):
+            if c is child:
+                self.children[i] = newChild
+                pass
             pass
         pass
 
@@ -62,23 +127,15 @@ class Expression:
         self.isInverse = not self.isInverse
         return self
 
-    def clone(self):
+    def clone(self, **kwargs):
         copy = self.__class__()
-        copy.ind = [i for i in self.ind]
-        copy.children = [child.clone() for child in self.children]
         copy.isInverse = self.isInverse
+        copy.ind = [i for i in self.ind]
+        copy.children = [(child.clone() if isinstance(child, Expression) else child) for child in self.children]
         return copy
 
-    def replaceIndex(self, i, j):
-        for a in range(len(self.ind)):
-            if self.ind[a] is i:
-                self.ind[a] = j
-                pass
-            pass
-        return self
-
     def printInd(self, i):
-        return self.ind[i].get()
+        return '!' if len(self.ind) <= i else self.ind[i].get() or '?'
 
     def symbol(self):
         return '(UNKNOWN SYMBOL)'
@@ -91,16 +148,18 @@ class Expression:
                 pass
             pass
         for child in self.children:
-            childMax = child.maxIndex()
-            if childMax > maxInd:
-                maxInd = childMax
+            if isinstance(child, Expression):
+                childMax = child.maxIndex()
+                if childMax > maxInd:
+                    maxInd = childMax
+                    pass
                 pass
             pass
         return maxInd
 
     def assignIndices(self, nextInd=None):
         if nextInd is None:
-            nextInd = self.maxIndex()+1
+            nextInd = max(self.maxIndex()+1, 97)
             pass
         for i in self.ind:
             if i.expr == self and i.type == 'summed':
@@ -109,13 +168,36 @@ class Expression:
                 pass
             pass
         for child in self.children:
-            child.assignIndices(nextInd)
+            if isinstance(child, Expression):
+                child.assignIndices(nextInd)
+                pass
             pass
         pass
 
     def display(self):
         self.assignIndices()
-        return '\(' + self.symbol() + '\)'
+        text = self.symbol()
+        newText = ''
+        offset = 0
+        openParen = 0
+        for m in re.finditer('\(|\)|\s\+\s|\s\-\s', text):
+            if text[m.start()] == '(':
+                openParen += 1
+            elif text[m.start()] == ')':
+                openParen -= 1
+                pass
+            if text[m.start()] == ' ' and openParen == 0 and m.start() > offset + 50:
+                if len(newText) > 0:
+                    #newText += ' \\\\ '
+                    pass
+                newText += ' \\( ' + text[offset:m.start()+1] + ' \\) '
+                offset = m.start()+1
+                pass
+            pass
+        newText += ' \\( ' + text[offset:] + ' \\) '
+        #newText = '\\displaylines{' + newText + '}'
+        #newText = '\\begin{align} ' + newText + ' \\end{align}'
+        return newText
 
     pass
 
@@ -128,7 +210,7 @@ class Sum(Expression):
     def symbol(self):
         ret = ''
         for operand in self.children:
-            if ret != '':
+            if ret != '' and isinstance(operand, Expression):
                 ret += ' - ' if operand.isInverse else ' + '
                 pass
             ret += operand if isinstance(operand, str) else operand.symbol()
@@ -150,7 +232,7 @@ class Product(Expression):
                 f = operand
             else:
                 f = operand.symbol()
-                if isinstance(operand, Sum):
+                if isinstance(operand, Sum) or isinstance(operand, Partial):
                     f = '(' + f + ')'
                     pass
                 pass
@@ -256,15 +338,17 @@ class CovariantDerivative(Sum):
         Sum.__init__(self)
         if len(args) > 1:
             a = self.addLowerIndex(args[0])
-            b = args[1]
-            self.addChild(Partial(a, b))
-            c = self.addSummedIndex()
-            for i in b.ind:
-                if i.expr == b:
-                    if i.type == 'upper':
-                        self.addChild(Product(Connection(i, c, a), b.clone().replaceIndex(i, c)))
-                    elif i.type == 'lower':
-                        self.addChild(Product(Connection(c, i, a), b.clone().replaceIndex(i, c)).inverse())
+            self.func = args[1]
+            self.addChild(Partial(a, self.func))
+            if isinstance(self.func, Expression):
+                c = self.addSummedIndex()
+                for i in self.func.ind:
+                    if i.expr == self.func:
+                        if i.type == 'upper':
+                            self.addChild(Product(Connection(i, c, a), self.func.clone().replaceIndex(i, c)))
+                        elif i.type == 'lower':
+                            self.addChild(Product(Connection(c, i, a), self.func.clone().replaceIndex(i, c)).inverse())
+                            pass
                         pass
                     pass
                 pass
@@ -281,10 +365,124 @@ class CovariantDerivative(Sum):
     pass
 
 
-r = CovariantDerivative('a', Metric('b', 'c'))
+class Laplacian(Product):
+    def __init__(self, *args):
+        Product.__init__(self)
+        if len(args) > 0:
+            self.func = args[0]
+            a = self.addSummedIndex()
+            b = self.addSummedIndex()
+            c = self.addSummedIndex()
+            self.addChild(Metric(a, b, True))
+            self.addChild(Sum(CovariantDerivative(a, CovariantDerivative(b, self.func)), \
+                Product(Connection(c, a, b), CovariantDerivative(c, self.func)).inverse()))
+            pass
+        pass
+
+    def symbol(self, short=False):
+        if short:
+            return '\Box{' + self.func.symbol() + '}'
+        else:
+            return Product.symbol(self)
+        pass
+
+    pass
+
+
+def distribute(exp):
+
+    if not isinstance(exp, Expression):
+        return exp
+
+    dist = exp
+
+    children = [child for child in exp.children]
+    for child in children:
+        childDist = distribute(child)
+        if childDist is not child:
+            exp.replaceChild(child, childDist)
+            pass
+        pass
+
+    children = [child for child in exp.children]
+    sums = []
+    other = []
+    for child in children:
+        if (isinstance(child, Sum) and isinstance(exp, Sum)) or (isinstance(child, Product) and isinstance(exp, Product)):
+            for operand in child.children:
+                if isinstance(operand, Expression):
+                    operand.isInverse = child.isInverse != operand.isInverse
+                    pass
+                exp.addChild(operand)
+                pass
+            exp.takeIndices(child, summed=True)
+            exp.removeChild(child)
+        elif isinstance(exp, Partial) or isinstance(exp, Product):
+            if isinstance(child, Sum):
+                sums.append(child)
+            else:
+                other.append(child)
+                pass
+            pass
+        pass
+
+    if len(sums) > 0:
+
+        dist = Sum()
+        dist.isInverse = exp.isInverse
+        dist.takeIndices(exp)
+
+        def newOp(indices):
+            op = exp.__class__()
+            op.takeIndices(exp, owner=False)
+            for operand in other:
+                op.addChild(operand)
+                pass
+            for i,sum in enumerate(sums):
+                dist.takeIndices(sum)
+                operand = sum.children[indices[i]]
+                op.addChild(operand)
+                if operand.isInverse:
+                    op.isInverse = not op.isInverse
+                    pass
+                op.replaceIndices(sum)
+                pass
+            op.replaceIndices(exp)
+            dist.addChild(op)
+            pass
+
+        lengths = [len(sum.children) for sum in sums]
+        combinations(newOp, lengths)
+        pass
+    return dist
+
+
+def combinations(callback, lengths):
+    n = len(lengths)
+    current = [0] * n
+    hasNext = True
+    while hasNext:
+        callback(current)
+        hasNext = False
+        for i in range(n):
+            if current[i] < lengths[i]-1:
+                current[i] += 1
+                hasNext = True
+                break
+            else:
+                current[i] = 0
+                pass
+            pass
+        pass
+    pass
+
+
+r = Laplacian('x')
 }}
 
-<div class="indented">{{=r.display()}}</div>
+<div class="indented"> {{=r.display()}} </div>
+<p></p>
+<div class="indented"> {{=distribute(r).display()}} </div>
 
 
 

@@ -1,8 +1,21 @@
 <html>
     <head>
         <link rel="stylesheet" href="{{=URL('static','spacetime/css/main.css')}}"/>
+
+        <script>
+            window.MathJax = {
+                tex2jax: {
+                    inlineMath: [["\\(","\\)"]]
+                },
+                chtml: {
+                    displayAlign: "left"
+                }
+            };
+        </script>
+
         <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
         <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
     </head>
     <body>
         <div id="wrapper">
@@ -30,7 +43,10 @@
                 return title
             }}
 
-            {{ def sectionNav(): }}
+            {{ def sectionNav():
+                if section == 'brief':
+                    return
+                }}
                 <div class="nav-prev nav-item">
                 {{ if prevSection:
                     title = cleanSectionTitle(prevSection['title'])
@@ -71,17 +87,6 @@
             {{ include 'header.html' }}
 
         </div>
-
-        <script>
-            //$(document).ready(function() {
-                window.MathJax = {
-                    tex2jax: { inlineMath: [["\\(","\\)"]] },
-                    "HTML-CSS": {
-                        linebreaks: { automatic: true, width: "container" }
-                    }
-                };
-            //});
-        </script>
 
     </body>
 </html>
