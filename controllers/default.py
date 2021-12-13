@@ -15,6 +15,13 @@
 from datetime import datetime
 
 
+def bob():
+    return dict()
+
+def bird():
+    return dict()
+
+
 #   knowledge:
 #   This is the main page.
 #   https://adamdrewherbst.pythonanywhere.com/welcome/default/knowledge

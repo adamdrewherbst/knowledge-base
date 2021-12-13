@@ -1,0 +1,34 @@
+<html>
+    <head>
+        <link rel="stylesheet" href="{{=URL('static','spacetime/css/main.css')}}"/>
+        <link rel="stylesheet" href="{{=URL('static','spacetime/css/equations.css')}}"/>
+
+        <script
+			  src="https://code.jquery.com/jquery-3.6.0.min.js"
+			  integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+			  crossorigin="anonymous"></script>
+
+        <script>
+            window.MathJax = {
+                tex2jax: {
+                    inlineMath: [["\\(","\\)"]]
+                },
+                chtml: {
+                    displayAlign: "left"
+                }
+            };
+        </script>
+
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+        <script src="{{=URL('static', 'spacetime/js/diffEq.js')}}"></script>
+
+    </head>
+    <body>
+        <h2>Equations</h2>
+        <div id="equations">
+
+        </div>
+    </body>
+</html>

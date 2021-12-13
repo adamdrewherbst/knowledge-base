@@ -96,6 +96,10 @@ def index():
     return locals()
 
 
+def equations():
+    return locals()
+
+
 def sendMail(form):
     import os
     import gluon.fileutils
