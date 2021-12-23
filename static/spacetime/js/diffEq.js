@@ -8,8 +8,25 @@ let equation = [
     {coeff: 4, a: {1: 1, 2: 1}, c: {0: 3, 1: 1}},
     {coeff: -8, a: {0: 1, 1: 1}, c: {0: 2, 1: 1, 2: 1}},
     {coeff: 2, a: {0: 1, 2: 1}, c: {0: 2}},
-    {coeff: -2, a: {0: 1, 2: 1}, c: {0: 2, 1: 2}}//*/
-]
+    {coeff: -2, a: {0: 1, 2: 1}, c: {0: 2, 1: 2}}
+]//*/
+
+
+/*let equation = [
+    {coeff: -1, c: {4: 1, 2: 1, 1: 1, 0: 3}},
+    {coeff: 1, c: {4: 1, 1: 3, 0: 2}},
+    {coeff: -1, c: {4: 1, 1: 1, 0: 2}},
+    {coeff: 1, c: {3: 2, 1: 1, 0: 3}},
+    {coeff: 1, c: {3: 1, 2: 2, 0: 3}},
+    {coeff: -4, c: {3: 1, 2: 1, 1: 2, 0: 2}},
+    {coeff: 1, c: {3: 1, 1: 4, 0: 1}},
+    {coeff: -1, c: {3: 1, 1: 2, 0: 1}},
+    {coeff: 1, c: {3: 1, 2: 1, 0: 2}},
+    {coeff: 2, c: {2: 2, 1: 3, 0: 1}},
+    {coeff: -1, c: {2: 1, 1: 5}},
+    {coeff: 1, c: {2: 1, 1: 3}}
+]//*/
+
 
 let fns = ['a', 'c'];
 
@@ -19,31 +36,102 @@ let coefficients = {
     },
     c: {
         1: 1
+        //3: -1/6,
+        //5: 1/120
     }
 };
 
-let period = 1, sinAmplitude = 1,
-    sigma = 0.2, spikeAmplitude = -10;
+let alpha = 4,
+    sigma = 1, spikeAmplitude = 0;
+let hasSin = true, hasGauss = true;
+let numCoeffs = 200,
+    taylorOrder = 60;
 
 
 $(function() {
 
-    for(let i = 1; i < 70; i += 2) {
-        let sin = sinAmplitude * Math.pow(-1, (i-1)/2) / (factorial(i) * Math.pow(period, i)),
+    for(let i = 1; i < numCoeffs; i += 2) {
+        let sin = alpha * (Math.pow(-1, (i-1)/2) / (factorial(i) * Math.pow(alpha, i))),
             gaussian = spikeAmplitude * Math.pow(-1, (i-1)/2) / (factorial((i-1)/2) * Math.pow(sigma, i-1));
         coefficients['c'][i] = 0;
-        //coefficients['c'][i] += sin;
-        coefficients['c'][i] += gaussian;
+        if(hasSin) coefficients['c'][i] += sin;
+        if(hasGauss) coefficients['c'][i] += gaussian;
     }
-    console.log('c = ' + JSON.stringify(coefficients['c']));
-    coefficients['a'][2] = coefficients['c'][3] * 9/7;
+    coefficients['a'][2] = coefficients['c'][3] * 3;//*/
 
     displayEquation(equation);
+    display('');
     taylorSeries();
+    MathJax.typeset();
 
-    printFunction('a');
+    graphFunction('a');
+    graphFunction('c');
+
     printFunction('c');
+    printFunction('a');
 });
+
+
+function graphFunction(fn) {
+    let canvas = document.getElementById('graph-' + fn),
+        ctx = canvas.getContext('2d');
+    if(!ctx) return;
+
+    let n = canvas.width,
+        y = Array.from({length: n}, (v,i) => 0),
+        yTrue = Array.from({length: n}, (v,i) => 0);
+
+    let x0 = 0;
+    let xScale = hasSin ? canvas.width / (alpha * Math.PI/2) : canvas.width / (8 * sigma);
+
+    let yMin = Infinity, yMax = -Infinity;
+
+    for(let i = 0; i < n; i++) {
+        let x = (i/n)*canvas.width / xScale;
+        for(let j in coefficients[fn]) {
+            let c = coefficients[fn][j];
+            y[i] += c * Math.pow(x, j);
+        }
+
+        if(fn == 'c') {
+            if(hasSin) yTrue[i] += alpha * Math.sin(x / alpha);
+            if(hasGauss) yTrue[i] += spikeAmplitude * x * Math.exp(-Math.pow(x/sigma,2));
+        } else {
+            if(hasSin) yTrue[i] += Math.cos(x / alpha);
+        }
+
+        //if(y[i] > yMax) yMax = y[i];
+        //if(y[i] < yMin) yMin = y[i];
+        if(yTrue[i] > yMax) yMax = yTrue[i];
+        if(yTrue[i] < yMin) yMin = yTrue[i];
+    }
+    y0 = 50 + (canvas.height-100) * yMax / (yMax - yMin);
+    let yScale = (canvas.height-100) / (yMax-yMin);
+
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.moveTo(x0, y0 - y[0]*yScale);
+    ctx.beginPath();
+    ctx.strokeStyle = '#f00';
+    ctx.setLineDash([]);
+    for(let i = 0; i < n; i++) {
+        if(isNaN(y[i]) || y[i] > yMax || y[i] < yMin) break;
+        ctx.lineTo((i/n)*canvas.width, y0 - y[i] * yScale);
+    }
+    ctx.stroke();
+
+    ctx.moveTo(x0, y0 - yTrue[0]*yScale);
+    ctx.beginPath();
+    ctx.strokeStyle = '#0f0';
+    ctx.setLineDash([5, 5]);
+    for(let i = 0; i < n; i++) {
+        ctx.lineTo((i/n)*canvas.width, y0 - yTrue[i]*yScale);
+    }
+    ctx.stroke();
+
+    console.log(y);
+}
 
 
 function printFunction(fn) {
@@ -72,24 +160,41 @@ function taylorSeries() {
         displayEquation(exp, true);
     }//*/
 
-    for(let i = 4; i <= 20; i += 2) {
+    for(let i = 4; i < taylorOrder; i++) {
         let exp = getExpansion(i);
-        //displayEquation(exp, true);
+        /*let onlyC = [];
+        for(let term of exp) {
+            let newTerm = {coeff: term.coeff, a: {}, c: {}};
+            for(let order in term.c) newTerm.c[order] = term.c[order];
+            for(let order in term.a) {
+                order = parseInt(order);
+                if(!newTerm.c.hasOwnProperty(order+1)) newTerm.c[order+1] = term.a[order];
+                else newTerm.c[order+1] += term.a[order];
+                newTerm.coeff *= Math.pow(order+1, term.a[order]);
+            }
+            addTerm(newTerm, onlyC);
+        }
+        simp = removeFactor(removeZeros(onlyC));//*/
+        displayMath('r^{'+i+'}: ', false);
+        displayEquation(exp, true);
+        //displayEquation(onlyC, true);
+        //display('');
         let found = false;
+        let f = 'a';
         if(exp.length == 2) {
             for(let j = 0; j < 2; j++) {
-                if(Object.keys(exp[j].a).length == 1 && Object.keys(exp[(j+1)%2].a).length == 0) {
+                if(Object.keys(exp[j][f]).length == 1 && Object.keys(exp[(j+1)%2][f]).length == 0) {
                     found = true;
-                    let n = Object.keys(exp[j].a)[0];
-                    coefficients['a'][n] = -exp[(j+1)%2].coeff / exp[j].coeff;
-                    displayMath('a_{' + n + '} = ' + coefficients['a'][n]);
+                    let n = Object.keys(exp[j][f])[0];
+                    coefficients[f][n] = -exp[(j+1)%2].coeff / exp[j].coeff;
+                    displayMath(f + '_{' + n + '} = ' + coefficients[f][n]);
                 }
             }
         }
         if(!found && exp.length > 1) {
             display("Couldn't solve term " + i);
             break;
-        }
+        }//*/
     }
     MathJax.typeset();
 }
@@ -97,8 +202,9 @@ function taylorSeries() {
 function displayMath(math) {
     display('\\(' + math + '\\)');
 }
-function display(str) {
-    $('#equations').append('<div class="equation">' + str + '</div>');
+function display(str, newline) {
+    if(newline === undefined) newline = true;
+    $('#equations').append('<div class="equation' + (newline ? ' newline' : ' inline') + '">' + str + '</div>');
 }
 
 function printExpansion(power) {
@@ -379,7 +485,7 @@ function displayEquation(equation, isEvaluated) {
         if(str.length > 0 && term.coeff > 0)
             str += '+';
         if(term.coeff != 1)
-            str += '' + term.coeff;
+            str += '' + (term.coeff == -1 ? '-' : term.coeff);
         //console.log('printing term ' + isEvaluated + ': ' + JSON.stringify(term));
         for(let f of fns) {
             let fn = term[f];

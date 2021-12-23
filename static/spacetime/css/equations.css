@@ -4,3 +4,11 @@
 
 .equation {
 }
+
+.inline {
+    display: inline-block;
+}
+
+#graphs {
+    border: 2px solid blue;
+}

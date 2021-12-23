@@ -99,6 +99,9 @@ def index():
 def equations():
     return locals()
 
+def solutions():
+    return locals()
+
 
 def sendMail(form):
     import os
